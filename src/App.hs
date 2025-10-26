@@ -1,5 +1,7 @@
 module App (runApp) where
 
+import App.Syntax
+import App.Views
 import Control.Monad (when)
 import qualified Data.Map as M
 import Miso
@@ -34,9 +36,8 @@ import Miso.Html.Event
 import qualified Miso.Html.Property as HP
 import Miso.Lens (use, (%=), (.=))
 import Miso.Svg (text_)
-import Syntax
+import Proof.Syntax
 import Util
-import Views
 
 -----------------------------------------------------------------------------
 

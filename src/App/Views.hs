@@ -1,5 +1,6 @@
-module Views where
+module App.Views where
 
+import App.Syntax
 import qualified Data.List as L
 import Miso
   ( Attribute,
@@ -26,7 +27,7 @@ import Miso.Property (boolProp, textProp)
 import Miso.Svg (onFocusOut, text_, tspan_)
 import qualified Miso.Svg.Element as S
 import qualified Miso.Svg.Property as SP
-import Syntax
+import Proof.Syntax
 
 viewDragIcon :: View (Model formula rule) Action
 viewDragIcon = H.img_ [HP.draggable_ False, HP.src_ "./draggable.svg", HP.height_ "16"]
@@ -96,16 +97,16 @@ viewProof ::
   Model formula rule -> View (Model formula rule) Action
 viewProof m = H.div_ [] [proofView]
   where
-    (lineNos, proofView) = _viewProof 0 0 (m ^. proof)
-    _viewProof :: Int -> Int -> Proof formula rule -> (Int, View (Model formula rule) Action)
-    _viewProof n dy (ProofLine d) = (dy + 1, viewLine m n (Right d))
-    _viewProof n dy (SubProof fs ps d) = (dy + length allLines, H.div_ [HP.class_ "subproof", HP.draggable_ True, onDragStart . DragStart $ TargetProof 0, onDragEnd DragEnd] allLines)
+    (lineNos, proofView) = _viewProof 0 (m ^. proof)
+    _viewProof :: Int -> Proof formula rule -> (Int, View (Model formula rule) Action)
+    _viewProof n (ProofLine d) = (n + 1, viewLine m n (Right d))
+    _viewProof n (SubProof fs ps d) = (n + length allLines, H.div_ [HP.class_ "subproof", HP.draggable_ True, onDragStart . DragStart $ TargetProof 0, onDragEnd DragEnd] allLines)
       where
         allLines :: [View (Model formula rule) Action]
         allLines = do
-          let (acc', fs') = L.mapAccumL (\acc f -> (acc + 1, viewLine m (n + acc) (Left f))) 0 fs
-          let (acc'', ps') = L.mapAccumL (\acc p -> _viewProof (n + acc) (dy + acc) p) acc' ps
-          fs' ++ ps' ++ [viewLine m (n + acc'') (Right d)]
+          let (n', fs') = L.mapAccumL (\n' f -> (n' + 1, viewLine m n' (Left f))) n fs
+          let (n'', ps') = L.mapAccumL _viewProof n' ps
+          fs' ++ ps' ++ [viewLine m n'' (Right d)]
 
 -----------------------------------------------------------------------------
 toEm :: Int -> MisoString

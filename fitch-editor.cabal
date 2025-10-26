@@ -1,5 +1,5 @@
 cabal-version: 3.0
-name: app
+name: fitch-editor
 version: 0.1.0.0
 synopsis: TODO
 description: TODO
@@ -29,24 +29,67 @@ common wasm
     cpp-options:
       -DWASM
 
-executable app
+test-suite test
+  default-language:
+    Haskell2010
+
+  type:
+    exitcode-stdio-1.0
+
+  hs-source-dirs:
+    tests
+
+  other-modules:
+    ProofSyntax
+
+  main-is:
+    test.hs
+
+  default-extensions:
+    FlexibleInstances
+    InstanceSigs
+
+  build-depends:
+    base >=4.9 || <5,
+    fitch-editor-lib,
+    tasty ==1.5 || >1.5.1,
+    tasty-hunit,
+    tasty-quickcheck,
+
+executable fitch-editor-FOL
   import:
     wasm
 
-  main-is:
-    Main.hs
+  hs-source-dirs:
+    apps
 
-  other-modules:
+  ghc-options:
+    -haddock
+
+  build-depends:
+    base >=4.9 || <5,
+    fitch-editor-lib,
+
+  main-is:
+    FOL.hs
+
+  default-language:
+    Haskell2010
+
+library fitch-editor-lib
+  exposed-modules:
     App
-    Syntax
+    App.Syntax
+    App.Views
+    Proof.Syntax
+    Proof.Util
     Util
-    Views
 
   default-extensions:
-    CPP
     DuplicateRecordFields
     ExistentialQuantification
     GADTs
+    InstanceSigs
     NamedFieldPuns
     NoFieldSelectors
     OverloadedRecordDot
@@ -54,16 +97,13 @@ executable app
     ScopedTypeVariables
 
   build-depends:
-    base <5,
+    base >=4.9 || <5,
     containers >=0.7,
-    miso,
+    miso >=1.9,
     mtl,
 
   hs-source-dirs:
-    app
-
-  ghc-options:
-    -haddock
+    src
 
   default-language:
     Haskell2010

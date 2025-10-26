@@ -1,7 +1,10 @@
-module Main where
+{-# LANGUAGE CPP #-}
+
+module FOL where
 
 import App
-import Syntax
+import App.Syntax
+import Proof.Syntax
 
 -----------------------------------------------------------------------------
 #ifdef WASM
