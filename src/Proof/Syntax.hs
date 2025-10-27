@@ -41,16 +41,18 @@ lLength :: Proof formula rule -> Int
 lLength (ProofLine l) = 1
 lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 
+-- TODO wrap in maybe??
 lLookup :: Proof formula rule -> Int -> Either (Assumption formula) (Derivation formula rule)
 lLookup (ProofLine d) 0 = Right d
-lLookup (ProofLine _) _ = error "Tried (!!) on ProofLine with n > 0"
+lLookup (ProofLine _) _ = error "Tried lLookup on ProofLine with n > 0"
 lLookup (SubProof [] [] l) 0 = Right l
-lLookup (SubProof [] [] _) _ = error "Tried (!!) on SubProof [] [] l with n > 0"
+lLookup (SubProof [] [] _) _ = error "Tried lLookup on SubProof [] [] _ with n > 0"
 lLookup (SubProof [] (p : _) _) n | n < lLength p = lLookup p n
-lLookup (SubProof [] (_ : ps) l) n = lLookup (SubProof [] ps l) n
+lLookup (SubProof [] (p : ps) l) n = lLookup (SubProof [] ps l) (n - lLength p)
 lLookup (SubProof fs ps l) n = if n < L.length fs then Left $ fs L.!! n else lLookup (SubProof [] ps l) (n - L.length fs)
 
 -- | returns whether a given line of a proof is movable (always returns true, except for conclusions, aka the last line in a proof.)
+-- TODO i think Maybe is not needed, n < 0 could be the final check.
 lIsMovable :: Int -> Proof formula rule -> Bool
 lIsMovable n p = fromMaybe False $ lIsMovable' n p
   where
@@ -58,15 +60,13 @@ lIsMovable n p = fromMaybe False $ lIsMovable' n p
     lIsMovable' n _ | n < 0 = Just False
     lIsMovable' 0 (ProofLine _) = Just True
     lIsMovable' n (ProofLine _) = Nothing
-    lIsMovable' n (SubProof fs ps l) | n < length fs = Just True
-    lIsMovable' n (SubProof fs [] l) = Just False
-    lIsMovable' n (SubProof fs (p : ps) l) = tryMovable (n - length fs) ps
-      where
-        tryMovable :: Int -> [Proof formula rule] -> Maybe Bool
-        tryMovable n [] = Just False
-        tryMovable n (p : ps) = lIsMovable' n p <|> tryMovable (n - lLength p) ps
+    lIsMovable' n (SubProof [] [] _) = Nothing
+    lIsMovable' n (SubProof [] (p : ps) l) = maybe (lIsMovable' (n - lLength p) (SubProof [] ps l)) pure (lIsMovable' n p)
+    lIsMovable' n (SubProof fs _ _) | n < length fs = Just True
+    lIsMovable' n (SubProof fs ps l) | n >= length fs = lIsMovable' (n - length fs) (SubProof [] ps l)
 
 -- `Maybe` is not needed here, maybe pull it inside a lRemove'
+-- TODO i think Maybe is not needed, n < 0 could be the final check.
 lRemove :: Int -> Proof formula rule -> Maybe (Proof formula rule)
 lRemove _ (ProofLine _) = Nothing
 lRemove n (SubProof fs ps l) | n < L.length fs = removeAt n fs >>= (\fs' -> pure $ SubProof fs' ps l)
@@ -82,6 +82,7 @@ lRemove n (SubProof fs ps l) = tryRemove (n - L.length fs) ps >>= (\ps' -> pure 
         (lRemove n p)
     tryRemove _ _ = Nothing
 
+-- TODO is maybe needed? Maybe just leave unchanged.
 lInsert :: Either (Assumption formula) (Derivation formula rule) -> Int -> Proof formula rule -> Maybe (Proof formula rule)
 lInsert (Left _) n (ProofLine _) = Nothing
 lInsert (Left a) n (SubProof as ps d) = maybe (tryInsert a (n - length as) ps >>= (\ps' -> return $ SubProof as ps' d)) (\as' -> return $ SubProof as' ps d) (insertAt a n as)
