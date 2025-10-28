@@ -36,6 +36,9 @@ test-suite test
   type:
     exitcode-stdio-1.0
 
+  ghc-options:
+    -fhpc
+
   hs-source-dirs:
     tests
 
@@ -53,6 +56,7 @@ test-suite test
     base >=4.9 || <5,
     fitch-editor-lib,
     tasty ==1.5 || >1.5.1,
+    tasty-coverage,
     tasty-hunit,
     tasty-quickcheck,
 

@@ -24,3 +24,8 @@ serve:
 clean:
 	rm -rf dist-newstyle public
 
+test:
+	cabal test
+
+report:
+	cabal test --enable-coverage
