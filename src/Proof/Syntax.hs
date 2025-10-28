@@ -72,6 +72,8 @@ lRemove n (SubProof fs ps l) | n < L.length fs = SubProof (removeAt n fs) ps l
 lRemove n (SubProof fs ps l) = case lRemove (n - L.length fs) (SubProof [] ps l) of
   (SubProof [] ps' _) -> SubProof fs ps' l
 
+data NodeAddr = NAAssumption Int | NADeriv Int (Maybe NodeAddr)
+
 data InsertPosition = Before | After
 
 lInsert :: Either (Assumption formula) (Derivation formula rule) -> Int -> InsertPosition -> Proof formula rule -> Proof formula rule

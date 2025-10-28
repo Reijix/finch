@@ -3,3 +3,4 @@ dist*
 result
 public
 .direnv/
+.hpc
