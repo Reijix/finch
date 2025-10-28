@@ -30,7 +30,7 @@ jobs:
           path: ./public
 
   deploy:
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     environment:
