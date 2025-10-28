@@ -23,6 +23,43 @@ data Proof formula rule where
   SubProof :: [Assumption formula] -> [Proof formula rule] -> Derivation formula rule -> Proof formula rule
   deriving (Eq)
 
+isSubProof :: Proof formula rule -> Bool
+isSubProof (ProofLine {}) = False
+isSubProof (SubProof {}) = True
+
+isProofLine :: Proof formula rule -> Bool
+isProofLine (ProofLine {}) = True
+isProofLine (SubProof {}) = False
+
+lineNoToLineAddr :: Int -> Proof formula rule -> Maybe LineAddr
+lineNoToLineAddr 0 (ProofLine {}) = Just $ LADeriv 0 Nothing
+lineNoToLineAddr n (SubProof [] [] _) = Nothing
+lineNoToLineAddr n (SubProof [] ps _) = helper n 0 ps
+  where
+    helper :: Int -> Int -> [Proof formula rule] -> Maybe LineAddr
+    helper n m [] = Nothing
+    helper 0 m ((ProofLine {}) : ps) = Just $ LADeriv m Nothing
+    helper n m (p : ps) | n < lLength p = do
+      addr <- lineNoToLineAddr n p
+      return $ LADeriv m (Just addr)
+    helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
+lineNoToLineAddr n (SubProof fs _ _) | n < L.length fs = Just $ LAAssumption n
+lineNoToLineAddr n (SubProof fs ps l) = lineNoToLineAddr (n - L.length fs) (SubProof [] ps l)
+
+lineAddrToLineNo :: LineAddr -> Proof formula rule -> Maybe Int
+lineAddrToLineNo = go 0
+  where
+    go :: Int -> LineAddr -> Proof formula rule -> Maybe Int
+    go n addr (ProofLine {}) = Nothing
+    go n (LAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
+    go n (LAAssumption m) (SubProof fs _ _) = Nothing
+    go n (LADeriv m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + m
+    go n (LADeriv m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + m) addr (ps !! m)
+
+data LineAddr = LAAssumption Int | LADeriv Int (Maybe LineAddr) deriving (Show, Eq)
+
+data ProofAddr = ProofAddr Int (Maybe ProofAddr)
+
 instance (Show formula, Show rule) => Show (Proof formula rule) where
   show :: (Show formula, Show rule) => Proof formula rule -> String
   show = show' 0
@@ -60,6 +97,12 @@ lIsMovable n (SubProof [] (p : ps) _) | n < lLength p = lIsMovable n p
 lIsMovable n (SubProof [] (p : ps) l) = lIsMovable (n - lLength p) (SubProof [] ps l)
 lIsMovable n (SubProof fs ps l) = lIsMovable (n - L.length fs) (SubProof [] ps l)
 
+lRemoveAddr :: LineAddr -> Proof formula rule -> Proof formula rule
+lRemoveAddr (LAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
+lRemoveAddr addr@(LADeriv n Nothing) p@(SubProof fs ps l) | n < L.length ps && isSubProof (ps !! n) = SubProof fs (removeAt n ps) l
+lRemoveAddr (LADeriv n (Just addr)) (SubProof fs ps l) = SubProof fs (updateAt n (lRemoveAddr addr) ps) l
+lRemoveAddr _ p = p
+
 lRemove :: Int -> Proof formula rule -> Proof formula rule
 lRemove n p | n < 0 = p
 lRemove n p@(ProofLine {}) = p
@@ -71,8 +114,6 @@ lRemove n (SubProof [] (p : ps) l) = case lRemove (n - lLength p) (SubProof [] p
 lRemove n (SubProof fs ps l) | n < L.length fs = SubProof (removeAt n fs) ps l
 lRemove n (SubProof fs ps l) = case lRemove (n - L.length fs) (SubProof [] ps l) of
   (SubProof [] ps' _) -> SubProof fs ps' l
-
-data NodeAddr = NAAssumption Int | NADeriv Int (Maybe NodeAddr)
 
 data InsertPosition = Before | After
 

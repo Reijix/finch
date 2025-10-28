@@ -9,6 +9,9 @@ import Test.Tasty.QuickCheck as QC
 
 --------------------------------------------
 -- UNIT TESTS
+
+-- Definitions for unit testing:
+
 derivation :: Int -> Derivation Formula Rule
 derivation n = Derivation (Formula n) (Rule n) []
 
@@ -45,29 +48,31 @@ exProof2 =
     ]
     (derivation 9)
 
-lIsLineSanity :: TestTree
-lIsLineSanity = testCase "lIsLine 2 exProof1" $ lIsLine 2 exProof1 @?= False
+lIsLineUnitTests :: TestTree
+lIsLineUnitTests =
+  testGroup
+    "lIsLine"
+    [testCase "lIsLine 2 exProof1" $ lIsLine 2 exProof1 @?= False]
 
-lRemoveEdge2 :: TestTree
-lRemoveEdge2 = testCase "lRemoveEdge2" $ lRemove 2 exProof2 @?= exProof2
-
--- remove line 2 from edge case (should remove the formula)
-lRemoveEdge :: TestTree
-lRemoveEdge = testCase "lRemoveEdge" $ lRemove 2 exProof1 @?= exProof1'
+lRemoveUnitTests :: TestTree
+lRemoveUnitTests =
+  testGroup
+    "lRemove"
+    [ testCase "lRemoveEdge2" $ lRemove 2 exProof2 @?= exProof2,
+      testCase "lRemoveEdge" $ lRemove 2 exProof1 @?= exProof1',
+      testCase "lRemove 0" $ lRemove 0 exProof0 @?= exProof0',
+      testCase "lRemove 1" $ lRemove 1 exProof0 @?= exProof0'',
+      testCase "lRemove 4" $ lRemove 4 exProof0 @?= exProof0,
+      testCase "lRemove 5" $ lRemove 5 exProof0 @?= exProof0,
+      testCase "lRemove 2" $ lRemove 2 exProof0 @?= exProof0''',
+      testCase "lRemove 3" $ lRemove 3 exProof0 @?= exProof0''''
+    ]
   where
     exProof1' =
       SubProof
         [Formula 0]
         [line 1, SubProof [Formula 3] [line 4, line 5] $ derivation 6]
         $ derivation 7
-
--- removing 0 or 1 should remove a formula
-lRemoveTests01 :: [TestTree]
-lRemoveTests01 =
-  [ testCase "lRemove 0" $ lRemove 0 exProof0 @?= exProof0',
-    testCase "lRemove 1" $ lRemove 1 exProof0 @?= exProof0''
-  ]
-  where
     exProof0' =
       SubProof
         [Formula 1]
@@ -80,41 +85,26 @@ lRemoveTests01 =
         [ SubProof [Formula 2] [line 3] (derivation 4)
         ]
         (derivation 5)
-
--- removing 4 or 5 should change nothing
-lRemoveTestsNoRemove :: [TestTree]
-lRemoveTestsNoRemove =
-  [ testCase "lRemove 4" $ lRemove 4 exProof0 @?= exProof0,
-    testCase "lRemove 5" $ lRemove 5 exProof0 @?= exProof0
-  ]
-
--- removing 2 should remove Formula
-lRemoveTest2 :: TestTree
-lRemoveTest2 = testCase "lRemove 2" $ lRemove 2 exProof0 @?= exProof0'
-  where
-    exProof0' =
+    exProof0''' =
       SubProof
         [Formula 0, Formula 1]
         [ SubProof [] [line 3] (derivation 4)
         ]
         (derivation 5)
-
--- removing 3 should remove a proofline
-lRemoveTest3 :: TestTree
-lRemoveTest3 = testCase "lRemove 3" $ lRemove 3 exProof0 @?= exProof0'
-  where
-    exProof0' =
+    exProof0'''' =
       SubProof
         [Formula 0, Formula 1]
         [ SubProof [Formula 2] [] (derivation 4)
         ]
         (derivation 5)
 
-lInsertTestLine0 :: TestTree
-lInsertTestLine0 = testCase "lInsert (Right $ derivation 0) 0 After exProof0" $ lInsert (Right $ derivation 0) 0 After exProof0 @?= exProof0
-
-lInsertTestLine1 :: TestTree
-lInsertTestLine1 = testCase "lInsert (Right $ derivation 0) 0 After exProof2" $ lInsert (Right $ derivation 0) 0 After exProof2 @?= exProof2'
+lInsertUnitTests :: TestTree
+lInsertUnitTests =
+  testGroup
+    "lInsert"
+    [ testCase "lInsert (Right $ derivation 0) 0 After exProof0" $ lInsert (Right $ derivation 0) 0 After exProof0 @?= exProof0,
+      testCase "lInsert (Right $ derivation 0) 0 After exProof2" $ lInsert (Right $ derivation 0) 0 After exProof2 @?= exProof2'
+    ]
   where
     exProof2' =
       SubProof
@@ -201,18 +191,12 @@ prop_lRemoveShift p =
     (lIsMovable n p && lIsMovable (n + 1) p) ==>
       (lLookup (lRemove n p) n == lLookup p (n + 1))
 
-lRemoveTests :: TestTree
-lRemoveTests =
+lRemoveQCTests :: TestTree
+lRemoveQCTests =
   testGroup
     "Testing lRemove"
-    [ testGroup
-        "QuickCheck"
-        [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1,
-          QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
-        ],
-      testGroup
-        "HUnit"
-        (lRemoveEdge : lRemoveEdge2 : lRemoveTest2 : lRemoveTest3 : lRemoveTests01 ++ lRemoveTestsNoRemove)
+    [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1,
+      QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
 -- -- TESTING lInsert
@@ -252,26 +236,22 @@ prop_lInsertAfterLinePlus1 p =
     lIsLine n p ==>
       (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) n After p) == lLength p + 1)
 
-lInsertTests :: TestTree
-lInsertTests =
+lInsertQCTests :: TestTree
+lInsertQCTests =
   testGroup
     "Testing lInsert"
-    [ testGroup
-        "QuickCheck"
-        [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1,
-          QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1,
-          QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore,
-          QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter,
-          QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1,
-          QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
-        ],
-      testGroup
-        "HUnit"
-        [lInsertTestLine0, lInsertTestLine1, lIsLineSanity]
+    [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1,
+      QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1,
+      QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore,
+      QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter,
+      QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1,
+      QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
     ]
 
 proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [lRemoveTests, lInsertTests]
+    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests],
+      testGroup "HUnit" [lRemoveUnitTests, lInsertUnitTests, lIsLineUnitTests]
+    ]

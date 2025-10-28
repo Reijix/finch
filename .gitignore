@@ -4,3 +4,4 @@ result
 public
 .direnv/
 .hpc
+*.tix
