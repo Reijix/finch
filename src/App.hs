@@ -37,7 +37,6 @@ import qualified Miso.Html.Property as HP
 import Miso.Lens (use, (%=), (.=))
 import Miso.Svg (text_)
 import Proof.Syntax
-import Util
 
 -----------------------------------------------------------------------------
 
