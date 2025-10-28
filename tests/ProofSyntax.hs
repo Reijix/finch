@@ -9,112 +9,149 @@ import Test.Tasty.QuickCheck as QC
 
 --------------------------------------------
 -- UNIT TESTS
-derivation :: Derivation Formula Rule
-derivation = Derivation Formula Rule []
+derivation :: Int -> Derivation Formula Rule
+derivation n = Derivation (Formula n) (Rule n) []
 
-line :: Proof Formula Rule
-line = ProofLine derivation
+line :: Int -> Proof Formula Rule
+line n = ProofLine (derivation n)
 
 -- example proof for removing a line
 exProof0 :: Proof Formula Rule
 exProof0 =
   SubProof
-    [Formula, Formula]
-    [ SubProof [Formula] [line] derivation
+    [Formula 0, Formula 1]
+    [ SubProof [Formula 2] [line 3] (derivation 4)
     ]
-    derivation
+    (derivation 5)
 
 -- example proof that triggered an edge case
 exProof1 :: Proof Formula Rule
 exProof1 =
   SubProof
-    [Formula]
-    [line, SubProof [Formula, Formula] [line, line] derivation]
-    derivation
+    [Formula 0]
+    [line 1, SubProof [Formula 2, Formula 3] [line 4, line 5] (derivation 6)]
+    (derivation 7)
 
 -- example proof that triggered another edge case
 exProof2 :: Proof Formula Rule
 exProof2 =
   SubProof
     []
-    [ SubProof [] [line, line] derivation,
+    [ SubProof [] [line 0, line 1] $ derivation 2,
       SubProof
-        [Formula, Formula]
-        [line, line, line]
-        derivation
+        [Formula 3, Formula 4]
+        [line 5, line 6, line 7]
+        (derivation 8)
     ]
-    derivation
+    (derivation 9)
+
+lIsLineSanity :: TestTree
+lIsLineSanity = testCase "lIsLine 2 exProof1" $ lIsLine 2 exProof1 @?= False
 
 lRemoveEdge2 :: TestTree
-lRemoveEdge2 = testCase "lRemoveEdge2" $ lRemove 2 exProof2 @?= Nothing
+lRemoveEdge2 = testCase "lRemoveEdge2" $ lRemove 2 exProof2 @?= exProof2
 
 -- remove line 2 from edge case (should remove the formula)
 lRemoveEdge :: TestTree
-lRemoveEdge = testCase "lRemoveEdge" $ lRemove 2 exProof1 @?= Just exProof1'
+lRemoveEdge = testCase "lRemoveEdge" $ lRemove 2 exProof1 @?= exProof1'
   where
     exProof1' =
       SubProof
-        [Formula]
-        [line, SubProof [Formula] [line, line] derivation]
-        derivation
+        [Formula 0]
+        [line 1, SubProof [Formula 3] [line 4, line 5] $ derivation 6]
+        $ derivation 7
 
 -- removing 0 or 1 should remove a formula
--- TODO adjust once Formula generator changed
 lRemoveTests01 :: [TestTree]
 lRemoveTests01 =
-  [ testCase "lRemove 0" $ lRemove 0 exProof0 @?= Just exProof0',
-    testCase "lRemove 1" $ lRemove 1 exProof0 @?= Just exProof0'
+  [ testCase "lRemove 0" $ lRemove 0 exProof0 @?= exProof0',
+    testCase "lRemove 1" $ lRemove 1 exProof0 @?= exProof0''
   ]
   where
     exProof0' =
       SubProof
-        [Formula]
-        [ SubProof [Formula] [ProofLine (Derivation Formula Rule [])] (Derivation Formula Rule [])
+        [Formula 1]
+        [ SubProof [Formula 2] [line 3] (derivation 4)
         ]
-        (Derivation Formula Rule [])
+        (derivation 5)
+    exProof0'' =
+      SubProof
+        [Formula 0]
+        [ SubProof [Formula 2] [line 3] (derivation 4)
+        ]
+        (derivation 5)
 
 -- removing 4 or 5 should change nothing
 lRemoveTestsNoRemove :: [TestTree]
 lRemoveTestsNoRemove =
-  [ testCase "lRemove 4" $ lRemove 4 exProof0 @?= Nothing,
-    testCase "lRemove 5" $ lRemove 5 exProof0 @?= Nothing
+  [ testCase "lRemove 4" $ lRemove 4 exProof0 @?= exProof0,
+    testCase "lRemove 5" $ lRemove 5 exProof0 @?= exProof0
   ]
 
 -- removing 2 should remove Formula
 lRemoveTest2 :: TestTree
-lRemoveTest2 = testCase "lRemove 2" $ lRemove 2 exProof0 @?= Just exProof0'
+lRemoveTest2 = testCase "lRemove 2" $ lRemove 2 exProof0 @?= exProof0'
   where
     exProof0' =
       SubProof
-        [Formula, Formula]
-        [ SubProof [] [ProofLine (Derivation Formula Rule [])] (Derivation Formula Rule [])
+        [Formula 0, Formula 1]
+        [ SubProof [] [line 3] (derivation 4)
         ]
-        (Derivation Formula Rule [])
+        (derivation 5)
 
 -- removing 3 should remove a proofline
 lRemoveTest3 :: TestTree
-lRemoveTest3 = testCase "lRemove 3" $ lRemove 3 exProof0 @?= Just exProof0'
+lRemoveTest3 = testCase "lRemove 3" $ lRemove 3 exProof0 @?= exProof0'
   where
     exProof0' =
       SubProof
-        [Formula, Formula]
-        [ SubProof [Formula] [] (Derivation Formula Rule [])
+        [Formula 0, Formula 1]
+        [ SubProof [Formula 2] [] (derivation 4)
         ]
-        (Derivation Formula Rule [])
+        (derivation 5)
+
+lInsertTestLine0 :: TestTree
+lInsertTestLine0 = testCase "lInsert (Right $ derivation 0) 0 After exProof0" $ lInsert (Right $ derivation 0) 0 After exProof0 @?= exProof0
+
+lInsertTestLine1 :: TestTree
+lInsertTestLine1 = testCase "lInsert (Right $ derivation 0) 0 After exProof2" $ lInsert (Right $ derivation 0) 0 After exProof2 @?= exProof2'
+  where
+    exProof2' =
+      SubProof
+        []
+        [ SubProof [] [line 0, line 0, line 1] $ derivation 2,
+          SubProof
+            [Formula 3, Formula 4]
+            [line 5, line 6, line 7]
+            (derivation 8)
+        ]
+        (derivation 9)
 
 --------------------------------------------
 -- PROPERTIES
-data Formula = Formula deriving (Show, Eq)
+newtype Formula = Formula Int deriving (Eq)
 
-data Rule = Rule deriving (Show, Eq)
+newtype Rule = Rule Int deriving (Eq)
+
+instance Show Formula where
+  show :: Formula -> String
+  show (Formula n) = 'F' : show n
+
+instance Show Rule where
+  show :: Rule -> String
+  show (Rule n) = 'R' : show n
 
 instance Arbitrary Formula where
   arbitrary :: Gen Formula
-  arbitrary = return Formula
+  arbitrary = fmap Formula (chooseInt (0, 100))
+
+instance Arbitrary Rule where
+  arbitrary :: Gen Rule
+  arbitrary = fmap Rule (chooseInt (0, 100))
 
 instance Arbitrary (Derivation Formula Rule) where
   arbitrary :: Gen (Derivation Formula Rule)
-  arbitrary = return $ Derivation Formula Rule []
+  arbitrary = liftM3 Derivation arbitrary arbitrary (pure [])
 
 instance Arbitrary (Proof Formula Rule) where
   arbitrary :: Gen (Proof Formula Rule)
@@ -129,13 +166,40 @@ instance Arbitrary (Proof Formula Rule) where
             l <- chooseInt (1, 8)
             vectorOf l (proof' (n `div` 2))
 
+-- arbitrary :: Gen (Proof Formula Rule)
+-- arbitrary = sized proof'
+--   where
+--     proof'' :: Int -> Gen (Proof Formula Rule)
+--     proof'' 0 = fmap ProofLine arbitrary
+--     proof'' n | n > 0 = oneof [fmap ProofLine arbitrary, liftM3 SubProof arbitrary ps arbitrary]
+--       where
+--         ps :: Gen [Proof Formula Rule]
+--         ps = do
+--           l <- chooseInt (1, 8)
+--           vectorOf l (proof'' (n `div` 2))
+--     -- Force outer proof to be a
+--     proof' :: Int -> Gen (Proof Formula Rule)
+--     proof' 0 = fmap ProofLine arbitrary
+--     proof' n | n > 0 = liftM3 SubProof arbitrary ps arbitrary
+--       where
+--         ps :: Gen [Proof Formula Rule]
+--         ps = do
+--           l <- chooseInt (1, 8)
+--           vectorOf l (proof'' (n `div` 2))
+
 -- removing a movable line should decrement the length of the proof.
 prop_lRemoveMinus1 :: Proof Formula Rule -> Property
-prop_lRemoveMinus1 p = forAll (chooseInt (0, lLength p)) $ \n -> lIsMovable n p ==> maybe 0 lLength (lRemove n p) == lLength p - 1
+prop_lRemoveMinus1 p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsMovable n p ==>
+      lLength (lRemove n p) == lLength p - 1
 
 -- removing a movable line should shift all indices by one.
 prop_lRemoveShift :: Proof Formula Rule -> Property
-prop_lRemoveShift p = forAll (chooseInt (0, lLength p)) $ \n -> (lIsMovable n p && lIsMovable (n + 1) p) ==> maybe (Left Formula) (`lLookup` n) (lRemove n p) == lLookup p (n + 1)
+prop_lRemoveShift p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    (lIsMovable n p && lIsMovable (n + 1) p) ==>
+      (lLookup (lRemove n p) n == lLookup p (n + 1))
 
 lRemoveTests :: TestTree
 lRemoveTests =
@@ -150,3 +214,64 @@ lRemoveTests =
         "HUnit"
         (lRemoveEdge : lRemoveEdge2 : lRemoveTest2 : lRemoveTest3 : lRemoveTests01 ++ lRemoveTestsNoRemove)
     ]
+
+-- -- TESTING lInsert
+prop_lInsertBeforeFormulaPlus1 :: Proof Formula Rule -> Property
+prop_lInsertBeforeFormulaPlus1 p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsFormula n p ==>
+      (lLength (lInsert (Left $ Formula 0) n Before p) == lLength p + 1)
+
+prop_lInsertAfterFormulaPlus1 :: Proof Formula Rule -> Property
+prop_lInsertAfterFormulaPlus1 p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsFormula n p ==>
+      (lLength (lInsert (Left $ Formula 0) n After p) == lLength p + 1)
+
+prop_lInsertlLookupFormulaBefore :: Proof Formula Rule -> Property
+prop_lInsertlLookupFormulaBefore p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsFormula n p ==>
+      (lLookup (lInsert (Left $ Formula 0) n Before p) n == Just (Left $ Formula 0))
+
+prop_lInsertlLookupFormulaAfter :: Proof Formula Rule -> Property
+prop_lInsertlLookupFormulaAfter p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsFormula n p ==>
+      (lLookup (lInsert (Left $ Formula 0) n After p) (n + 1) == Just (Left $ Formula 0))
+
+prop_lInsertBeforeLinePlus1 :: Proof Formula Rule -> Property
+prop_lInsertBeforeLinePlus1 p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsLine n p ==>
+      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) n Before p) == lLength p + 1)
+
+prop_lInsertAfterLinePlus1 :: Proof Formula Rule -> Property
+prop_lInsertAfterLinePlus1 p =
+  forAll (chooseInt (0, lLength p)) $ \n ->
+    lIsLine n p ==>
+      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) n After p) == lLength p + 1)
+
+lInsertTests :: TestTree
+lInsertTests =
+  testGroup
+    "Testing lInsert"
+    [ testGroup
+        "QuickCheck"
+        [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1,
+          QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1,
+          QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore,
+          QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter,
+          QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1,
+          QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
+        ],
+      testGroup
+        "HUnit"
+        [lInsertTestLine0, lInsertTestLine1, lIsLineSanity]
+    ]
+
+proofTests :: TestTree
+proofTests =
+  testGroup
+    "Testing functions concerning the modification of proofs"
+    [lRemoveTests, lInsertTests]

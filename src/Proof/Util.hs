@@ -1,17 +1,13 @@
 module Proof.Util where
 
-insertAt :: a -> Int -> [a] -> Maybe [a]
-insertAt x 0 xs = Just $ x : xs
-insertAt x n [] = Nothing
-insertAt x n (y : ys) = do
-  ys' <- insertAt x (n - 1) ys
-  Just $ y : ys'
+insertAt :: a -> Int -> [a] -> [a]
+insertAt x 0 xs = x : xs
+insertAt x n [] = []
+insertAt x n (y : ys) = y : insertAt x (n - 1) ys
 
-removeAt :: Int -> [a] -> Maybe [a]
-removeAt n [] = Nothing
+removeAt :: Int -> [a] -> [a]
+removeAt n [] = []
 removeAt n (x : xs)
-  | n < 0 = Nothing
-  | n == 0 = Just xs
-  | n > 0 = do
-      xs' <- removeAt (n - 1) xs
-      return $ x : xs'
+  | n < 0 = x : xs
+  | n == 0 = xs
+  | n > 0 = x : removeAt (n - 1) xs

@@ -41,63 +41,68 @@ lLength :: Proof formula rule -> Int
 lLength (ProofLine l) = 1
 lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 
--- TODO wrap in maybe??
-lLookup :: Proof formula rule -> Int -> Either (Assumption formula) (Derivation formula rule)
-lLookup (ProofLine d) 0 = Right d
-lLookup (ProofLine _) _ = error "Tried lLookup on ProofLine with n > 0"
-lLookup (SubProof [] [] l) 0 = Right l
-lLookup (SubProof [] [] _) _ = error "Tried lLookup on SubProof [] [] _ with n > 0"
+lLookup :: Proof formula rule -> Int -> Maybe (Either (Assumption formula) (Derivation formula rule))
+lLookup (ProofLine d) 0 = Just $ Right d
+lLookup (ProofLine _) _ = Nothing
+lLookup (SubProof [] [] l) 0 = Just $ Right l
+lLookup (SubProof [] [] _) _ = Nothing
 lLookup (SubProof [] (p : _) _) n | n < lLength p = lLookup p n
 lLookup (SubProof [] (p : ps) l) n = lLookup (SubProof [] ps l) (n - lLength p)
-lLookup (SubProof fs ps l) n = if n < L.length fs then Left $ fs L.!! n else lLookup (SubProof [] ps l) (n - L.length fs)
+lLookup (SubProof fs ps l) n = if n < L.length fs then Just . Left $ fs L.!! n else lLookup (SubProof [] ps l) (n - L.length fs)
 
 -- | returns whether a given line of a proof is movable (always returns true, except for conclusions, aka the last line in a proof.)
--- TODO i think Maybe is not needed, n < 0 could be the final check.
 lIsMovable :: Int -> Proof formula rule -> Bool
-lIsMovable n p = fromMaybe False $ lIsMovable' n p
-  where
-    lIsMovable' :: Int -> Proof formula rule -> Maybe Bool
-    lIsMovable' n _ | n < 0 = Just False
-    lIsMovable' 0 (ProofLine _) = Just True
-    lIsMovable' n (ProofLine _) = Nothing
-    lIsMovable' n (SubProof [] [] _) = Nothing
-    lIsMovable' n (SubProof [] (p : ps) l) = maybe (lIsMovable' (n - lLength p) (SubProof [] ps l)) pure (lIsMovable' n p)
-    lIsMovable' n (SubProof fs _ _) | n < length fs = Just True
-    lIsMovable' n (SubProof fs ps l) | n >= length fs = lIsMovable' (n - length fs) (SubProof [] ps l)
+lIsMovable n _ | n < 0 = False
+lIsMovable n (ProofLine _) = False
+lIsMovable _ (SubProof [] [] _) = False
+lIsMovable 0 (SubProof [] ((ProofLine {}) : ps) _) = True
+lIsMovable n (SubProof [] (p : ps) _) | n < lLength p = lIsMovable n p
+lIsMovable n (SubProof [] (p : ps) l) = lIsMovable (n - lLength p) (SubProof [] ps l)
+lIsMovable n (SubProof fs ps l) = lIsMovable (n - L.length fs) (SubProof [] ps l)
 
--- `Maybe` is not needed here, maybe pull it inside a lRemove'
--- TODO i think Maybe is not needed, n < 0 could be the final check.
-lRemove :: Int -> Proof formula rule -> Maybe (Proof formula rule)
-lRemove _ (ProofLine _) = Nothing
-lRemove n (SubProof fs ps l) | n < L.length fs = removeAt n fs >>= (\fs' -> pure $ SubProof fs' ps l)
-lRemove n (SubProof fs ps l) = tryRemove (n - L.length fs) ps >>= (\ps' -> pure $ SubProof fs ps' l)
-  where
-    tryRemove :: Int -> [Proof formula rule] -> Maybe [Proof formula rule]
-    tryRemove 0 ((ProofLine _) : ps) = Just ps
-    tryRemove n (p@(ProofLine _) : ps) = tryRemove (n - 1) ps >>= \ps' -> return $ p : ps'
-    tryRemove n (p@(SubProof {}) : ps) =
-      maybe
-        (tryRemove (n - lLength p) ps >>= \ps' -> return $ p : ps')
-        (\p' -> Just $ p' : ps)
-        (lRemove n p)
-    tryRemove _ _ = Nothing
+lRemove :: Int -> Proof formula rule -> Proof formula rule
+lRemove n p | n < 0 = p
+lRemove n p@(ProofLine {}) = p
+lRemove n p@(SubProof [] [] _) = p
+lRemove 0 (SubProof [] (ProofLine {} : ps) l) = SubProof [] ps l
+lRemove n (SubProof [] (p : ps) l) | n < lLength p = SubProof [] (lRemove n p : ps) l
+lRemove n (SubProof [] (p : ps) l) = case lRemove (n - lLength p) (SubProof [] ps l) of
+  (SubProof [] ps' _) -> SubProof [] (p : ps') l
+lRemove n (SubProof fs ps l) | n < L.length fs = SubProof (removeAt n fs) ps l
+lRemove n (SubProof fs ps l) = case lRemove (n - L.length fs) (SubProof [] ps l) of
+  (SubProof [] ps' _) -> SubProof fs ps' l
 
--- TODO is maybe needed? Maybe just leave unchanged.
-lInsert :: Either (Assumption formula) (Derivation formula rule) -> Int -> Proof formula rule -> Maybe (Proof formula rule)
-lInsert (Left _) n (ProofLine _) = Nothing
-lInsert (Left a) n (SubProof as ps d) = maybe (tryInsert a (n - length as) ps >>= (\ps' -> return $ SubProof as ps' d)) (\as' -> return $ SubProof as' ps d) (insertAt a n as)
-  where
-    tryInsert :: Assumption formula -> Int -> [Proof formula rule] -> Maybe [Proof formula rule]
-    tryInsert a n (p : ps) = maybe (tryInsert a (n - lLength p) ps >>= (\ps' -> return $ p : ps')) (\p' -> return $ p' : ps) (lInsert (Left a) n p)
-lInsert (Right (Derivation {})) n (ProofLine _) = Nothing
-lInsert (Right d) 0 (SubProof fs ps l) = Just $ SubProof fs (ProofLine d : ps) l
-lInsert (Right d) n (SubProof fs (p : ps) l) =
-  maybe
-    ( do
-        p' <- lInsert (Right d) (n - lLength p) (SubProof fs ps l)
-        case p' of
-          ProofLine _ -> error ""
-          SubProof fs' ps' l' -> return $ SubProof fs' (p : ps') l'
-    )
-    (\p' -> return $ SubProof fs (p' : ps) l)
-    (lInsert (Right d) n p)
+data InsertPosition = Before | After
+
+lInsert :: Either (Assumption formula) (Derivation formula rule) -> Int -> InsertPosition -> Proof formula rule -> Proof formula rule
+lInsert _ n _ p | n < 0 = p
+lInsert _ n _ p@(ProofLine _) = p
+lInsert (Right d) 0 Before (SubProof [] (p@(ProofLine {}) : ps) l) = SubProof [] (ProofLine d : p : ps) l
+lInsert (Right d) 0 After (SubProof [] (p@(ProofLine {}) : ps) l) = SubProof [] (p : ProofLine d : ps) l
+lInsert (Right d) 0 pos (SubProof [] (p : ps) l) = SubProof [] (lInsert (Right d) 0 pos p : ps) l
+lInsert l n pos (SubProof [] (p : ps) d) | n < lLength p = SubProof [] (lInsert l n pos p : ps) d
+lInsert l n pos (SubProof [] (p : ps) d) = case lInsert l (n - lLength p) pos (SubProof [] ps d) of
+  (SubProof fs' ps' _) -> SubProof fs' (p : ps') d
+lInsert (Left a) n pos (SubProof fs ps d) | n < L.length fs = case pos of
+  Before -> SubProof (insertAt a n fs) ps d
+  After -> SubProof (insertAt a (n + 1) fs) ps d
+lInsert (Left a) n pos p@(SubProof [] [] _) = p
+lInsert l n pos (SubProof fs ps d) = case lInsert l (n - L.length fs) pos (SubProof [] ps d) of
+  (SubProof _ ps' _) -> SubProof fs ps' d
+
+lIsFormula :: Int -> Proof formula rule -> Bool
+lIsFormula n p | n < 0 = False
+lIsFormula n (ProofLine _) = False
+lIsFormula n (SubProof [] [] d) = False
+lIsFormula n (SubProof [] (p : ps) d) = lIsFormula n p || lIsFormula (n - lLength p) (SubProof [] ps d)
+lIsFormula n (SubProof fs ps _) | n < L.length fs = True
+lIsFormula n (SubProof fs ps d) = lIsFormula (n - L.length fs) (SubProof [] ps d)
+
+lIsLine :: Int -> Proof formula rule -> Bool
+lIsLine n p | n < 0 = False
+lIsLine n (ProofLine _) = False
+lIsLine n (SubProof [] [] d) = False
+lIsLine 0 (SubProof [] (ProofLine {} : ps) d) = True
+lIsLine n (SubProof [] (p : ps) d) | n < lLength p = lIsLine n p
+lIsLine n (SubProof [] (p : ps) d) = lIsLine (n - lLength p) (SubProof [] ps d)
+lIsLine n (SubProof fs ps d) = lIsLine (n - L.length fs) (SubProof [] ps d)

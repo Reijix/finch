@@ -6,7 +6,7 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck as QC
 
 main :: IO ()
-main = defaultMain $ localOption (QuickCheckTests 200) tests
+main = defaultMain $ localOption (QuickCheckTests 200) $ localOption (QuickCheckMaxRatio 50) tests
 
 tests :: TestTree
-tests = testGroup "Tests" [lRemoveTests]
+tests = testGroup "Tests" [proofTests]
