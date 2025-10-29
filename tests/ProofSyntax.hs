@@ -92,76 +92,78 @@ instance Arbitrary (Proof Formula Rule) where
             l <- chooseInt (1, 8)
             vectorOf l (proof' (n `div` 2))
 
-arbitraryLineAddrFor :: Proof Formula Rule -> Gen LineAddr
-arbitraryLineAddrFor (ProofLine {}) = return $ LADeriv 0 Nothing
-arbitraryLineAddrFor (SubProof fs ps l) = case fs of
-  [] -> laderiv
-  _ -> oneof [laassumption, laderiv]
+arbitraryNodeAddrFor :: Proof Formula Rule -> Gen NodeAddr
+arbitraryNodeAddrFor (ProofLine {}) = return $ NALine 0
+arbitraryNodeAddrFor (SubProof fs ps l) = case fs of
+  [] -> oneof [naLine, naDeriv]
+  _ -> oneof [naAssumption, naLine, naDeriv]
   where
-    laassumption = fmap LAAssumption (chooseInt (0, L.length fs - 1))
-    laderiv = do
+    naLine = fmap NALine (chooseInt (0, L.length ps - 1))
+    naAssumption = fmap NAAssumption (chooseInt (0, L.length fs - 1))
+    naDeriv = do
       n <- chooseInt (0, L.length ps - 1)
       case ps !! n of
-        ProofLine {} -> return $ LADeriv n Nothing
-        p@(SubProof {}) -> arbitraryLineAddrFor p <&> (LADeriv n . Just)
+        ProofLine {} -> return $ NALine n
+        p@(SubProof {}) -> arbitraryNodeAddrFor p <&> (NAProof n . Just)
 
-prop_lRemoveAddrMinus1 :: Proof Formula Rule -> Property
-prop_lRemoveAddrMinus1 (ProofLine {}) = discard
-prop_lRemoveAddrMinus1 p@(SubProof {}) =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lLength (lRemoveAddr a p) === lLength p - 1
+prop_lRemoveMinus1 :: Proof Formula Rule -> Property
+prop_lRemoveMinus1 (ProofLine {}) = discard
+prop_lRemoveMinus1 p@(SubProof {}) =
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsLine a p ==>
+      lLength (lRemove a p) === lLength p - 1
 
-prop_lRemoveAddrShift :: Proof Formula Rule -> Property
-prop_lRemoveAddrShift p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsLineAddr a p && lIsLineAddr (incrementLineAddr a) p ==>
-      lLookupAddr a (lRemoveAddr a p) === lLookupAddr (incrementLineAddr a) p
+prop_lRemoveShift :: Proof Formula Rule -> Property
+prop_lRemoveShift p =
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsLine a p && lIsLine (incrementNodeAddr a) p ==>
+      lLookup a (lRemove a p) === lLookup (incrementNodeAddr a) p
 
 lRemoveQCTests :: TestTree
 lRemoveQCTests =
   testGroup
     "Testing lRemove"
-    [ QC.testProperty "prop_lRemoveAddrMinus1" prop_lRemoveAddrMinus1,
-      QC.testProperty "prop_lRemoveAddrShift" prop_lRemoveAddrShift
+    [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1,
+      QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
 -- -- TESTING lInsert
 prop_lInsertBeforeFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeFormulaPlus1 (ProofLine {}) = discard
 prop_lInsertBeforeFormulaPlus1 p@(SubProof {}) =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsFormulaAddr a p ==>
-      lLength (lInsertAddr (Left $ Formula 0) a Before p) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsFormula a p ==>
+      lLength (lInsert (Left $ Formula 0) a Before p) === lLength p + 1
 
 prop_lInsertAfterFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterFormulaPlus1 p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsFormulaAddr a p ==>
-      (lLength (lInsertAddr (Left $ Formula 0) a After p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsFormula a p ==>
+      (lLength (lInsert (Left $ Formula 0) a After p) == lLength p + 1)
 
 prop_lInsertlLookupFormulaBefore :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaBefore p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsFormulaAddr a p ==>
-      (lLookupAddr a (lInsertAddr (Left $ Formula 0) a Before p) == Just (Left $ Formula 0))
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsFormula a p ==>
+      (lLookup a (lInsert (Left $ Formula 0) a Before p) == Just (Left $ Formula 0))
 
 prop_lInsertlLookupFormulaAfter :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaAfter p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsFormulaAddr a p ==>
-      (lLookupAddr (incrementLineAddr a) (lInsertAddr (Left $ Formula 0) a After p) == Just (Left $ Formula 0))
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsFormula a p ==>
+      (lLookup (incrementNodeAddr a) (lInsert (Left $ Formula 0) a After p) == Just (Left $ Formula 0))
 
 prop_lInsertBeforeLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeLinePlus1 p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsLineAddr a p ==>
-      (lLength (lInsertAddr (Right $ Derivation (Formula 0) (Rule 0) []) a Before p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsLine a p ==>
+      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) a Before p) == lLength p + 1)
 
 prop_lInsertAfterLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterLinePlus1 p =
-  forAll (arbitraryLineAddrFor p) $ \a ->
-    lIsLineAddr a p ==>
-      (lLength (lInsertAddr (Right $ Derivation (Formula 0) (Rule 0) []) a After p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    lIsLine a p ==>
+      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) a After p) == lLength p + 1)
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
@@ -178,18 +180,19 @@ lInsertQCTests =
 prop_fromLineNoInverse :: Proof Formula Rule -> Property
 prop_fromLineNoInverse p = forAll (chooseInt (0, lLength p - 1)) $ \n ->
   isJust (fromLineNo n p) ==>
-    fromLineAddr (fromJust $ fromLineNo n p) p === Just n
+    fromNodeAddr (fromJust $ fromLineNo n p) p === Just n
 
-prop_fromLineAddrInverse :: Proof Formula Rule -> Property
-prop_fromLineAddrInverse p = forAll (arbitraryLineAddrFor p) $ \a ->
-  fromLineNo (fromJust $ fromLineAddr a p) p === Just a
+prop_fromNodeAddrInverse :: Proof Formula Rule -> Property
+prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p) $ \a ->
+  isJust (fromNodeAddr a p) ==>
+    fromLineNo (fromJust $ fromNodeAddr a p) p === Just a
 
 lineNoQCTests :: TestTree
 lineNoQCTests =
   testGroup
-    "testing conversion of lineNo and lineAddr"
+    "testing conversion of lineNo and NodeAddr"
     [ QC.testProperty "prop_fromLineNoInverse" prop_fromLineNoInverse,
-      QC.testProperty "prop_fromLineAddrInverse" prop_fromLineAddrInverse
+      QC.testProperty "prop_fromNodeAddrInverse" prop_fromNodeAddrInverse
     ]
 
 proofTests :: TestTree

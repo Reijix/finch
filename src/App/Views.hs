@@ -2,6 +2,7 @@ module App.Views where
 
 import App.Syntax
 import qualified Data.List as L
+import Data.Maybe (fromJust, fromMaybe)
 import Miso
   ( Attribute,
     MisoString,
@@ -62,22 +63,22 @@ lineContainer ::
   forall formula rule.
   (Show formula) =>
   (Show rule) =>
-  Model formula rule -> Bool -> Int -> MisoString -> View (Model formula rule) Action
-lineContainer m isAssumption n s =
+  Model formula rule -> Bool -> NodeAddr -> MisoString -> View (Model formula rule) Action
+lineContainer m isAssumption a s =
   H.div_
     [ HP.draggable_ True,
       HP.classList_ [("proof-line", True), ("draggable", True)],
-      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) . DragStart $ TargetLine n,
+      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ DragStart a,
       onDragEnd DragEnd,
-      onDoubleClick (DoubleClick n),
+      onDoubleClick (DoubleClick a),
       onFocusOut Blur
     ]
     [ H.input_
-        [ inert_ (n /= (m ^. focusedLine)),
-          HP.id_ . ms $ "proof-line" ++ show n,
+        [ inert_ (Just a /= (m ^. focusedLine)),
+          HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
           HP.classList_ [("proof-input", True), ("assumption", isAssumption)],
           HP.draggable_ False,
-          -- onDragStartWithOptions preventDefault DragStart,
+          onDragStartWithOptions preventDefault Nop,
           value_ s
         ]
     ]
@@ -86,27 +87,44 @@ viewLine ::
   forall formula rule.
   (Show formula) =>
   (Show rule) =>
-  Model formula rule -> Int -> Either (Assumption formula) (Derivation formula rule) -> View (Model formula rule) Action
-viewLine m n (Left f) = lineContainer m True n $ ms $ show f ++ show n
-viewLine m n (Right (Derivation f r _)) = lineContainer m False n $ ms $ show f ++ show r ++ show n
+  Model formula rule ->
+  NodeAddr ->
+  Either (Assumption formula) (Derivation formula rule) ->
+  View (Model formula rule) Action
+viewLine m a (Left f) = lineContainer m True a $ ms $ show f ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+viewLine m a (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f ++ show r ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
 
 viewProof ::
   forall formula rule.
   (Show formula) =>
   (Show rule) =>
   Model formula rule -> View (Model formula rule) Action
-viewProof m = H.div_ [] [proofView]
+viewProof model = H.div_ [] [proofView]
   where
-    (lineNos, proofView) = _viewProof 0 (m ^. proof)
-    _viewProof :: Int -> Proof formula rule -> (Int, View (Model formula rule) Action)
-    _viewProof n (ProofLine d) = (n + 1, viewLine m n (Right d))
-    _viewProof n (SubProof fs ps d) = (n + length allLines, H.div_ [HP.class_ "subproof", HP.draggable_ True, onDragStart . DragStart $ TargetProof 0, onDragEnd DragEnd] allLines)
+    proofView = case model ^. proof of
+      ProofLine _ -> error "Tried calling viewProof on a ProofLine"
+      SubProof fs ps d -> HP.div_ [HP.class_ "subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
+        where
+          (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (Left f))) 0 fs
+          (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
+          viewConclusion = viewLine model (NALine n) (Right d)
+    _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
+    _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) (Right d)
+    _viewProof n ma (SubProof fs ps d) =
+      H.div_
+        [ HP.class_ "subproof",
+          HP.draggable_ True,
+          onDragStart $ DragStart a,
+          onDragEnd DragEnd
+        ]
+        (viewAssumptions ++ viewProofs ++ [viewConclusion])
       where
-        allLines :: [View (Model formula rule) Action]
-        allLines = do
-          let (n', fs') = L.mapAccumL (\n' f -> (n' + 1, viewLine m n' (Left f))) n fs
-          let (n'', ps') = L.mapAccumL _viewProof n' ps
-          fs' ++ ps' ++ [viewLine m n'' (Right d)]
+        a = case ma of
+          Nothing -> NAProof n Nothing
+          Just addr -> addr
+        (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (Left f))) 0 fs
+        (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof n (Just a) p)) 0 ps
+        viewConclusion = viewLine model (naAppendLine m a) (Right d)
 
 -----------------------------------------------------------------------------
 toEm :: Int -> MisoString

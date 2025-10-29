@@ -21,7 +21,7 @@ data Formula = Formula deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
 emptyModel :: (Model Formula Rule)
-emptyModel = Model {_cursorX = 50, _cursorY = 52, _focusedLine = -1, _proof = exProof, _dragTarget = TargetNone}
+emptyModel = Model {_cursorX = 50, _cursorY = 52, _focusedLine = Nothing, _proof = exProof, _dragTarget = Nothing}
 
 exProof :: (Proof Formula Rule)
 exProof =

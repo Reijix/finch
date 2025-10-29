@@ -4,6 +4,7 @@ import App.Syntax
 import App.Views
 import Control.Monad (when)
 import qualified Data.Map as M
+import Data.Maybe (fromJust, fromMaybe)
 import Miso
   ( App,
     CSS (Href),
@@ -63,32 +64,30 @@ updateModel :: Action -> Effect ROOT (Model rule formula) Action
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
-    TargetProof n -> pure ()
-    TargetLine n -> pure () -- proof %= lRemove n
-    TargetNone -> pure ()
+    Nothing -> pure ()
+    Just addr -> proof %= lRemove addr
   io_ . consoleLog $ "dropped in bin"
-updateModel (Drop (LocationLine n)) = do
-  io_ . consoleLog . ms $ "dropped in line " ++ show n
-updateModel (Drop (LocationProof _)) = pure ()
+updateModel (Drop (LocationAddr n)) = do
+  io_ . consoleLog . ms $ "dropped in addr " ++ show n
 updateModel DragEnter = pure ()
 updateModel DragLeave = pure ()
 updateModel (DragStart dt) = do
-  dragTarget .= dt
-  case dt of
-    TargetNone -> io_ . consoleLog $ "dragstartNone"
-    TargetLine n -> io_ . consoleLog . ms $ "dragstartLine" ++ show n
-    TargetProof n -> io_ . consoleLog . ms $ "dragstartProof" ++ show n
+  dragTarget .= Just dt
+  io_ . consoleLog . ms $ "dragstart " ++ show dt
 updateModel DragOver = pure ()
 updateModel DragEnd = io_ . consoleLog $ "dragend"
-updateModel (DoubleClick n) = do
-  focusedLine .= n
-  io_ . focus . ms $ "proof-line" ++ show n
+updateModel (DoubleClick a) = do
+  focusedLine .= Just a
+  p <- use proof
+  io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
 -- io_ . select . ms $ "proof-line" ++ show n
 updateModel Blur = do
   io_ . consoleLog $ "blur"
-  focusedLine .= -1
+  focusedLine .= Nothing
+updateModel Nop = pure ()
 
 -----------------------------------------------------------------------------
+-- TODO: Add Buttons for adding Nodes as next step.
 viewModel ::
   forall formula rule.
   (Show formula) =>

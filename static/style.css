@@ -21,10 +21,11 @@
 
 .proof-input {
   border: none;
+  min-width: 30rem;
 }
 
 .proof-line {
-  max-width: 10rem;
+  max-width: 30rem;
 }
 
 .proof-line:hover {

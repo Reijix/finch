@@ -31,27 +31,27 @@ import Proof.Syntax
 
 -----------------------------------------------------------------------------
 data DropLocation where
-  LocationLine :: Int -> DropLocation
-  LocationProof :: Int -> DropLocation
+  LocationAddr :: NodeAddr -> DropLocation
   LocationBin :: DropLocation
   deriving (Show, Eq)
 
-data DragTarget where
-  TargetProof :: Int -> DragTarget
-  TargetLine :: Int -> DragTarget
-  TargetNone :: DragTarget
-  deriving (Show, Eq)
+-- data DragTarget where
+--   TargetProof :: Int -> DragTarget
+--   TargetLine :: Int -> DragTarget
+--   TargetNone :: DragTarget
+--   deriving (Show, Eq)
 
 data Action where
   Blur :: Action
-  DoubleClick :: Int -> Action
+  DoubleClick :: NodeAddr -> Action
   Drop :: DropLocation -> Action
   DragEnter :: Action
   DragLeave :: Action
   DragOver :: Action
-  DragStart :: DragTarget -> Action
+  DragStart :: NodeAddr -> Action
   DragEnd :: Action
   Drag :: Action
+  Nop :: Action
   deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
@@ -60,13 +60,13 @@ data Action where
 data Model formula rule = Model
   { _cursorX :: Double,
     _cursorY :: Double,
-    _focusedLine :: Int,
+    _focusedLine :: Maybe NodeAddr,
     _proof :: Proof formula rule,
-    _dragTarget :: DragTarget
+    _dragTarget :: Maybe NodeAddr
   }
   deriving (Show, Eq)
 
-focusedLine :: Lens (Model formula rule) Int
+focusedLine :: Lens (Model formula rule) (Maybe NodeAddr)
 focusedLine = lens (._focusedLine) $ \model a -> model {_focusedLine = a}
 
 cursorX :: Lens (Model formula rule) Double
@@ -78,5 +78,5 @@ cursorY = lens (._cursorY) $ \model y -> model {_cursorY = y}
 proof :: Lens (Model formula rule) (Proof formula rule)
 proof = lens (._proof) $ \model p -> model {_proof = p}
 
-dragTarget :: Lens (Model formula rule) DragTarget
+dragTarget :: Lens (Model formula rule) (Maybe NodeAddr)
 dragTarget = lens (._dragTarget) $ \model dt -> model {_dragTarget = dt}

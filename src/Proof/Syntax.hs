@@ -18,10 +18,30 @@ type Assumption formula = formula
 
 data Derivation formula rule = Derivation formula rule [Reference] deriving (Show, Eq)
 
+-- | A datatype for respresnting fitch-style proofs.
 data Proof formula rule where
+  -- | A single line of the prove consisting of a derivation.
   ProofLine :: Derivation formula rule -> Proof formula rule
+  -- | A subproof consisting of a list of assumptions, a list of subproofs (or derivations) and a conclusion.
   SubProof :: [Assumption formula] -> [Proof formula rule] -> Derivation formula rule -> Proof formula rule
   deriving (Eq)
+
+instance (Show formula, Show rule) => Show (Proof formula rule) where
+  show :: (Show formula, Show rule) => Proof formula rule -> String
+  show = show' 0 0
+    where
+      withIndent :: Int -> Int -> String -> String
+      withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
+      showProof :: Int -> Int -> Proof formula rule -> String
+      showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
+      showProof line level p@(SubProof {}) = show' line (level + 1) p
+      show' :: Int -> Int -> Proof formula rule -> String
+      show' line level (ProofLine (Derivation f r _)) = show f ++ show r
+      show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
+        where
+          (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withIndent ln level $ show f)) line fs
+          (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + lLength p, showProof ln' level p)) line' ps
+          conclusionShow = withIndent line'' level (show' line'' level (ProofLine l))
 
 isSubProof :: Proof formula rule -> Bool
 isSubProof (ProofLine {}) = False
@@ -31,109 +51,136 @@ isProofLine :: Proof formula rule -> Bool
 isProofLine (ProofLine {}) = True
 isProofLine (SubProof {}) = False
 
-fromLineNo :: Int -> Proof formula rule -> Maybe LineAddr
-fromLineNo 0 (ProofLine {}) = Just $ LADeriv 0 Nothing
-fromLineNo n (SubProof [] [] _) = Nothing
-fromLineNo n (SubProof [] ps _) = helper n 0 ps
-  where
-    helper :: Int -> Int -> [Proof formula rule] -> Maybe LineAddr
-    helper n m [] = Nothing
-    helper 0 m ((ProofLine {}) : ps) = Just $ LADeriv m Nothing
-    helper n m (p : ps) | n < lLength p = do
-      addr <- fromLineNo n p
-      return $ LADeriv m (Just addr)
-    helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
-fromLineNo n (SubProof fs _ _) | n < L.length fs = Just $ LAAssumption n
-fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
-fromLineNo n p = Nothing
-
-fromLineAddr :: LineAddr -> Proof formula rule -> Maybe Int
-fromLineAddr = go 0
-  where
-    go :: Int -> LineAddr -> Proof formula rule -> Maybe Int
-    go 0 (LADeriv 0 Nothing) (ProofLine {}) = Just 0
-    go n addr (ProofLine {}) = Nothing
-    go n (LAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
-    go n (LAAssumption m) (SubProof fs _ _) = Nothing
-    go n (LADeriv m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
-    go n (LADeriv m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)
-
-data LineAddr = LAAssumption Int | LADeriv Int (Maybe LineAddr) deriving (Show, Eq)
-
-incrementLineAddr :: LineAddr -> LineAddr
-incrementLineAddr (LAAssumption n) = LAAssumption $ n + 1
-incrementLineAddr (LADeriv n Nothing) = LADeriv (n + 1) Nothing
-incrementLineAddr (LADeriv n (Just a)) = LADeriv n (Just (incrementLineAddr a))
-
--- TODO implement corresponding functions
-data ProofAddr = ProofAddr Int (Maybe ProofAddr)
-
--- TODO improve
-instance (Show formula, Show rule) => Show (Proof formula rule) where
-  show :: (Show formula, Show rule) => Proof formula rule -> String
-  show = show' 0
-    where
-      withSpaces :: Int -> String -> String
-      withSpaces n s = replicate n ' ' ++ s ++ "\n"
-      show' :: Int -> Proof formula rule -> String
-      show' n (ProofLine (Derivation f r _)) = show f ++ show r
-      show' n (SubProof fs ps l) = concatMap (withSpaces n . show) fs ++ concatMap (showProof n) ps ++ withSpaces n (show' n (ProofLine l))
-        where
-          showProof :: Int -> Proof formula rule -> String
-          showProof n p@(ProofLine _) = withSpaces n $ show' n p
-          showProof n p@(SubProof {}) = show' (n + 2) p
-
+-- | The `lLength` of a proof is its number of lines.
 lLength :: Proof formula rule -> Int
 lLength (ProofLine l) = 1
 lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 
-lLookup :: Proof formula rule -> Int -> Maybe (Either (Assumption formula) (Derivation formula rule))
-lLookup (ProofLine d) 0 = Just $ Right d
-lLookup (ProofLine _) _ = Nothing
-lLookup (SubProof [] [] l) 0 = Just $ Right l
-lLookup (SubProof [] [] _) _ = Nothing
-lLookup (SubProof [] (p : _) _) n | n < lLength p = lLookup p n
-lLookup (SubProof [] (p : ps) l) n = lLookup (SubProof [] ps l) (n - lLength p)
-lLookup (SubProof fs ps l) n = if n < L.length fs then Just . Left $ fs L.!! n else lLookup (SubProof [] ps l) (n - L.length fs)
+-- * Indexing proofs
 
-lLookupAddr :: LineAddr -> Proof formula rule -> Maybe (Either (Assumption formula) (Derivation formula rule))
-lLookupAddr (LAAssumption n) (SubProof fs _ _)
+-- | This type is used for indexing lines in a proof.
+--   Its recursive structure makes defining functions that manipulate proofs more convenient
+--
+-- ==== Usage
+--
+-- A `NodeAddr` may either be a reference to
+-- * a single assumption `NAAssumption` @n@,
+-- * a single line or proof inside the proof `NAProof` @n@ `Nothing`
+-- * a reference to a nested element inside a subproof `NAProof` @n@ (`Just` @a@)
+-- TODO cases for NAProof n Nothing everywhere!!
+data NodeAddr
+  = NAAssumption Int
+  | NALine Int
+  | NAProof Int (Maybe NodeAddr)
+  deriving (Show, Eq)
+
+-- ** Conversion between line numbers and `NodeAddr`
+
+-- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
+fromLineNo :: Int -> Proof formula rule -> Maybe NodeAddr
+fromLineNo 0 (ProofLine {}) = Just $ NALine 0
+fromLineNo 0 (SubProof [] [] _) = Just $ NALine 0
+fromLineNo n (SubProof [] [] _) = Nothing
+fromLineNo n (SubProof [] ps _) = helper n 0 ps
+  where
+    helper :: Int -> Int -> [Proof formula rule] -> Maybe NodeAddr
+    helper n m [] = Nothing
+    helper 0 m ((ProofLine {}) : ps) = Just $ NALine m
+    helper n m (p : ps) | n < lLength p = do
+      addr <- fromLineNo n p
+      return $ NAProof m (Just addr)
+    helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
+fromLineNo n (SubProof fs _ _) | n < L.length fs = Just $ NAAssumption n
+fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
+fromLineNo n p = Nothing
+
+-- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
+fromNodeAddr :: NodeAddr -> Proof formula rule -> Maybe Int
+fromNodeAddr = go 0
+  where
+    go :: Int -> NodeAddr -> Proof formula rule -> Maybe Int
+    go 0 (NALine 0) (ProofLine {}) = Just 0
+    go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
+    go n (NAAssumption m) (SubProof fs _ _) = Nothing
+    go 0 (NALine 0) (SubProof [] [] _) = Just 0
+    go n (NALine m) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
+    go n (NALine m) (SubProof fs ps _) | m == L.length ps = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 ps
+    go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)
+    go _ _ _ = Nothing
+
+-- ** Utilities for working with addresses
+
+naAppendAssumption :: Int -> NodeAddr -> NodeAddr
+naAppendAssumption m (NAProof n (Just a)) = NAProof n (Just $ naAppendAssumption m a)
+naAppendAssumption m (NAProof n Nothing) = NAProof n (Just $ NAAssumption m)
+naAppendAssumption m a = error $ show a ++ "\n cannot append assumption."
+
+naAppendLine :: Int -> NodeAddr -> NodeAddr
+naAppendLine m (NAProof n (Just a)) = NAProof n (Just $ naAppendLine m a)
+naAppendLine m (NAProof n Nothing) = NAProof n (Just $ NALine m)
+naAppendLine m a = error $ show a ++ "\n cannot append assumption."
+
+-- | `incrementNodeAddr` increments an address by 1, while keeping the nesting structure unchanged.
+incrementNodeAddr :: NodeAddr -> NodeAddr
+incrementNodeAddr (NAAssumption n) = NAAssumption (n + 1)
+incrementNodeAddr (NALine n) = NALine (n + 1)
+incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
+
+-- * Querying proofs
+
+lIsFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsFormula (NAAssumption n) (SubProof fs _ _) = n < L.length fs
+lIsFormula (NAProof n (Just a)) (SubProof _ ps _) =
+  n < L.length ps && isSubProof (ps !! n) && lIsFormula a (ps !! n)
+lIsFormula _ _ = False
+
+lIsLine :: NodeAddr -> Proof formula rule -> Bool
+lIsLine (NALine n) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
+lIsLine (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && lIsLine a (ps !! n)
+lIsLine _ _ = False
+
+lLookup :: NodeAddr -> Proof formula rule -> Maybe (Either (Assumption formula) (Derivation formula rule))
+lLookup (NAAssumption n) (SubProof fs _ _)
   | n < L.length fs = Just . Left $ fs !! n
-lLookupAddr (LADeriv n Nothing) (SubProof _ ps _)
+lLookup (NALine n) (SubProof _ ps _)
   | n < L.length ps = case ps !! n of
       ProofLine d -> Just $ Right d
       SubProof {} -> Nothing
-lLookupAddr (LADeriv n (Just a)) (SubProof _ ps _)
-  | n < L.length ps = lLookupAddr a (ps !! n)
+lLookup (NAProof n (Just a)) (SubProof _ ps _)
+  | n < L.length ps = lLookup a (ps !! n)
 
-lRemoveAddr :: LineAddr -> Proof formula rule -> Proof formula rule
-lRemoveAddr (LAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
-lRemoveAddr (LADeriv n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
-lRemoveAddr (LADeriv n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lRemoveAddr addr) ps) l
-lRemoveAddr _ p = p
+-- * Modifying proofs
 
-data InsertPosition = Before | After
+-- | `lRemove` @addr@ @proof@ removes the element at @addr@ inside @proof@ if it exists (and is not a conclusion).
+-- Otherwise @proof@ is returned.
+lRemove :: NodeAddr -> Proof formula rule -> Proof formula rule
+lRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
+lRemove (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
+lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps = SubProof fs (removeAt n ps) l
+lRemove (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lRemove addr) ps) l
+lRemove _ p = p
 
-lInsertAddr :: Either (Assumption formula) (Derivation formula rule) -> LineAddr -> InsertPosition -> Proof formula rule -> Proof formula rule
-lInsertAddr (Left f) (LAAssumption n) pos (SubProof fs ps l)
+-- | Enumeration for specifying where to insert an element into a proof.
+data InsertPosition
+  = -- | Insert `Before` the specified address.
+    Before
+  | -- | Insert `After` the specified address.
+    After
+
+-- | `lInsert` (`Left` @f@) @addr@ @pos@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
+--
+-- `lInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
+--
+-- Both formulae and derivations are either inserted `Before` or `After` the specified address.
+lInsert :: Either (Assumption formula) (Derivation formula rule) -> NodeAddr -> InsertPosition -> Proof formula rule -> Proof formula rule
+lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of
       Before -> SubProof (insertAt f n fs) ps l
       After -> SubProof (insertAt f (n + 1) fs) ps l
-lInsertAddr (Right d) (LADeriv n Nothing) pos (SubProof fs ps l)
+lInsert (Right d) (NALine n) pos (SubProof fs ps l)
   | n < L.length ps = case pos of
       Before -> SubProof fs (insertAt (ProofLine d) n ps) l
       After -> SubProof fs (insertAt (ProofLine d) (n + 1) ps) l
-lInsertAddr e (LADeriv n (Just a)) pos (SubProof fs ps l)
-  | n < L.length ps && isSubProof (ps !! n) = SubProof fs (updateAt n (lInsertAddr e a pos) ps) l
-lInsertAddr _ _ _ p = p
-
-lIsFormulaAddr :: LineAddr -> Proof formula rule -> Bool
-lIsFormulaAddr (LAAssumption n) (SubProof fs _ _) = n < L.length fs
-lIsFormulaAddr (LADeriv n (Just a)) (SubProof _ ps _) =
-  n < L.length ps && isSubProof (ps !! n) && lIsFormulaAddr a (ps !! n)
-lIsFormulaAddr _ _ = False
-
-lIsLineAddr :: LineAddr -> Proof formula rule -> Bool
-lIsLineAddr (LADeriv n Nothing) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
-lIsLineAddr (LADeriv n (Just a)) (SubProof _ ps _) = n < L.length ps && lIsLineAddr a (ps !! n)
-lIsLineAddr _ _ = False
+lInsert e (NAProof n (Just a)) pos (SubProof fs ps l)
+  | n < L.length ps && isSubProof (ps !! n) = SubProof fs (updateAt n (lInsert e a pos) ps) l
+lInsert _ _ _ p = p
