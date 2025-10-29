@@ -64,7 +64,7 @@ updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
     TargetProof n -> pure ()
-    TargetLine n -> proof %= lRemove n
+    TargetLine n -> pure () -- proof %= lRemove n
     TargetNone -> pure ()
   io_ . consoleLog $ "dropped in bin"
 updateModel (Drop (LocationLine n)) = do
