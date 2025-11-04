@@ -166,6 +166,7 @@ data InsertPosition
     Before
   | -- | Insert `After` the specified address.
     After
+  deriving (Show, Eq)
 
 -- | `lInsert` (`Left` @f@) @addr@ @pos@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
 --

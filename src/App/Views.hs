@@ -50,11 +50,24 @@ onPD f =
 viewBin :: View (Model formula rule) Action
 viewBin =
   H.div_
-    [ onDragOverWithOptions preventDefault DragOver,
-      onDragEnterWithOptions preventDefault DragEnter,
-      onDragLeaveWithOptions preventDefault DragLeave,
+    [ onDragOverWithOptions preventDefault Nop,
+      onDragEnterWithOptions preventDefault Nop,
+      onDragLeaveWithOptions preventDefault Nop,
       onDropWithOptions defaultOptions (Drop LocationBin),
       HP.class_ "bin"
+    ]
+    []
+
+viewInsertLineNode :: View (Model formula rule) Action
+viewInsertLineNode =
+  H.div_
+    [ HP.classList_
+        [ ("spawn-button", True),
+          ("draggable", True)
+        ],
+      HP.draggable_ True,
+      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ SpawnStart SpawnLine,
+      onDragEnd DragEnd
     ]
     []
 
@@ -67,13 +80,35 @@ lineContainer ::
 lineContainer m isAssumption a s =
   H.div_
     [ HP.draggable_ True,
-      HP.classList_ [("proof-line", True), ("draggable", True)],
+      HP.classList_
+        [ ("proof-line", True),
+          ("draggable", True),
+          ("can-hover", not (m ^. dragging))
+        ],
       onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ DragStart a,
-      onDragEnd DragEnd,
+      onDragEndWithOptions (Options {_preventDefault = False, _stopPropagation = True}) DragEnd,
       onDoubleClick (DoubleClick a),
       onFocusOut Blur
     ]
-    [ H.input_
+    [ H.div_
+        [ HP.class_ "upper-hover-zone",
+          HP.classList_ [("insert-before", (m ^. currentLineBefore) == Just a)],
+          onDragOverWithOptions preventDefault DragOver,
+          onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a Before),
+          onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave Before),
+          onDropWithOptions defaultOptions (Drop (LocationAddr a))
+        ]
+        [],
+      H.div_
+        [ HP.class_ "lower-hover-zone",
+          HP.classList_ [("insert-after", (m ^. currentLineAfter) == Just a)],
+          onDragOverWithOptions preventDefault DragOver,
+          onDragEnterWithOptions preventDefault (DragEnter a After),
+          onDragLeaveWithOptions preventDefault (DragLeave After),
+          onDropWithOptions defaultOptions (Drop (LocationAddr a))
+        ]
+        [],
+      H.input_
         [ inert_ (Just a /= (m ^. focusedLine)),
           HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
           HP.classList_ [("proof-input", True), ("assumption", isAssumption)],

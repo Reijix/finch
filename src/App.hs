@@ -69,13 +69,26 @@ updateModel (Drop LocationBin) = do
   io_ . consoleLog $ "dropped in bin"
 updateModel (Drop (LocationAddr n)) = do
   io_ . consoleLog . ms $ "dropped in addr " ++ show n
-updateModel DragEnter = pure ()
-updateModel DragLeave = pure ()
+updateModel (DragEnter a Before) = do
+  -- io_ . consoleLog . ms $ "dragenter " ++ show a
+  currentLineBefore .= Just a
+updateModel (DragEnter a After) = do
+  -- io_ . consoleLog . ms $ "dragenter " ++ show a
+  currentLineAfter .= Just a
+updateModel (DragLeave Before) = do
+  -- io_ . consoleLog . ms $ "dragleave"
+  currentLineBefore .= Nothing
+updateModel (DragLeave After) = do
+  -- io_ . consoleLog . ms $ "dragleave"
+  currentLineAfter .= Nothing
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
+  dragging .= True
   io_ . consoleLog . ms $ "dragstart " ++ show dt
 updateModel DragOver = pure ()
-updateModel DragEnd = io_ . consoleLog $ "dragend"
+updateModel DragEnd = do
+  dragging .= False
+  io_ . consoleLog $ "dragend"
 updateModel (DoubleClick a) = do
   focusedLine .= Just a
   p <- use proof
@@ -85,6 +98,8 @@ updateModel Blur = do
   io_ . consoleLog $ "blur"
   focusedLine .= Nothing
 updateModel Nop = pure ()
+updateModel (SpawnStart _) =
+  io_ . consoleLog $ "spawnstart"
 
 -----------------------------------------------------------------------------
 -- TODO: Add Buttons for adding Nodes as next step.
@@ -98,7 +113,8 @@ viewModel model =
   H.div_
     []
     [ viewProof model,
-      viewBin
+      viewBin,
+      viewInsertLineNode
     ]
 
 -----------------------------------------------------------------------------

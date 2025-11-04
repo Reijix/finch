@@ -25,11 +25,13 @@
 }
 
 .proof-line {
+  position: relative;
   max-width: 30rem;
+  height: 1.3rem;
 }
 
-.proof-line:hover {
-  transform: translateY(-1px);
+.can-hover:hover {
+  transform: translateX(2px);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
@@ -37,6 +39,36 @@
   height: 100px;
   width: 100px;
   background-color: aquamarine;
+}
+
+.spawn-button {
+  height: 100px;
+  width: 100px;
+  background-color: orange;
+}
+
+.upper-hover-zone {
+  position: absolute;
+  /* x: 0px;
+  y: 0px; */
+  height: 50%;
+  width: 100%;
+}
+
+.lower-hover-zone {
+  position: absolute;
+  /* x: 0px; */
+  top: 50%;
+  height: 50%;
+  width: 100%;
+}
+
+.insert-before {
+  border-top: 3px solid red;
+}
+
+.insert-after {
+  border-bottom: 3px solid red;
 }
 
 .subproof {

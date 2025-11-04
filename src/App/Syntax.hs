@@ -35,20 +35,21 @@ data DropLocation where
   LocationBin :: DropLocation
   deriving (Show, Eq)
 
--- data DragTarget where
---   TargetProof :: Int -> DragTarget
---   TargetLine :: Int -> DragTarget
---   TargetNone :: DragTarget
---   deriving (Show, Eq)
+data SpawnType where
+  SpawnLine :: SpawnType
+  SpawnProof :: SpawnType
+  SpawnAssumption :: SpawnType
+  deriving (Show, Eq)
 
 data Action where
   Blur :: Action
   DoubleClick :: NodeAddr -> Action
   Drop :: DropLocation -> Action
-  DragEnter :: Action
-  DragLeave :: Action
+  DragEnter :: NodeAddr -> InsertPosition -> Action
+  DragLeave :: InsertPosition -> Action
   DragOver :: Action
   DragStart :: NodeAddr -> Action
+  SpawnStart :: SpawnType -> Action
   DragEnd :: Action
   Drag :: Action
   Nop :: Action
@@ -62,7 +63,10 @@ data Model formula rule = Model
     _cursorY :: Double,
     _focusedLine :: Maybe NodeAddr,
     _proof :: Proof formula rule,
-    _dragTarget :: Maybe NodeAddr
+    _dragTarget :: Maybe NodeAddr,
+    _currentLineBefore :: Maybe NodeAddr,
+    _currentLineAfter :: Maybe NodeAddr,
+    _dragging :: Bool
   }
   deriving (Show, Eq)
 
@@ -80,3 +84,12 @@ proof = lens (._proof) $ \model p -> model {_proof = p}
 
 dragTarget :: Lens (Model formula rule) (Maybe NodeAddr)
 dragTarget = lens (._dragTarget) $ \model dt -> model {_dragTarget = dt}
+
+currentLineBefore :: Lens (Model formula rule) (Maybe NodeAddr)
+currentLineBefore = lens (._currentLineBefore) $ \model dt -> model {_currentLineBefore = dt}
+
+currentLineAfter :: Lens (Model formula rule) (Maybe NodeAddr)
+currentLineAfter = lens (._currentLineAfter) $ \model dt -> model {_currentLineAfter = dt}
+
+dragging :: Lens (Model formula rule) Bool
+dragging = lens (._dragging) $ \model x -> model {_dragging = x}
