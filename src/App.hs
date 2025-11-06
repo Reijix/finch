@@ -21,6 +21,7 @@ import Miso
     emptyDecoder,
     focus,
     io_,
+    keyboardEvents,
     mouseSub,
     ms,
     preventDefault,
@@ -56,7 +57,7 @@ runApp emptyModel = run $ startApp app
     app =
       (component emptyModel updateModel viewModel)
         { styles = [Href "style.css"],
-          events = M.union dragEvents (M.fromList [("dblclick", False), ("focusout", False)])
+          events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents
         }
 
 -----------------------------------------------------------------------------
@@ -87,6 +88,8 @@ updateModel (DragStart dt) = do
   io_ . consoleLog . ms $ "dragstart " ++ show dt
 updateModel DragOver = pure ()
 updateModel DragEnd = do
+  currentLineAfter .= Nothing
+  currentLineBefore .= Nothing
   dragging .= False
   io_ . consoleLog $ "dragend"
 updateModel (DoubleClick a) = do

@@ -77,7 +77,7 @@ lineContainer ::
   (Show formula) =>
   (Show rule) =>
   Model formula rule -> Bool -> NodeAddr -> MisoString -> View (Model formula rule) Action
-lineContainer m isAssumption a s =
+lineContainer m isLastAssumption a s =
   H.div_
     [ HP.draggable_ True,
       HP.classList_
@@ -111,8 +111,9 @@ lineContainer m isAssumption a s =
       H.input_
         [ inert_ (Just a /= (m ^. focusedLine)),
           HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
-          HP.classList_ [("proof-input", True), ("assumption", isAssumption)],
+          HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption)],
           HP.draggable_ False,
+          onEnter Nop Blur,
           onDragStartWithOptions preventDefault Nop,
           value_ s
         ]
@@ -124,10 +125,11 @@ viewLine ::
   (Show rule) =>
   Model formula rule ->
   NodeAddr ->
+  Bool ->
   Either (Assumption formula) (Derivation formula rule) ->
   View (Model formula rule) Action
-viewLine m a (Left f) = lineContainer m True a $ ms $ show f ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
-viewLine m a (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f ++ show r ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms $ show f ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+viewLine m a _ (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f ++ show r ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
 
 viewProof ::
   forall formula rule.
@@ -140,11 +142,11 @@ viewProof model = H.div_ [] [proofView]
       ProofLine _ -> error "Tried calling viewProof on a ProofLine"
       SubProof fs ps d -> HP.div_ [HP.class_ "subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
         where
-          (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (Left f))) 0 fs
+          (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == 0) (Left f))) 0 fs
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
-          viewConclusion = viewLine model (NALine n) (Right d)
+          viewConclusion = viewLine model (NALine n) False (Right d)
     _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
-    _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) (Right d)
+    _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) False (Right d)
     _viewProof n ma (SubProof fs ps d) =
       H.div_
         [ HP.class_ "subproof",
@@ -157,9 +159,9 @@ viewProof model = H.div_ [] [proofView]
         a = case ma of
           Nothing -> NAProof n Nothing
           Just addr -> addr
-        (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (Left f))) 0 fs
+        (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == 0) (Left f))) 0 fs
         (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof n (Just a) p)) 0 ps
-        viewConclusion = viewLine model (naAppendLine m a) (Right d)
+        viewConclusion = viewLine model (naAppendLine m a) False (Right d)
 
 -----------------------------------------------------------------------------
 toEm :: Int -> MisoString

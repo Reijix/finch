@@ -28,6 +28,7 @@
   position: relative;
   max-width: 30rem;
   height: 1.3rem;
+  box-sizing: border-box;
 }
 
 .can-hover:hover {
@@ -65,14 +66,17 @@
 
 .insert-before {
   border-top: 3px solid red;
+  box-sizing: border-box;
 }
 
 .insert-after {
   border-bottom: 3px solid red;
+  box-sizing: border-box;
 }
 
 .subproof {
   position: relative;
+  box-sizing: border-box;
   border-left: 3px solid black;
   margin-left: 5px;
   margin-top: 5px;
@@ -90,7 +94,9 @@
   /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
 }
 
-.assumption {
+/* TODO: last assumption should have border-bottom, first assumption should have margin-top */
+
+.last-assumption {
   border-bottom: 3px solid black;
 }
 
