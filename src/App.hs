@@ -20,6 +20,7 @@ import Miso
     dragEvents,
     emptyDecoder,
     focus,
+    fromMisoString,
     io_,
     keyboardEvents,
     mouseSub,
@@ -37,6 +38,7 @@ import qualified Miso.Html.Element as H
 import Miso.Html.Event
 import qualified Miso.Html.Property as HP
 import Miso.Lens (use, (%=), (.=))
+import Miso.String (FromMisoString)
 import Miso.Svg (text_)
 import Proof.Syntax
 
@@ -47,21 +49,22 @@ runApp ::
   forall formula rule.
   (Eq formula) =>
   (Show formula) =>
+  (FromMisoString formula) =>
   (Eq rule) =>
   (Show rule) =>
-  Model rule formula ->
+  Model formula rule ->
   IO ()
 runApp emptyModel = run $ startApp app
   where
-    app :: App (Model rule formula) Action
+    app :: App (Model formula rule) Action
     app =
       (component emptyModel updateModel viewModel)
         { styles = [Href "style.css"],
-          events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents
+          events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
         }
 
 -----------------------------------------------------------------------------
-updateModel :: Action -> Effect ROOT (Model rule formula) Action
+updateModel :: forall formula rule. (FromMisoString formula) => Action -> Effect ROOT (Model formula rule) Action
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
@@ -103,6 +106,14 @@ updateModel Blur = do
 updateModel Nop = pure ()
 updateModel (SpawnStart _) =
   io_ . consoleLog $ "spawnstart"
+updateModel (Input str) = do
+  io_ . consoleLog $ "input"
+  fline <- use focusedLine
+  case fline of
+    Nothing -> pure ()
+    Just addr -> do
+      io_ . consoleLog . ms $ "printing " ++ show str
+      proof %= lUpdateFormula (fromMisoString str :: formula) addr
 
 -----------------------------------------------------------------------------
 -- TODO: Add Buttons for adding Nodes as next step.
@@ -110,8 +121,8 @@ viewModel ::
   forall formula rule.
   (Show formula) =>
   (Show rule) =>
-  Model rule formula ->
-  View (Model rule formula) Action
+  Model formula rule ->
+  View (Model formula rule) Action
 viewModel model =
   H.div_
     []

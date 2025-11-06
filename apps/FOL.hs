@@ -17,7 +17,7 @@ main = runApp emptyModel
 -----------------------------------------------------------------------------
 data Rule = Rule deriving (Show, Eq)
 
-data Formula = Formula deriving (Show, Eq)
+type Formula = String
 
 -----------------------------------------------------------------------------
 emptyModel :: (Model Formula Rule)
@@ -36,9 +36,9 @@ emptyModel =
 exProof :: (Proof Formula Rule)
 exProof =
   SubProof
-    [Formula, Formula]
-    [ SubProof [Formula] [ProofLine (Derivation Formula Rule [])] (Derivation Formula Rule [])
+    ["Formula", "Formula"]
+    [ SubProof ["Formula"] [ProofLine (Derivation "Formula" Rule [])] (Derivation "Formula" Rule [])
     ]
-    (Derivation Formula Rule [])
+    (Derivation "Formula" Rule [])
 
 -----------------------------------------------------------------------------

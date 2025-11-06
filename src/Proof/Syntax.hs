@@ -149,7 +149,18 @@ lLookup (NALine n) (SubProof _ ps _)
 lLookup (NAProof n (Just a)) (SubProof _ ps _)
   | n < L.length ps = lLookup a (ps !! n)
 
--- * Modifying proofs
+-- * Updating proof contents
+
+lUpdateFormula :: forall formula rule. formula -> NodeAddr -> Proof formula rule -> Proof formula rule
+lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
+lUpdateFormula f (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
+  where
+    updateProofLine :: Proof formula rule -> Proof formula rule
+    updateProofLine (ProofLine (Derivation f' rule ref)) = ProofLine (Derivation f rule ref)
+lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
+lUpdateFormula _ _ p = p
+
+-- * (Re-)moving proofs
 
 -- | `lRemove` @addr@ @proof@ removes the element at @addr@ inside @proof@ if it exists (and is not a conclusion).
 -- Otherwise @proof@ is returned.

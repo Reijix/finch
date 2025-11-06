@@ -114,6 +114,7 @@ lineContainer m isLastAssumption a s =
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption)],
           HP.draggable_ False,
           onEnter Nop Blur,
+          onInput Input,
           onDragStartWithOptions preventDefault Nop,
           value_ s
         ]

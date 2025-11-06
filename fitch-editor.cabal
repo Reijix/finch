@@ -100,7 +100,7 @@ library fitch-editor-lib
   build-depends:
     base >=4.9 || <5,
     containers >=0.7,
-    miso >=1.9,
+    miso,
     mtl,
 
   hs-source-dirs:

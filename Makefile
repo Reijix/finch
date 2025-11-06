@@ -1,7 +1,7 @@
 
-.PHONY= update build optim
+.PHONY= update build optim serve
 
-all: update build optim serve
+all: update build optim
 
 update:
 	wasm32-wasi-cabal update
@@ -18,8 +18,10 @@ optim:
 	wasm-opt -all -O2 public/fitch-editor-FOL.wasm -o public/fitch-editor-FOL.wasm
 	wasm-tools strip -o public/fitch-editor-FOL.wasm public/fitch-editor-FOL.wasm
 
-serve:
+serve1:
 	http-server public
+
+serve: all serve1
 
 clean:
 	rm -rf dist-newstyle public

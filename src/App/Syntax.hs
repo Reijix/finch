@@ -43,6 +43,7 @@ data SpawnType where
 
 data Action where
   Blur :: Action
+  Input :: MisoString -> Action
   DoubleClick :: NodeAddr -> Action
   Drop :: DropLocation -> Action
   DragEnter :: NodeAddr -> InsertPosition -> Action
