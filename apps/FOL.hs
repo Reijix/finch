@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module FOL where
 
@@ -17,7 +18,15 @@ main = runApp emptyModel
 -----------------------------------------------------------------------------
 data Rule = Rule deriving (Show, Eq)
 
-type Formula = String
+newtype Formula = Formula String deriving (Eq)
+
+instance Show Formula where
+  show :: Formula -> String
+  show (Formula str) = str
+
+instance FromString Formula where
+  fromString :: String -> Either Formula String
+  fromString = Left . Formula
 
 -----------------------------------------------------------------------------
 emptyModel :: (Model Formula Rule)
@@ -36,9 +45,9 @@ emptyModel =
 exProof :: (Proof Formula Rule)
 exProof =
   SubProof
-    ["Formula", "Formula"]
-    [ SubProof ["Formula"] [ProofLine (Derivation "Formula" Rule [])] (Derivation "Formula" Rule [])
+    [Formula "Formula", Formula "Formula"]
+    [ SubProof [Formula "Formula"] [ProofLine (Derivation (Formula "Formula") Rule [])] (Derivation (Formula "Formula") Rule [])
     ]
-    (Derivation "Formula" Rule [])
+    (Derivation (Formula "Formula") Rule [])
 
 -----------------------------------------------------------------------------

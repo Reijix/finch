@@ -129,8 +129,9 @@ viewLine ::
   Bool ->
   Either (Assumption formula) (Derivation formula rule) ->
   View (Model formula rule) Action
-viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms $ show f ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
-viewLine m a _ (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f ++ show r ++ show a ++ " lineno:" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms $ show f
+-- TODO add container for rules
+viewLine m a _ (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f
 
 viewProof ::
   forall formula rule.

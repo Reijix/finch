@@ -30,6 +30,9 @@ import qualified Miso.Svg.Property as SP
 import Proof.Syntax
 
 -----------------------------------------------------------------------------
+class FromString a where
+  fromString :: String -> Either a String
+
 data DropLocation where
   LocationAddr :: NodeAddr -> DropLocation
   LocationBin :: DropLocation

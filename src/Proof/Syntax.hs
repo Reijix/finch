@@ -151,12 +151,14 @@ lLookup (NAProof n (Just a)) (SubProof _ ps _)
 
 -- * Updating proof contents
 
+-- TODO updating conclusion not possible atm
+updateProofLine :: formula -> Proof formula rule -> Proof formula rule
+updateProofLine f (ProofLine (Derivation _ rule ref)) = ProofLine (Derivation f rule ref)
+
 lUpdateFormula :: forall formula rule. formula -> NodeAddr -> Proof formula rule -> Proof formula rule
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
-lUpdateFormula f (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
-  where
-    updateProofLine :: Proof formula rule -> Proof formula rule
-    updateProofLine (ProofLine (Derivation f' rule ref)) = ProofLine (Derivation f rule ref)
+lUpdateFormula f (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
+lUpdateFormula f (NALine n) (SubProof fs ps (Derivation _ rule ref)) | n == L.length ps = SubProof fs ps (Derivation f rule ref)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p
 
@@ -184,6 +186,7 @@ data InsertPosition
 -- `lInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
 --
 -- Both formulae and derivations are either inserted `Before` or `After` the specified address.
+-- TODO can insert `Before` conclusion??
 lInsert :: Either (Assumption formula) (Derivation formula rule) -> NodeAddr -> InsertPosition -> Proof formula rule -> Proof formula rule
 lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of

@@ -38,7 +38,6 @@ import qualified Miso.Html.Element as H
 import Miso.Html.Event
 import qualified Miso.Html.Property as HP
 import Miso.Lens (use, (%=), (.=))
-import Miso.String (FromMisoString)
 import Miso.Svg (text_)
 import Proof.Syntax
 
@@ -49,7 +48,7 @@ runApp ::
   forall formula rule.
   (Eq formula) =>
   (Show formula) =>
-  (FromMisoString formula) =>
+  (FromString formula) =>
   (Eq rule) =>
   (Show rule) =>
   Model formula rule ->
@@ -64,7 +63,7 @@ runApp emptyModel = run $ startApp app
         }
 
 -----------------------------------------------------------------------------
-updateModel :: forall formula rule. (FromMisoString formula) => Action -> Effect ROOT (Model formula rule) Action
+updateModel :: forall formula rule. (FromString formula) => Action -> Effect ROOT (Model formula rule) Action
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
@@ -113,7 +112,9 @@ updateModel (Input str) = do
     Nothing -> pure ()
     Just addr -> do
       io_ . consoleLog . ms $ "printing " ++ show str
-      proof %= lUpdateFormula (fromMisoString str :: formula) addr
+      case fromString (fromMisoString str :: String) of
+        Left f -> proof %= lUpdateFormula f addr
+        Right _ -> undefined -- TODO
 
 -----------------------------------------------------------------------------
 -- TODO: Add Buttons for adding Nodes as next step.
