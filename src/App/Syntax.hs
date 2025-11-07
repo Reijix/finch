@@ -34,7 +34,7 @@ class FromString a where
   fromString :: String -> Either a String
 
 data DropLocation where
-  LocationAddr :: NodeAddr -> DropLocation
+  LocationAddr :: NodeAddr -> InsertPosition -> DropLocation
   LocationBin :: DropLocation
   deriving (Show, Eq)
 
@@ -68,6 +68,7 @@ data Model formula rule = Model
     _focusedLine :: Maybe NodeAddr,
     _proof :: Proof formula rule,
     _dragTarget :: Maybe NodeAddr,
+    _spawnType :: Maybe SpawnType,
     _currentLineBefore :: Maybe NodeAddr,
     _currentLineAfter :: Maybe NodeAddr,
     _dragging :: Bool
@@ -88,6 +89,9 @@ proof = lens (._proof) $ \model p -> model {_proof = p}
 
 dragTarget :: Lens (Model formula rule) (Maybe NodeAddr)
 dragTarget = lens (._dragTarget) $ \model dt -> model {_dragTarget = dt}
+
+spawnType :: Lens (Model formula rule) (Maybe SpawnType)
+spawnType = lens (._spawnType) $ \model st -> model {_spawnType = st}
 
 currentLineBefore :: Lens (Model formula rule) (Maybe NodeAddr)
 currentLineBefore = lens (._currentLineBefore) $ \model dt -> model {_currentLineBefore = dt}

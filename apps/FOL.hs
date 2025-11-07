@@ -36,11 +36,19 @@ emptyModel =
       _cursorY = 52,
       _focusedLine = Nothing,
       _proof = exProof,
+      _spawnType = Nothing,
       _dragTarget = Nothing,
       _currentLineBefore = Nothing,
       _currentLineAfter = Nothing,
       _dragging = False
     }
+
+-- exProof :: Proof Formula Rule
+-- exProof =
+--   SubProof
+--     []
+--     [ProofLine (Derivation (Formula "line1") Rule []), ProofLine (Derivation (Formula "line2") Rule [])]
+--     (Derivation (Formula "conclusion") Rule [])
 
 exProof :: (Proof Formula Rule)
 exProof =

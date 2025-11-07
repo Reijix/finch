@@ -37,7 +37,7 @@ import Miso.Effect (Sub)
 import qualified Miso.Html.Element as H
 import Miso.Html.Event
 import qualified Miso.Html.Property as HP
-import Miso.Lens (use, (%=), (.=))
+import Miso.Lens (use, (%=), (.=), (^.))
 import Miso.Svg (text_)
 import Proof.Syntax
 
@@ -70,8 +70,20 @@ updateModel (Drop LocationBin) = do
     Nothing -> pure ()
     Just addr -> proof %= lRemove addr
   io_ . consoleLog $ "dropped in bin"
-updateModel (Drop (LocationAddr n)) = do
-  io_ . consoleLog . ms $ "dropped in addr " ++ show n
+updateModel (Drop (LocationAddr laddr pos)) = do
+  p <- use proof
+  -- TODO compare addresses
+  use dragTarget >>= \case
+    Nothing -> pure ()
+    Just addr -> do
+      case lLookup addr p of
+        Nothing -> io_ . consoleLog . ms $ "lLookup failed with addr=" ++ show addr
+        Just e -> proof .= lInsert e laddr pos p
+  use spawnType >>= \case
+    Nothing -> pure ()
+    Just SpawnLine -> undefined
+    Just SpawnProof -> undefined
+    Just SpawnAssumption -> undefined
 updateModel (DragEnter a Before) = do
   -- io_ . consoleLog . ms $ "dragenter " ++ show a
   currentLineBefore .= Just a
@@ -93,6 +105,7 @@ updateModel DragEnd = do
   currentLineAfter .= Nothing
   currentLineBefore .= Nothing
   dragging .= False
+  dragTarget .= Nothing
   io_ . consoleLog $ "dragend"
 updateModel (DoubleClick a) = do
   focusedLine .= Just a
@@ -130,6 +143,7 @@ viewModel model =
     [ viewProof model,
       viewBin,
       viewInsertLineNode
+      -- H.p_ [] [text $ ms $ show (model ^. proof)]
     ]
 
 -----------------------------------------------------------------------------

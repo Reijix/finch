@@ -128,6 +128,8 @@ incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 
 -- * Querying proofs
 
+-- TODO remove all `l` prefixes!
+
 lIsFormula :: NodeAddr -> Proof formula rule -> Bool
 lIsFormula (NAAssumption n) (SubProof fs _ _) = n < L.length fs
 lIsFormula (NAProof n (Just a)) (SubProof _ ps _) =
@@ -146,18 +148,23 @@ lLookup (NALine n) (SubProof _ ps _)
   | n < L.length ps = case ps !! n of
       ProofLine d -> Just $ Right d
       SubProof {} -> Nothing
+lLookup (NALine n) (SubProof _ ps l)
+  | n == L.length ps = Just $ Right l
 lLookup (NAProof n (Just a)) (SubProof _ ps _)
   | n < L.length ps = lLookup a (ps !! n)
+lLookup _ _ = Nothing
 
 -- * Updating proof contents
 
--- TODO updating conclusion not possible atm
-updateProofLine :: formula -> Proof formula rule -> Proof formula rule
-updateProofLine f (ProofLine (Derivation _ rule ref)) = ProofLine (Derivation f rule ref)
-
+-- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
+--
+-- Fails silently
 lUpdateFormula :: forall formula rule. formula -> NodeAddr -> Proof formula rule -> Proof formula rule
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
 lUpdateFormula f (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
+  where
+    updateProofLine :: formula -> Proof formula rule -> Proof formula rule
+    updateProofLine f (ProofLine (Derivation _ rule ref)) = ProofLine (Derivation f rule ref)
 lUpdateFormula f (NALine n) (SubProof fs ps (Derivation _ rule ref)) | n == L.length ps = SubProof fs ps (Derivation f rule ref)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p

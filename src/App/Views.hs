@@ -96,7 +96,7 @@ lineContainer m isLastAssumption a s =
           onDragOverWithOptions preventDefault DragOver,
           onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a Before),
           onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave Before),
-          onDropWithOptions defaultOptions (Drop (LocationAddr a))
+          onDropWithOptions defaultOptions (Drop (LocationAddr a Before))
         ]
         [],
       H.div_
@@ -105,7 +105,7 @@ lineContainer m isLastAssumption a s =
           onDragOverWithOptions preventDefault DragOver,
           onDragEnterWithOptions preventDefault (DragEnter a After),
           onDragLeaveWithOptions preventDefault (DragLeave After),
-          onDropWithOptions defaultOptions (Drop (LocationAddr a))
+          onDropWithOptions defaultOptions (Drop (LocationAddr a After))
         ]
         [],
       H.input_
@@ -148,6 +148,7 @@ viewProof model = H.div_ [] [proofView]
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
           viewConclusion = viewLine model (NALine n) False (Right d)
     _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
+    _viewProof n Nothing (ProofLine d) = viewLine model (NALine n) False (Right d)
     _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) False (Right d)
     _viewProof n ma (SubProof fs ps d) =
       H.div_
@@ -162,7 +163,7 @@ viewProof model = H.div_ [] [proofView]
           Nothing -> NAProof n Nothing
           Just addr -> addr
         (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == 0) (Left f))) 0 fs
-        (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof n (Just a) p)) 0 ps
+        (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
         viewConclusion = viewLine model (naAppendLine m a) False (Right d)
 
 -----------------------------------------------------------------------------

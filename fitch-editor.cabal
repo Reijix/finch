@@ -96,6 +96,7 @@ library fitch-editor-lib
     OverloadedRecordDot
     OverloadedStrings
     ScopedTypeVariables
+    LambdaCase
 
   build-depends:
     base >=4.9 || <5,
