@@ -1,7 +1,7 @@
 module App.Views where
 
 import App.Syntax
-import qualified Data.List as L
+import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe)
 import Miso
   ( Attribute,
@@ -18,16 +18,16 @@ import Miso
     preventDefault,
     text,
   )
-import qualified Miso.Html as HP
-import qualified Miso.Html.Element as H
+import Miso.Html qualified as HP
+import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property (value_)
-import qualified Miso.Html.Property as HP
+import Miso.Html.Property qualified as HP
 import Miso.Lens
 import Miso.Property (boolProp, textProp)
 import Miso.Svg (onFocusOut, text_, tspan_)
-import qualified Miso.Svg.Element as S
-import qualified Miso.Svg.Property as SP
+import Miso.Svg.Element qualified as S
+import Miso.Svg.Property qualified as SP
 import Proof.Syntax
 
 viewDragIcon :: View (Model formula rule) Action
@@ -146,7 +146,7 @@ viewProof model = H.div_ [] [proofView]
         where
           (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == L.length fs - 1) (Left f))) 0 fs
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
-          viewConclusion = viewLine model (NALine n) False (Right d)
+          viewConclusion = viewLine model NAConclusion False (Right d)
     _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
     _viewProof n Nothing (ProofLine d) = viewLine model (NALine n) False (Right d)
     _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) False (Right d)
@@ -164,7 +164,7 @@ viewProof model = H.div_ [] [proofView]
           Just addr -> addr
         (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == L.length fs - 1) (Left f))) 0 fs
         (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
-        viewConclusion = viewLine model (naAppendLine m a) False (Right d)
+        viewConclusion = viewLine model (naAppendConclusion a) False (Right d)
 
 -----------------------------------------------------------------------------
 toEm :: Int -> MisoString

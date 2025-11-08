@@ -3,7 +3,7 @@ module App (runApp) where
 import App.Syntax
 import App.Views
 import Control.Monad (when)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
 import Miso
   ( App,
@@ -30,13 +30,13 @@ import Miso
     startApp,
     text,
   )
-import qualified Miso.CSS as CSS
-import qualified Miso.CSS as HP
+import Miso.CSS qualified as CSS
+import Miso.CSS qualified as HP
 import Miso.CSS.Color (red)
 import Miso.Effect (Sub)
-import qualified Miso.Html.Element as H
+import Miso.Html.Element qualified as H
 import Miso.Html.Event
-import qualified Miso.Html.Property as HP
+import Miso.Html.Property qualified as HP
 import Miso.Lens (use, (%=), (.=), (^.))
 import Miso.Svg (text_)
 import Proof.Syntax
@@ -70,15 +70,10 @@ updateModel (Drop LocationBin) = do
     Nothing -> pure ()
     Just addr -> proof %= lRemove addr
   io_ . consoleLog $ "dropped in bin"
-updateModel (Drop (LocationAddr laddr pos)) = do
-  p <- use proof
-  -- TODO compare addresses
+updateModel (Drop (LocationAddr targetAddr pos)) = do
   use dragTarget >>= \case
     Nothing -> pure ()
-    Just addr -> do
-      case lLookup addr p of
-        Nothing -> io_ . consoleLog . ms $ "lLookup failed with addr=" ++ show addr
-        Just e -> proof .= lInsert e laddr pos p
+    Just sourceAddr -> proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
     Just SpawnLine -> undefined
