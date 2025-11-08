@@ -18,7 +18,7 @@ type Assumption formula = formula
 
 data Derivation formula rule = Derivation formula rule [Reference] deriving (Show, Eq)
 
--- | A datatype for respresnting fitch-style proofs.
+-- | A datatype for respresenting fitch-style proofs.
 data Proof formula rule where
   -- | A single line of the prove consisting of a derivation.
   ProofLine :: Derivation formula rule -> Proof formula rule
@@ -73,6 +73,19 @@ data NodeAddr
   | NALine Int
   | NAProof Int (Maybe NodeAddr)
   deriving (Show, Eq)
+
+instance Ord NodeAddr where
+  compare :: NodeAddr -> NodeAddr -> Ordering
+  compare (NAAssumption n) (NAAssumption m) = compare n m
+  compare (NAAssumption _) (NALine _) = LT
+  compare (NALine _) (NAAssumption _) = GT
+  compare (NALine n) (NALine m) = compare n m
+  compare (NALine n) (NAProof m _) = compare n m
+  compare (NAProof n _) (NALine m) = compare n m
+  compare (NAAssumption _) (NAProof _ _) = LT
+  compare (NAProof _ _) (NAAssumption _) = GT
+  compare (NAProof n (Just addr1)) (NAProof m (Just addr2)) | n == m = compare addr1 addr2
+  compare (NAProof n _) (NAProof m _) = compare n m
 
 -- ** Conversion between line numbers and `NodeAddr`
 

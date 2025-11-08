@@ -84,6 +84,7 @@ updateModel (Drop (LocationAddr laddr pos)) = do
     Just SpawnLine -> undefined
     Just SpawnProof -> undefined
     Just SpawnAssumption -> undefined
+-- TODO maybe remove all of this and instead do it via ::hover and adding a css-class on dragstart
 updateModel (DragEnter a Before) = do
   -- io_ . consoleLog . ms $ "dragenter " ++ show a
   currentLineBefore .= Just a
@@ -100,7 +101,7 @@ updateModel (DragStart dt) = do
   dragTarget .= Just dt
   dragging .= True
   io_ . consoleLog . ms $ "dragstart " ++ show dt
-updateModel DragOver = pure ()
+-- updateModel DragOver = pure ()
 updateModel DragEnd = do
   currentLineAfter .= Nothing
   currentLineBefore .= Nothing

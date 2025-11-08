@@ -93,7 +93,7 @@ lineContainer m isLastAssumption a s =
     [ H.div_
         [ HP.class_ "upper-hover-zone",
           HP.classList_ [("insert-before", (m ^. currentLineBefore) == Just a)],
-          onDragOverWithOptions preventDefault DragOver,
+          onDragOverWithOptions preventDefault Nop,
           onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a Before),
           onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave Before),
           onDropWithOptions defaultOptions (Drop (LocationAddr a Before))
@@ -102,7 +102,7 @@ lineContainer m isLastAssumption a s =
       H.div_
         [ HP.class_ "lower-hover-zone",
           HP.classList_ [("insert-after", (m ^. currentLineAfter) == Just a)],
-          onDragOverWithOptions preventDefault DragOver,
+          onDragOverWithOptions preventDefault Nop,
           onDragEnterWithOptions preventDefault (DragEnter a After),
           onDragLeaveWithOptions preventDefault (DragLeave After),
           onDropWithOptions defaultOptions (Drop (LocationAddr a After))
@@ -144,7 +144,7 @@ viewProof model = H.div_ [] [proofView]
       ProofLine _ -> error "Tried calling viewProof on a ProofLine"
       SubProof fs ps d -> HP.div_ [HP.class_ "subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
         where
-          (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == 0) (Left f))) 0 fs
+          (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == L.length fs - 1) (Left f))) 0 fs
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
           viewConclusion = viewLine model (NALine n) False (Right d)
     _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
@@ -162,7 +162,7 @@ viewProof model = H.div_ [] [proofView]
         a = case ma of
           Nothing -> NAProof n Nothing
           Just addr -> addr
-        (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == 0) (Left f))) 0 fs
+        (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == L.length fs - 1) (Left f))) 0 fs
         (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
         viewConclusion = viewLine model (naAppendLine m a) False (Right d)
 

@@ -195,10 +195,24 @@ lineNoQCTests =
       QC.testProperty "prop_fromNodeAddrInverse" prop_fromNodeAddrInverse
     ]
 
+prop_compareLineNo :: Proof Formula Rule -> Property
+prop_compareLineNo p =
+  forAll (arbitraryNodeAddrFor p) $ \a ->
+    forAll (arbitraryNodeAddrFor p) $ \b ->
+      isJust (fromNodeAddr a p) ==>
+        isJust (fromNodeAddr b p) ==>
+          compare a b === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)
+
+compareQCTests :: TestTree
+compareQCTests =
+  testGroup
+    "testing compare instance of NodeAddr"
+    [QC.testProperty "prop_compareLineNo" prop_compareLineNo]
+
 proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests],
+    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests],
       testGroup "HUnit" []
     ]
