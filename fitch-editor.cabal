@@ -31,7 +31,7 @@ common wasm
 
 test-suite test
   default-language:
-    Haskell2010
+    GHC2024
 
   type:
     exitcode-stdio-1.0
@@ -44,10 +44,6 @@ test-suite test
 
   main-is:
     test.hs
-
-  default-extensions:
-    FlexibleInstances
-    InstanceSigs
 
   build-depends:
     base >=4.9 || <5,
@@ -75,7 +71,7 @@ executable fitch-editor-FOL
     FOL.hs
 
   default-language:
-    Haskell2010
+    GHC2024
 
 library fitch-editor-lib
   exposed-modules:
@@ -87,16 +83,8 @@ library fitch-editor-lib
     Util
 
   default-extensions:
-    DuplicateRecordFields
-    ExistentialQuantification
-    GADTs
-    InstanceSigs
-    NamedFieldPuns
-    NoFieldSelectors
     OverloadedRecordDot
     OverloadedStrings
-    ScopedTypeVariables
-    LambdaCase
 
   build-depends:
     base >=4.9 || <5,
@@ -108,4 +96,4 @@ library fitch-editor-lib
     src
 
   default-language:
-    Haskell2010
+    GHC2024
