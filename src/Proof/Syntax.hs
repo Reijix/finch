@@ -259,10 +259,12 @@ getNAAfterInsert (NAProof n Nothing) (NALine m) pos = NALine $ _compareWithPos n
 getNAAfterInsert NAConclusion a _ = a
 
 lMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof formula rule -> Proof formula rule
-lMove _ _ sourceAddr p | lIsConclusion sourceAddr p = p
-lMove targetAddr pos sourceAddr p = case lLookup sourceAddr p of
-  Nothing -> p
-  Just node ->
-    let p' = lInsert node targetAddr pos p
-     in -- TODO needs a check if lInsert failed!!
-        lRemove (getNAAfterInsert targetAddr sourceAddr pos) p'
+lMove targetAddr pos sourceAddr p
+  | lIsFormula sourceAddr p && lIsFormula targetAddr p
+      || lIsLine sourceAddr p && lIsLine targetAddr p =
+      case lLookup sourceAddr p of
+        Nothing -> p
+        Just node ->
+          let p' = lInsert node targetAddr pos p
+           in lRemove (getNAAfterInsert targetAddr sourceAddr pos) p'
+lMove _ _ _ p = p
