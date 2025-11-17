@@ -29,6 +29,11 @@ common wasm
     cpp-options:
       -DWASM
 
+common javascript
+  if arch(javascript)
+    ld-options:
+      -sEXPORTED_RUNTIME_METHODS=HEAP8
+
 test-suite test
   default-language:
     GHC2024
@@ -55,13 +60,10 @@ test-suite test
 
 executable fitch-editor-FOL
   import:
-    wasm
+    javascript
 
   hs-source-dirs:
     apps
-
-  ghc-options:
-    -haddock
 
   build-depends:
     base >=4.9 || <5,

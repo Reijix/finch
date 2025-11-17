@@ -2,7 +2,6 @@ packages:
   ./*.cabal
   
 package *
-  documentation: true
 
 constraints:
   zlib +bundled-c-zlib
@@ -12,5 +11,8 @@ source-repository-package
   location: https://github.com/dmjio/miso.git
   branch: master
 
-program-options
-  ghc-options: -haddock
+with-compiler:
+  javascript-unknown-ghcjs-ghc
+
+with-hc-pkg:
+  javascript-unknown-ghcjs-ghc-pkg

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module FOL where
+module Main where
 
 import App
 import App.Syntax
