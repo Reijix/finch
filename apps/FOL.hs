@@ -8,10 +8,6 @@ import App.Syntax
 import Proof.Syntax
 
 -----------------------------------------------------------------------------
-#ifdef WASM
-foreign export javascript "hs_start" main :: IO ()
-#endif
------------------------------------------------------------------------------
 main :: IO ()
 main = runApp emptyModel
 
