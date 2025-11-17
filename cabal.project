@@ -11,8 +11,3 @@ source-repository-package
   location: https://github.com/dmjio/miso.git
   branch: master
 
-with-compiler:
-  javascript-unknown-ghcjs-ghc
-
-with-hc-pkg:
-  javascript-unknown-ghcjs-ghc-pkg

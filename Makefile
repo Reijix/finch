@@ -1,22 +1,18 @@
 
-.PHONY= update build optim serve
+CABAL_OPTIONS = --allow-newer --with-compiler=javascript-unknown-ghcjs-ghc --with-hc-pkg=javascript-unknown-ghcjs-ghc-pkg
 
-all: update build optim
+.PHONY: update build serve
+
+all: update build
 
 update:
-	wasm32-wasi-cabal update
+	cabal update
 
 build:
-	wasm32-wasi-cabal build 
+	cabal build $(CABAL_OPTIONS)
 	rm -rf public
-	cp -r static public
-	$(eval my_wasm=$(shell wasm32-wasi-cabal list-bin fitch-editor-FOL | tail -n 1))
-	$(shell wasm32-wasi-ghc --print-libdir)/post-link.mjs --input $(my_wasm) --output public/ghc_wasm_jsffi.js
-	cp -v $(my_wasm) public/
-
-optim:
-	wasm-opt -all -O2 public/fitch-editor-FOL.wasm -o public/fitch-editor-FOL.wasm
-	wasm-tools strip -o public/fitch-editor-FOL.wasm public/fitch-editor-FOL.wasm
+	cp -r $(shell cabal list-bin fitch-editor-FOL $(CABAL_OPTIONS)).jsexe public
+	cp static/* public
 
 serve1:
 	http-server public
