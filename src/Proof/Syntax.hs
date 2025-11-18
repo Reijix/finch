@@ -152,12 +152,29 @@ incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 -- * Querying proofs
 
 -- TODO remove all `l` prefixes!
+lIsFirstFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsFirstFormula (NAAssumption 0) (SubProof fs _ _) = True
+lIsFirstFormula (NAProof n (Just a)) (SubProof _ ps _) =
+  n < L.length ps && isSubProof (ps !! n) && lIsFirstFormula a (ps !! n)
+lIsFirstFormula _ _ = False
 
 lIsFormula :: NodeAddr -> Proof formula rule -> Bool
 lIsFormula (NAAssumption n) (SubProof fs _ _) = n < L.length fs
 lIsFormula (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsFormula a (ps !! n)
 lIsFormula _ _ = False
+
+lIsLastFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsLastFormula (NAAssumption n) (SubProof fs _ _) = n == L.length fs - 1
+lIsLastFormula (NAProof n (Just a)) (SubProof _ ps _) =
+  n < L.length ps && isSubProof (ps !! n) && lIsLastFormula a (ps !! n)
+lIsLastFormula _ _ = False
+
+lIsFirstLine :: NodeAddr -> Proof formula rule -> Bool
+lIsFirstLine (NALine 0) (SubProof fs _ _) = True
+lIsFirstLine (NAProof n (Just a)) (SubProof _ ps _) =
+  n < L.length ps && isSubProof (ps !! n) && lIsFirstLine a (ps !! n)
+lIsFirstLine _ _ = False
 
 lIsLine :: NodeAddr -> Proof formula rule -> Bool
 lIsLine (NALine n) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
@@ -221,6 +238,7 @@ data InsertPosition
 --
 -- Both formulae and derivations are either inserted `Before` or `After` the specified address.
 -- TODO can insert `Before` conclusion??
+-- TODO change Right to Proof formula rule!
 lInsert :: Either (Assumption formula) (Derivation formula rule) -> NodeAddr -> InsertPosition -> Proof formula rule -> Proof formula rule
 lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of
@@ -258,13 +276,22 @@ getNAAfterInsert (NAProof _ Nothing) (NAAssumption m) _ = NAAssumption m
 getNAAfterInsert (NAProof n Nothing) (NALine m) pos = NALine $ _compareWithPos n m pos
 getNAAfterInsert NAConclusion a _ = a
 
+_lMoveUnsafe :: NodeAddr -> InsertPosition -> NodeAddr -> Proof formula rule -> Proof formula rule
+_lMoveUnsafe targetAddr pos sourceAddr p = case lLookup sourceAddr p of
+  Nothing -> p
+  Just node ->
+    let p' = lInsert node targetAddr pos p
+     in lRemove (getNAAfterInsert targetAddr sourceAddr pos) p'
+
+-- TODO cases for proof!
 lMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof formula rule -> Proof formula rule
-lMove targetAddr pos sourceAddr p
-  | lIsFormula sourceAddr p && lIsFormula targetAddr p
-      || lIsLine sourceAddr p && lIsLine targetAddr p =
-      case lLookup sourceAddr p of
-        Nothing -> p
-        Just node ->
-          let p' = lInsert node targetAddr pos p
-           in lRemove (getNAAfterInsert targetAddr sourceAddr pos) p'
+lMove targetAddr pos sourceAddr p | lIsFormula sourceAddr p && lIsFormula targetAddr p = _lMoveUnsafe targetAddr pos sourceAddr p
+-- lMove targetAddr Before sourceAddr p | lIsFormula sourceAddr p && lIsFirstLine targetAddr p = _
+-- lMove targetAddr Before sourceAddr p | lIsFormula sourceAddr p && lIsConclusion targetAddr p = _
+-- lMove targetAddr After sourceAddr p | lIsFormula sourceAddr p && lIsConclusion targetAddr p = _
+lMove targetAddr pos sourceAddr p | lIsLine sourceAddr p && lIsLine targetAddr p = _lMoveUnsafe targetAddr pos sourceAddr p
+-- lMove targetAddr Before sourceAddr p | lIsLine sourceAddr p && lIsFirstFormula targetAddr p = _
+-- lMove targetAddr After sourceAddr p | lIsLine sourceAddr p && lIsLastFormula targetAddr p = _
+lMove targetAddr Before sourceAddr p | lIsLine sourceAddr p && lIsConclusion targetAddr p = _lMoveUnsafe targetAddr Before sourceAddr p
+-- lMove targetAddr After sourceAddr p | lIsLine sourceAddr p && lIsConclusion targetAddr p = _
 lMove _ _ _ p = p

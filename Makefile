@@ -9,7 +9,7 @@ update:
 	cabal update
 
 build:
-	cabal build $(CABAL_OPTIONS)
+	cabal build $(CABAL_OPTIONS) fitch-editor-FOL
 	rm -rf public
 	cp -r $(shell cabal list-bin fitch-editor-FOL $(CABAL_OPTIONS)).jsexe public
 	cp static/* public

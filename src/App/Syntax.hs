@@ -1,6 +1,6 @@
 module App.Syntax where
 
-import qualified Data.List as L
+import Data.List qualified as L
 import Miso
   ( App,
     Attribute,
@@ -22,11 +22,11 @@ import Miso
     startApp,
     text,
   )
-import qualified Miso.CSS as CSS
+import Miso.CSS qualified as CSS
 import Miso.Lens (Lens, lens, this, use, (.=), (^.))
 import Miso.Svg (text_, tspan_)
-import qualified Miso.Svg.Element as S
-import qualified Miso.Svg.Property as SP
+import Miso.Svg.Element qualified as S
+import Miso.Svg.Property qualified as SP
 import Proof.Syntax
 
 -----------------------------------------------------------------------------
