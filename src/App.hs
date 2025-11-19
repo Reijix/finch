@@ -73,13 +73,14 @@ updateModel (Drop LocationBin) = do
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   use dragTarget >>= \case
     Nothing -> pure ()
-    Just sourceAddr -> proof %= lMove targetAddr pos sourceAddr
+    Just sourceAddr -> do
+      io_ . consoleLog . ms $ "dropping (" ++ show sourceAddr ++ ") into (" ++ show targetAddr ++ ")"
+      proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
     Just SpawnLine -> undefined
     Just SpawnProof -> undefined
     Just SpawnAssumption -> undefined
--- TODO maybe remove all of this and instead do it via ::hover and adding a css-class on dragstart
 updateModel (DragEnter a Before) = do
   -- io_ . consoleLog . ms $ "dragenter " ++ show a
   currentLineBefore .= Just a

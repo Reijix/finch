@@ -65,13 +65,11 @@ lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 --
 -- A `NodeAddr` may either be a reference to
 -- * a single assumption `NAAssumption` @n@,
--- * a single line inside the proof `NALine` @n@
 -- * the conclusion `NAConclusion` of the proof
--- * a single proof inside the proof `NAProof` @n@ `Nothing`
+-- * a single proof or line inside the proof `NAProof` @n@ `Nothing`
 -- * a reference to a nested element inside a subproof `NAProof` @n@ (`Just` @a@)
 data NodeAddr
   = NAAssumption Int
-  | NALine Int
   | NAConclusion
   | NAProof Int (Maybe NodeAddr)
   deriving (Show, Eq)
@@ -79,11 +77,11 @@ data NodeAddr
 instance Ord NodeAddr where
   compare :: NodeAddr -> NodeAddr -> Ordering
   compare (NAAssumption n) (NAAssumption m) = compare n m
-  compare (NAAssumption _) (NALine _) = LT
-  compare (NALine _) (NAAssumption _) = GT
-  compare (NALine n) (NALine m) = compare n m
-  compare (NALine n) (NAProof m _) = compare n m
-  compare (NAProof n _) (NALine m) = compare n m
+  compare (NAAssumption _) (NAProof _ Nothing) = LT
+  compare (NAProof _ Nothing) (NAAssumption _) = GT
+  compare (NAProof n Nothing) (NAProof m Nothing) = compare n m
+  compare (NAProof n Nothing) (NAProof m _) = compare n m
+  compare (NAProof n _) (NAProof m Nothing) = compare n m
   compare (NAAssumption _) (NAProof _ _) = LT
   compare (NAProof _ _) (NAAssumption _) = GT
   compare (NAProof n (Just addr1)) (NAProof m (Just addr2)) | n == m = compare addr1 addr2
@@ -96,7 +94,7 @@ instance Ord NodeAddr where
 
 -- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
 fromLineNo :: Int -> Proof formula rule -> Maybe NodeAddr
-fromLineNo 0 (ProofLine {}) = Just $ NALine 0
+fromLineNo 0 (ProofLine {}) = Just $ NAProof 0 Nothing
 -- fromLineNo 0 (SubProof [] [] _) = Just NAConclusion
 -- fromLineNo n (SubProof [] [] _) = Nothing
 -- TODO handle conclusion
@@ -104,7 +102,7 @@ fromLineNo n (SubProof [] ps _) = helper n 0 ps
   where
     helper :: Int -> Int -> [Proof formula rule] -> Maybe NodeAddr
     helper n m [] = Nothing
-    helper 0 m ((ProofLine {}) : ps) = Just $ NALine m
+    helper 0 m ((ProofLine {}) : ps) = Just $ NAProof m Nothing
     helper n m (p : ps) | n < lLength p = do
       addr <- fromLineNo n p
       return $ NAProof m (Just addr)
@@ -118,11 +116,11 @@ fromNodeAddr :: NodeAddr -> Proof formula rule -> Maybe Int
 fromNodeAddr = go 0
   where
     go :: Int -> NodeAddr -> Proof formula rule -> Maybe Int
-    go 0 (NALine 0) (ProofLine {}) = Just 0
+    go 0 (NAProof 0 Nothing) (ProofLine {}) = Just 0
     go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
     go n (NAAssumption m) (SubProof fs _ _) = Nothing
-    go 0 (NALine 0) (SubProof [] [] _) = Just 0
-    go n (NALine m) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
+    go 0 (NAProof 0 Nothing) (SubProof [] [] _) = Just 0
+    go n (NAProof m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
     go n NAConclusion (SubProof fs ps _) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 ps
     go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)
     go _ _ _ = Nothing
@@ -134,10 +132,10 @@ naAppendAssumption m (NAProof n (Just a)) = NAProof n (Just $ naAppendAssumption
 naAppendAssumption m (NAProof n Nothing) = NAProof n (Just $ NAAssumption m)
 naAppendAssumption m a = error $ show a ++ "\n cannot append assumption."
 
-naAppendLine :: Int -> NodeAddr -> NodeAddr
-naAppendLine m (NAProof n (Just a)) = NAProof n (Just $ naAppendLine m a)
-naAppendLine m (NAProof n Nothing) = NAProof n (Just $ NALine m)
-naAppendLine m a = error $ show a ++ "\n cannot append line."
+naAppendProof :: Int -> NodeAddr -> NodeAddr
+naAppendProof m (NAProof n (Just a)) = NAProof n (Just $ naAppendProof m a)
+naAppendProof m (NAProof n Nothing) = NAProof n (Just $ NAProof m Nothing)
+naAppendProof m a = error $ show a ++ "\n cannot append line."
 
 naAppendConclusion :: NodeAddr -> NodeAddr
 naAppendConclusion (NAProof n (Just a)) = NAProof n (Just $ naAppendConclusion a)
@@ -147,7 +145,7 @@ naAppendConclusion a = error $ show a ++ "\n cannot append conclusion."
 -- | `incrementNodeAddr` increments an address by 1, while keeping the nesting structure unchanged.
 incrementNodeAddr :: NodeAddr -> NodeAddr
 incrementNodeAddr (NAAssumption n) = NAAssumption (n + 1)
-incrementNodeAddr (NALine n) = NALine (n + 1)
+incrementNodeAddr (NAProof n Nothing) = NAProof (n + 1) Nothing
 incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 
 -- * Querying proofs
@@ -172,13 +170,13 @@ lIsLastFormula (NAProof n (Just a)) (SubProof _ ps _) =
 lIsLastFormula _ _ = False
 
 lIsFirstLine :: NodeAddr -> Proof formula rule -> Bool
-lIsFirstLine (NALine 0) (SubProof fs _ _) = True
+lIsFirstLine (NAProof 0 Nothing) (SubProof fs _ _) = True
 lIsFirstLine (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsFirstLine a (ps !! n)
 lIsFirstLine _ _ = False
 
 lIsLine :: NodeAddr -> Proof formula rule -> Bool
-lIsLine (NALine n) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
+lIsLine (NAProof n Nothing) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
 lIsLine (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && lIsLine a (ps !! n)
 lIsLine _ _ = False
 
@@ -190,10 +188,8 @@ lIsConclusion _ _ = False
 lLookup :: NodeAddr -> Proof formula rule -> Maybe (Either (Assumption formula) (Proof formula rule))
 lLookup (NAAssumption n) (SubProof fs _ _)
   | n < L.length fs = Just . Left $ fs !! n
-lLookup (NALine n) (SubProof _ ps _)
-  | n < L.length ps = case ps !! n of
-      p@(ProofLine d) -> Just $ Right p
-      SubProof {} -> Nothing
+lLookup (NAProof n Nothing) (SubProof _ ps _)
+  | n < L.length ps = Just . Right $ ps !! n
 lLookup NAConclusion (SubProof _ ps l) = Just . Right $ ProofLine l
 lLookup (NAProof n (Just a)) (SubProof _ ps _)
   | n < L.length ps = lLookup a (ps !! n)
@@ -208,7 +204,7 @@ lLookup _ _ = Nothing
 -- Fails silently
 lUpdateFormula :: forall formula rule. formula -> NodeAddr -> Proof formula rule -> Proof formula rule
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
-lUpdateFormula f (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
+lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
   where
     updateProofLine :: formula -> Proof formula rule -> Proof formula rule
     updateProofLine f (ProofLine (Derivation _ rule ref)) = ProofLine (Derivation f rule ref)
@@ -222,7 +218,7 @@ lUpdateFormula _ _ p = p
 -- Otherwise @proof@ is returned.
 lRemove :: NodeAddr -> Proof formula rule -> Proof formula rule
 lRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
-lRemove (NALine n) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
+lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
 lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps = SubProof fs (removeAt n ps) l
 lRemove (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lRemove addr) ps) l
 lRemove _ p = p
@@ -245,17 +241,17 @@ lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of
       Before -> Just $ SubProof (insertAt f n fs) ps l
       After -> Just $ SubProof (insertAt f (n + 1) fs) ps l
-lInsert (Left f) (NALine 0) Before (SubProof fs ps l) = Just $ SubProof (insertAt f (L.length fs) fs) ps l
+lInsert (Left f) (NAProof 0 Nothing) Before (SubProof fs ps l) = Just $ SubProof (insertAt f (L.length fs) fs) ps l
 lInsert (Left f) NAConclusion Before (SubProof fs [] l) = Just $ SubProof (insertAt f (L.length fs) fs) [] l
-lInsert (Right p) (NALine n) pos (SubProof fs ps l)
+lInsert (Right p) (NAProof n Nothing) pos (SubProof fs ps l)
   | n < L.length ps = case pos of
       Before -> Just $ SubProof fs (insertAt p n ps) l
       After -> Just $ SubProof fs (insertAt p (n + 1) ps) l
 lInsert (Right p) NAConclusion Before (SubProof fs ps l) = Just $ SubProof fs (insertAt p (L.length ps) ps) l
 lInsert (Right p) (NAAssumption n) After p'@(SubProof fs _ _)
-  | n == L.length fs - 1 = lInsert (Right p) (NALine 0) Before p'
-lInsert (Right p) (NAProof n (Just (NAAssumption 0))) Before p' = lInsert (Right p) (NALine n) Before p'
-lInsert (Right p) (NAProof n (Just NAConclusion)) After p' = lInsert (Right p) (NALine n) After p'
+  | n == L.length fs - 1 = lInsert (Right p) (NAProof 0 Nothing) Before p'
+lInsert (Right p) (NAProof n (Just (NAAssumption 0))) Before p' = lInsert (Right p) (NAProof n Nothing) Before p'
+lInsert (Right p) (NAProof n (Just NAConclusion)) After p' = lInsert (Right p) (NAProof n Nothing) After p'
 lInsert e (NAProof n (Just a)) pos (SubProof fs ps l)
   | n < L.length ps && isSubProof (ps !! n) = lInsert e a pos (ps !! n) >>= (\p' -> pure $ SubProof fs (updateAt n (const p') ps) l)
 lInsert _ _ _ p = Nothing

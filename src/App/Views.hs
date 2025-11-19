@@ -16,6 +16,7 @@ import Miso
     onWithOptions,
     pointerDecoder,
     preventDefault,
+    stopPropagation,
     text,
   )
 import Miso.Html qualified as HP
@@ -85,8 +86,8 @@ lineContainer m isLastAssumption a s =
           ("draggable", True),
           ("can-hover", not (m ^. dragging))
         ],
-      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ DragStart a,
-      onDragEndWithOptions (Options {_preventDefault = False, _stopPropagation = True}) DragEnd,
+      onDragStartWithOptions stopPropagation $ DragStart a,
+      onDragEndWithOptions stopPropagation DragEnd,
       onDoubleClick (DoubleClick a),
       onFocusOut Blur
     ]
@@ -116,7 +117,7 @@ lineContainer m isLastAssumption a s =
           onEnter Nop Blur,
           onInput Input,
           onDragStartWithOptions preventDefault Nop,
-          value_ s
+          value_ s -- (ms $ show s ++ show a)
         ]
     ]
 
@@ -148,20 +149,20 @@ viewProof model = H.div_ [] [proofView]
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
           viewConclusion = viewLine model NAConclusion False (Right d)
     _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
-    _viewProof n Nothing (ProofLine d) = viewLine model (NALine n) False (Right d)
-    _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendLine n a) False (Right d)
+    _viewProof n Nothing (ProofLine d) = viewLine model (NAProof n Nothing) False (Right d)
+    _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendProof n a) False (Right d)
     _viewProof n ma (SubProof fs ps d) =
       H.div_
         [ HP.class_ "subproof",
           HP.draggable_ True,
-          onDragStart $ DragStart a,
-          onDragEnd DragEnd
+          onDragStartWithOptions stopPropagation $ DragStart a,
+          onDragEndWithOptions stopPropagation DragEnd
         ]
         (viewAssumptions ++ viewProofs ++ [viewConclusion])
       where
         a = case ma of
           Nothing -> NAProof n Nothing
-          Just addr -> addr
+          Just addr -> naAppendProof n addr
         (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == L.length fs - 1) (Left f))) 0 fs
         (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
         viewConclusion = viewLine model (naAppendConclusion a) False (Right d)
