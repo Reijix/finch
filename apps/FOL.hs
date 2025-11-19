@@ -51,6 +51,7 @@ exProof =
   SubProof
     [Formula "Formula", Formula "Formula"]
     [ ProofLine (Derivation (Formula "Formula") Rule []),
+      SubProof [Formula "Formula"] [ProofLine (Derivation (Formula "Formula") Rule [])] (Derivation (Formula "Formula") Rule []),
       SubProof [Formula "Formula"] [ProofLine (Derivation (Formula "Formula") Rule [])] (Derivation (Formula "Formula") Rule [])
     ]
     (Derivation (Formula "Formula") Rule [])
