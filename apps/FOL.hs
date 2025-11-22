@@ -23,6 +23,10 @@ instance FromString Formula where
   fromString :: String -> Either Formula String
   fromString = Left . Formula
 
+instance FromString Rule where
+  fromString :: String -> Either Rule String
+  fromString = Left . Rule
+
 -----------------------------------------------------------------------------
 emptyModel :: (Model Formula Rule)
 emptyModel =

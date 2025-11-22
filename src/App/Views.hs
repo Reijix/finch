@@ -57,7 +57,7 @@ viewBin =
       onDropWithOptions defaultOptions (Drop LocationBin),
       HP.class_ "bin"
     ]
-    []
+    [H.p_ [] ["Delete Node"]]
 
 viewSpawnNode :: SpawnType -> String -> View (Model formula rule) Action
 viewSpawnNode tp str =
@@ -130,9 +130,17 @@ viewLine ::
   Bool ->
   Either (Assumption formula) (Derivation formula rule) ->
   View (Model formula rule) Action
-viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms $ show f
+viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms text
+  where
+    text = case f of
+      Parsed f -> show f
+      Unparsed str err -> str
 -- TODO add container for rules
-viewLine m a _ (Right (Derivation f r)) = lineContainer m False a $ ms $ show f
+viewLine m a _ (Right (Derivation f r)) = lineContainer m False a $ ms text
+  where
+    text = case f of
+      Parsed f -> show f
+      Unparsed str err -> str
 
 viewProof ::
   forall formula rule.

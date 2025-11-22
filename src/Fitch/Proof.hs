@@ -58,6 +58,12 @@ data RuleApplication rule
   = RuleApplication rule [Reference]
   deriving (Show, Eq)
 
+instance (FromString rule) => FromString (RuleApplication rule) where
+  fromString :: String -> Either (RuleApplication rule) String
+  fromString str = case fromString str :: Either rule String of
+    Left r -> Left $ RuleApplication r []
+    Right e -> Right e
+
 data Derivation formula rule
   = Derivation (ParseWrapper formula) (ParseWrapper (RuleApplication rule))
   deriving (Show, Eq)
@@ -299,9 +305,7 @@ lInsert e (NAProof n (Just a)) pos (SubProof fs ps l)
 lInsert _ _ _ p = Nothing
 
 lMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof formula rule -> Proof formula rule
-lMove targetAddr pos sourceAddr p = case lLookup sourceAddr p of
-  Nothing -> p
-  Just node -> case compare targetAddr sourceAddr of
-    LT -> let p' = lRemove sourceAddr p in fromMaybe p $ lInsert node targetAddr pos p'
-    GT -> maybe p (lRemove sourceAddr) $ lInsert node targetAddr pos p
-    _ -> p
+lMove targetAddr pos sourceAddr p = case (compare targetAddr sourceAddr, lLookup sourceAddr p) of
+  (LT, Just node) | not (lIsConclusion sourceAddr p) -> let p' = lRemove sourceAddr p in fromMaybe p $ lInsert node targetAddr pos p'
+  (GT, Just node) | not (lIsConclusion sourceAddr p) -> maybe p (lRemove sourceAddr) $ lInsert node targetAddr pos p
+  _ -> p

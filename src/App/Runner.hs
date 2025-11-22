@@ -2,8 +2,9 @@ module App.Runner (runApp, Proof (..), FromString (..), Model (..), Derivation (
 
 import App.Model
 import App.Views
+import Control.Monad.State
 import Data.Map qualified as M
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import Fitch.Proof
 import Miso
   ( App,
@@ -37,8 +38,11 @@ import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property qualified as HP
-import Miso.Lens (use, (%=), (.=), (^.))
+import Miso.Lens (Lens, use, (%=), (.=), (^.))
 import Miso.Svg (text_)
+
+(%=?) :: (MonadState record m) => Lens record field -> (field -> Maybe field) -> m ()
+(%=?) _lens f = _lens %= (\x -> fromMaybe x (f x))
 
 -----------------------------------------------------------------------------
 
@@ -50,6 +54,7 @@ runApp ::
   (FromString formula) =>
   (Eq rule) =>
   (Show rule) =>
+  (FromString rule) =>
   Model formula rule ->
   IO ()
 runApp emptyModel = run $ startApp app
@@ -62,7 +67,11 @@ runApp emptyModel = run $ startApp app
         }
 
 -----------------------------------------------------------------------------
-updateModel :: forall formula rule. (FromString formula) => Action -> Effect ROOT (Model formula rule) Action
+updateModel ::
+  forall formula rule.
+  (FromString formula) =>
+  (FromString rule) =>
+  Action -> Effect ROOT (Model formula rule) Action
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
@@ -77,9 +86,9 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
       proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
-    Just SpawnLine -> undefined
-    Just SpawnProof -> undefined
-    Just SpawnAssumption -> undefined
+    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse "Formula") (tryParse "Rule")) targetAddr pos
+    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse "Formula") (tryParse "Rule"))) targetAddr pos
+    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -93,6 +102,7 @@ updateModel DragEnd = do
   currentLineBefore .= Nothing
   dragging .= False
   dragTarget .= Nothing
+  spawnType .= Nothing
 updateModel (DoubleClick a) = do
   focusedLine .= Just a
   p <- use proof
