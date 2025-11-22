@@ -41,7 +41,7 @@ test-suite test
     test.hs
 
   build-depends:
-    base >=4.9 || <5,
+    base,
     fitch-editor-lib,
     tasty ==1.5 || >1.5.1,
     tasty-coverage,
@@ -56,7 +56,7 @@ executable fitch-editor-FOL
     apps
 
   build-depends:
-    base >=4.9 || <5,
+    base,
     fitch-editor-lib,
 
   main-is:
@@ -67,20 +67,18 @@ executable fitch-editor-FOL
 
 library fitch-editor-lib
   exposed-modules:
-    App
-    App.Syntax
+    App.Model
+    App.Runner
     App.Views
-    Proof.Syntax
-    Proof.Util
-    Util
+    Fitch.Proof
 
   default-extensions:
     OverloadedRecordDot
     OverloadedStrings
 
   build-depends:
-    base >=4.9 || <5,
-    containers >=0.7,
+    base,
+    containers,
     miso,
     mtl,
 

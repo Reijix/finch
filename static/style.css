@@ -43,8 +43,7 @@
 }
 
 .spawn-button {
-  height: 100px;
-  width: 100px;
+  max-width: 10rem;
   background-color: orange;
 }
 

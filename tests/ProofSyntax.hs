@@ -2,9 +2,9 @@ module ProofSyntax where
 
 import Control.Monad
 import Data.Functor
-import qualified Data.List as L
+import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe, isJust)
-import Proof.Syntax
+import Fitch.Proof
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck as QC
@@ -92,31 +92,39 @@ instance Arbitrary (Proof Formula Rule) where
             l <- chooseInt (1, 8)
             vectorOf l (proof' (n `div` 2))
 
-arbitraryNodeAddrFor :: Proof Formula Rule -> Gen NodeAddr
-arbitraryNodeAddrFor (ProofLine {}) = return $ NALine 0
-arbitraryNodeAddrFor (SubProof fs ps l) = case fs of
-  [] -> oneof [naLine, naDeriv]
-  _ -> oneof [naAssumption, naLine, naDeriv]
+data AddrKind = Assumption | Line | Proof | Conclusion | Any
+
+arbitraryNodeAddrFor :: Proof Formula Rule -> AddrKind -> Gen NodeAddr
+arbitraryNodeAddrFor (ProofLine {}) _ = discard -- return $ NAProof 0 Nothing
+arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
+  ([], Assumption) -> discard
+  ([], Any) -> oneof [naLine ps, naSubProof Any, naConclusion]
+  (_, Assumption) -> oneof [naAssumption, naSubProof Assumption]
+  (_, Line) -> oneof [naLine ps, naSubProof Line]
+  (_, Proof) -> oneof [naProof ps, naSubProof Proof]
+  (_, Conclusion) -> oneof [naConclusion, naSubProof Conclusion]
+  (_, Any) -> oneof [naAssumption, naLine ps, naSubProof Any, naConclusion]
   where
-    naLine = fmap NALine (chooseInt (0, L.length ps - 1))
+    naConclusion = return NAConclusion
+    naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isProofLine $ ps !! n)
+    naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isSubProof $ ps !! n)
     naAssumption = fmap NAAssumption (chooseInt (0, L.length fs - 1))
-    naDeriv = do
-      n <- chooseInt (0, L.length ps - 1)
-      case ps !! n of
-        ProofLine {} -> return $ NALine n
-        p@(SubProof {}) -> arbitraryNodeAddrFor p <&> (NAProof n . Just)
+    naSubProof ak = do
+      mn <- chooseInt (0, L.length ps - 1) `suchThatMaybe` (\n -> isSubProof $ ps !! n)
+      case mn of
+        Nothing -> discard
+        Just n -> arbitraryNodeAddrFor (ps !! n) ak <&> (NAProof n . Just)
 
 prop_lRemoveMinus1 :: Proof Formula Rule -> Property
 prop_lRemoveMinus1 (ProofLine {}) = discard
 prop_lRemoveMinus1 p@(SubProof {}) =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsLine a p ==>
-      lLength (lRemove a p) === lLength p - 1
+  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+    lLength (lRemove a p) === lLength p - 1
 
 prop_lRemoveShift :: Proof Formula Rule -> Property
 prop_lRemoveShift p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsLine a p && lIsLine (incrementNodeAddr a) p ==>
+  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+    lIsLine (incrementNodeAddr a) p ==>
       lLookup a (lRemove a p) === lLookup (incrementNodeAddr a) p
 
 lRemoveQCTests :: TestTree
@@ -127,43 +135,37 @@ lRemoveQCTests =
       QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
--- -- TESTING lInsert
+-- TESTING lInsert
 prop_lInsertBeforeFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeFormulaPlus1 (ProofLine {}) = discard
 prop_lInsertBeforeFormulaPlus1 p@(SubProof {}) =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsFormula a p ==>
-      lLength (lInsert (Left $ Formula 0) a Before p) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
+    lLength (fromJust (lInsert (Left $ Formula 0) a Before p)) === lLength p + 1
 
 prop_lInsertAfterFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterFormulaPlus1 p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsFormula a p ==>
-      (lLength (lInsert (Left $ Formula 0) a After p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
+    lLength (fromJust (lInsert (Left $ Formula 0) a After p)) === lLength p + 1
 
 prop_lInsertlLookupFormulaBefore :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaBefore p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsFormula a p ==>
-      (lLookup a (lInsert (Left $ Formula 0) a Before p) == Just (Left $ Formula 0))
+  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
+    lLookup a (fromJust (lInsert (Left $ Formula 0) a Before p)) === Just (Left $ Formula 0)
 
 prop_lInsertlLookupFormulaAfter :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaAfter p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsFormula a p ==>
-      (lLookup (incrementNodeAddr a) (lInsert (Left $ Formula 0) a After p) == Just (Left $ Formula 0))
+  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
+    lLookup (incrementNodeAddr a) (fromJust (lInsert (Left $ Formula 0) a After p)) === Just (Left $ Formula 0)
 
 prop_lInsertBeforeLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeLinePlus1 p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsLine a p ==>
-      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) a Before p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+    lLength (fromJust (lInsert (Right . ProofLine $ Derivation (Formula 0) (Rule 0) []) a Before p)) === lLength p + 1
 
 prop_lInsertAfterLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterLinePlus1 p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    lIsLine a p ==>
-      (lLength (lInsert (Right $ Derivation (Formula 0) (Rule 0) []) a After p) == lLength p + 1)
+  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+    lLength (fromJust (lInsert (Right . ProofLine $ Derivation (Formula 0) (Rule 0) []) a After p)) === lLength p + 1
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
@@ -183,7 +185,7 @@ prop_fromLineNoInverse p = forAll (chooseInt (0, lLength p - 1)) $ \n ->
     fromNodeAddr (fromJust $ fromLineNo n p) p === Just n
 
 prop_fromNodeAddrInverse :: Proof Formula Rule -> Property
-prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p) $ \a ->
+prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p Any) $ \a ->
   isJust (fromNodeAddr a p) ==>
     fromLineNo (fromJust $ fromNodeAddr a p) p === Just a
 
@@ -197,8 +199,8 @@ lineNoQCTests =
 
 prop_compareLineNo :: Proof Formula Rule -> Property
 prop_compareLineNo p =
-  forAll (arbitraryNodeAddrFor p) $ \a ->
-    forAll (arbitraryNodeAddrFor p) $ \b ->
+  forAll (arbitraryNodeAddrFor p Any) $ \a ->
+    forAll (arbitraryNodeAddrFor p Any) $ \b ->
       isJust (fromNodeAddr a p) ==>
         isJust (fromNodeAddr b p) ==>
           compare a b === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)

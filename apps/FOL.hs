@@ -3,9 +3,7 @@
 
 module Main where
 
-import App
-import App.Syntax
-import Proof.Syntax
+import App.Runner
 
 -----------------------------------------------------------------------------
 main :: IO ()
@@ -38,13 +36,6 @@ emptyModel =
       _currentLineAfter = Nothing,
       _dragging = False
     }
-
--- exProof :: Proof Formula Rule
--- exProof =
---   SubProof
---     []
---     [ProofLine (Derivation (Formula "line1") Rule []), ProofLine (Derivation (Formula "line2") Rule [])]
---     (Derivation (Formula "conclusion") Rule [])
 
 exProof :: (Proof Formula Rule)
 exProof =

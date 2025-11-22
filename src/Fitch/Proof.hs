@@ -1,9 +1,32 @@
-module Proof.Syntax where
+module Fitch.Proof where
 
 import Control.Applicative
 import Data.List qualified as L
 import Data.Maybe
-import Proof.Util
+
+-- * Utilities that are not exported!
+
+insertAt :: a -> Int -> [a] -> [a]
+insertAt x 0 xs = x : xs
+insertAt x n [] = []
+insertAt x n (y : ys) = y : insertAt x (n - 1) ys
+
+removeAt :: Int -> [a] -> [a]
+removeAt n [] = []
+removeAt n (x : xs)
+  | n < 0 = x : xs
+  | n == 0 = xs
+  | n > 0 = x : removeAt (n - 1) xs
+
+-- | Update nth element of a list, if it exists.
+--   @O(min index n)@.
+--
+--   Precondition: the index is >= 0.
+-- (Taken from Agda.Utils.List)
+updateAt :: Int -> (a -> a) -> [a] -> [a]
+updateAt _ _ [] = []
+updateAt 0 f (a : as) = f a : as
+updateAt n f (a : as) = a : updateAt (n - 1) f as
 
 data RuleSpec formula rule = RuleSpec rule [Either formula (Proof formula rule)] formula deriving (Show, Eq)
 
@@ -93,14 +116,12 @@ instance Ord NodeAddr where
 -- ** Conversion between line numbers and `NodeAddr`
 
 -- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
-fromLineNo :: Int -> Proof formula rule -> Maybe NodeAddr
+fromLineNo :: forall formula rule. Int -> Proof formula rule -> Maybe NodeAddr
 fromLineNo 0 (ProofLine {}) = Just $ NAProof 0 Nothing
--- fromLineNo 0 (SubProof [] [] _) = Just NAConclusion
--- fromLineNo n (SubProof [] [] _) = Nothing
--- TODO handle conclusion
 fromLineNo n (SubProof [] ps _) = helper n 0 ps
   where
     helper :: Int -> Int -> [Proof formula rule] -> Maybe NodeAddr
+    helper 0 _ [] = Just NAConclusion
     helper n m [] = Nothing
     helper 0 m ((ProofLine {}) : ps) = Just $ NAProof m Nothing
     helper n m (p : ps) | n < lLength p = do

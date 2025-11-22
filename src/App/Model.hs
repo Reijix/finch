@@ -1,6 +1,7 @@
-module App.Syntax where
+module App.Model where
 
 import Data.List qualified as L
+import Fitch.Proof
 import Miso
   ( App,
     Attribute,
@@ -27,7 +28,6 @@ import Miso.Lens (Lens, lens, this, use, (.=), (^.))
 import Miso.Svg (text_, tspan_)
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
-import Proof.Syntax
 
 -----------------------------------------------------------------------------
 class FromString a where
@@ -60,7 +60,6 @@ data Action where
   deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
--- actually, just keep track of current element, this can be an either (proof, line or formula) and then insert a phantom object into the proof tree.
 
 data Model formula rule = Model
   { _cursorX :: Double,

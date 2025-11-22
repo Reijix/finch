@@ -1,8 +1,9 @@
 module App.Views where
 
-import App.Syntax
+import App.Model
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe)
+import Fitch.Proof
 import Miso
   ( Attribute,
     MisoString,
@@ -29,7 +30,6 @@ import Miso.Property (boolProp, textProp)
 import Miso.Svg (onFocusOut, text_, tspan_)
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
-import Proof.Syntax
 
 viewDragIcon :: View (Model formula rule) Action
 viewDragIcon = H.img_ [HP.draggable_ False, HP.src_ "./draggable.svg", HP.height_ "16"]
@@ -59,18 +59,18 @@ viewBin =
     ]
     []
 
-viewInsertLineNode :: View (Model formula rule) Action
-viewInsertLineNode =
+viewSpawnNode :: SpawnType -> String -> View (Model formula rule) Action
+viewSpawnNode tp str =
   H.div_
     [ HP.classList_
         [ ("spawn-button", True),
           ("draggable", True)
         ],
       HP.draggable_ True,
-      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ SpawnStart SpawnLine,
+      onDragStartWithOptions (Options {_preventDefault = False, _stopPropagation = True}) $ SpawnStart tp,
       onDragEnd DragEnd
     ]
-    []
+    [H.p_ [] [text $ ms str]]
 
 -- VIEWS
 lineContainer ::

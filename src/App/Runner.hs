@@ -1,10 +1,11 @@
-module App (runApp) where
+module App.Runner (runApp, Proof (..), FromString (..), Model (..), Derivation (..)) where
 
-import App.Syntax
+import App.Model
 import App.Views
 import Control.Monad (when)
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
+import Fitch.Proof
 import Miso
   ( App,
     CSS (Href),
@@ -39,7 +40,6 @@ import Miso.Html.Event
 import Miso.Html.Property qualified as HP
 import Miso.Lens (use, (%=), (.=), (^.))
 import Miso.Svg (text_)
-import Proof.Syntax
 
 -----------------------------------------------------------------------------
 
@@ -127,7 +127,6 @@ updateModel (Input str) = do
         Right _ -> undefined -- TODO
 
 -----------------------------------------------------------------------------
--- TODO: Add Buttons for adding Nodes as next step.
 viewModel ::
   forall formula rule.
   (Show formula) =>
@@ -139,8 +138,9 @@ viewModel model =
     []
     [ viewProof model,
       viewBin,
-      viewInsertLineNode
-      -- H.p_ [] [text $ ms $ show (model ^. proof)]
+      viewSpawnNode SpawnLine "Insert Line",
+      viewSpawnNode SpawnAssumption "Insert Assumption",
+      viewSpawnNode SpawnProof "Insert Proof"
     ]
 
 -----------------------------------------------------------------------------
