@@ -2,9 +2,8 @@ module App.Runner (runApp, Proof (..), FromString (..), Model (..), Derivation (
 
 import App.Model
 import App.Views
-import Control.Monad (when)
 import Data.Map qualified as M
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust)
 import Fitch.Proof
 import Miso
   ( App,
@@ -81,50 +80,33 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
     Just SpawnLine -> undefined
     Just SpawnProof -> undefined
     Just SpawnAssumption -> undefined
-updateModel (DragEnter a Before) = do
-  -- io_ . consoleLog . ms $ "dragenter " ++ show a
-  currentLineBefore .= Just a
-updateModel (DragEnter a After) = do
-  -- io_ . consoleLog . ms $ "dragenter " ++ show a
-  currentLineAfter .= Just a
-updateModel (DragLeave Before) = do
-  -- io_ . consoleLog . ms $ "dragleave"
-  currentLineBefore .= Nothing
-updateModel (DragLeave After) = do
-  -- io_ . consoleLog . ms $ "dragleave"
-  currentLineAfter .= Nothing
+updateModel (DragEnter a Before) = currentLineBefore .= Just a
+updateModel (DragEnter a After) = currentLineAfter .= Just a
+-- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
+updateModel (DragLeave Before) = currentLineBefore .= Nothing
+updateModel (DragLeave After) = currentLineAfter .= Nothing
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   dragging .= True
-  io_ . consoleLog . ms $ "dragstart " ++ show dt
--- updateModel DragOver = pure ()
 updateModel DragEnd = do
   currentLineAfter .= Nothing
   currentLineBefore .= Nothing
   dragging .= False
   dragTarget .= Nothing
-  io_ . consoleLog $ "dragend"
 updateModel (DoubleClick a) = do
   focusedLine .= Just a
   p <- use proof
   io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
+-- TODO implement select upstream
 -- io_ . select . ms $ "proof-line" ++ show n
 updateModel Blur = do
-  io_ . consoleLog $ "blur"
   focusedLine .= Nothing
 updateModel Nop = pure ()
-updateModel (SpawnStart _) =
-  io_ . consoleLog $ "spawnstart"
+updateModel (SpawnStart st) = spawnType .= Just st
+-- TODO: Maybe actual parse should only happen on enter, i.e. when `blur` fires.
 updateModel (Input str) = do
-  io_ . consoleLog $ "input"
   fline <- use focusedLine
-  case fline of
-    Nothing -> pure ()
-    Just addr -> do
-      io_ . consoleLog . ms $ "printing " ++ show str
-      case fromString (fromMisoString str :: String) of
-        Left f -> proof %= lUpdateFormula f addr
-        Right _ -> undefined -- TODO
+  mapM_ (\addr -> proof %= lUpdateFormula (tryParse (fromMisoString str :: String)) addr) fline
 
 -----------------------------------------------------------------------------
 viewModel ::

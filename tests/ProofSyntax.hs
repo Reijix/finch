@@ -14,8 +14,14 @@ import Test.Tasty.QuickCheck as QC
 
 -- Definitions for unit testing:
 
+formula :: Int -> ParseWrapper Formula
+formula = Parsed . Formula
+
+rule :: Int -> [Reference] -> ParseWrapper (RuleApplication Rule)
+rule str ref = Parsed (RuleApplication (Rule str) ref)
+
 derivation :: Int -> Derivation Formula Rule
-derivation n = Derivation (Formula n) (Rule n) []
+derivation n = Derivation (formula n) (rule n [])
 
 line :: Int -> Proof Formula Rule
 line n = ProofLine (derivation n)
@@ -24,8 +30,8 @@ line n = ProofLine (derivation n)
 exProof0 :: Proof Formula Rule
 exProof0 =
   SubProof
-    [Formula 0, Formula 1]
-    [ SubProof [Formula 2] [line 3] (derivation 4)
+    [formula 0, formula 1]
+    [ SubProof [formula 2] [line 3] (derivation 4)
     ]
     (derivation 5)
 
@@ -33,8 +39,8 @@ exProof0 =
 exProof1 :: Proof Formula Rule
 exProof1 =
   SubProof
-    [Formula 0]
-    [line 1, SubProof [Formula 2, Formula 3] [line 4, line 5] (derivation 6)]
+    [formula 0]
+    [line 1, SubProof [formula 2, formula 3] [line 4, line 5] (derivation 6)]
     (derivation 7)
 
 -- example proof that triggered another edge case
@@ -44,14 +50,14 @@ exProof2 =
     []
     [ SubProof [] [line 0, line 1] $ derivation 2,
       SubProof
-        [Formula 3, Formula 4]
+        [formula 3, formula 4]
         [line 5, line 6, line 7]
         (derivation 8)
     ]
     (derivation 9)
 
 exProof3 :: Proof Formula Rule
-exProof3 = SubProof [] [SubProof [Formula 0] [line 1] (derivation 2), line 3] (derivation 4)
+exProof3 = SubProof [] [SubProof [formula 0] [line 1] (derivation 2), line 3] (derivation 4)
 
 --------------------------------------------
 -- PROPERTIES
@@ -75,9 +81,17 @@ instance Arbitrary Rule where
   arbitrary :: Gen Rule
   arbitrary = fmap Rule (chooseInt (0, 100))
 
+instance Arbitrary (RuleApplication Rule) where
+  arbitrary :: Gen (RuleApplication Rule)
+  arbitrary = liftM2 RuleApplication arbitrary (pure [])
+
+instance (Arbitrary a) => Arbitrary (ParseWrapper a) where
+  arbitrary :: Gen (ParseWrapper a)
+  arbitrary = fmap Parsed arbitrary
+
 instance Arbitrary (Derivation Formula Rule) where
   arbitrary :: Gen (Derivation Formula Rule)
-  arbitrary = liftM3 Derivation arbitrary arbitrary (pure [])
+  arbitrary = liftM2 Derivation arbitrary arbitrary
 
 instance Arbitrary (Proof Formula Rule) where
   arbitrary :: Gen (Proof Formula Rule)
@@ -92,18 +106,18 @@ instance Arbitrary (Proof Formula Rule) where
             l <- chooseInt (1, 8)
             vectorOf l (proof' (n `div` 2))
 
-data AddrKind = Assumption | Line | Proof | Conclusion | Any
+data AddrKind = AssumptionKind | LineKind | ProofKind | ConclusionKind | AnyKind
 
 arbitraryNodeAddrFor :: Proof Formula Rule -> AddrKind -> Gen NodeAddr
 arbitraryNodeAddrFor (ProofLine {}) _ = discard -- return $ NAProof 0 Nothing
 arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
-  ([], Assumption) -> discard
-  ([], Any) -> oneof [naLine ps, naSubProof Any, naConclusion]
-  (_, Assumption) -> oneof [naAssumption, naSubProof Assumption]
-  (_, Line) -> oneof [naLine ps, naSubProof Line]
-  (_, Proof) -> oneof [naProof ps, naSubProof Proof]
-  (_, Conclusion) -> oneof [naConclusion, naSubProof Conclusion]
-  (_, Any) -> oneof [naAssumption, naLine ps, naSubProof Any, naConclusion]
+  ([], AssumptionKind) -> discard
+  ([], AnyKind) -> oneof [naLine ps, naSubProof AnyKind, naConclusion]
+  (_, AssumptionKind) -> oneof [naAssumption, naSubProof AssumptionKind]
+  (_, LineKind) -> oneof [naLine ps, naSubProof LineKind]
+  (_, ProofKind) -> oneof [naProof ps, naSubProof ProofKind]
+  (_, ConclusionKind) -> oneof [naConclusion, naSubProof ConclusionKind]
+  (_, AnyKind) -> oneof [naAssumption, naLine ps, naSubProof AnyKind, naConclusion]
   where
     naConclusion = return NAConclusion
     naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isProofLine $ ps !! n)
@@ -118,12 +132,12 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
 prop_lRemoveMinus1 :: Proof Formula Rule -> Property
 prop_lRemoveMinus1 (ProofLine {}) = discard
 prop_lRemoveMinus1 p@(SubProof {}) =
-  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+  forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     lLength (lRemove a p) === lLength p - 1
 
 prop_lRemoveShift :: Proof Formula Rule -> Property
 prop_lRemoveShift p =
-  forAll (arbitraryNodeAddrFor p Line) $ \a ->
+  forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     lIsLine (incrementNodeAddr a) p ==>
       lLookup a (lRemove a p) === lLookup (incrementNodeAddr a) p
 
@@ -139,33 +153,33 @@ lRemoveQCTests =
 prop_lInsertBeforeFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeFormulaPlus1 (ProofLine {}) = discard
 prop_lInsertBeforeFormulaPlus1 p@(SubProof {}) =
-  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
-    lLength (fromJust (lInsert (Left $ Formula 0) a Before p)) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
+    lLength (fromJust (lInsert (Left $ formula 0) a Before p)) === lLength p + 1
 
 prop_lInsertAfterFormulaPlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterFormulaPlus1 p =
-  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
-    lLength (fromJust (lInsert (Left $ Formula 0) a After p)) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
+    lLength (fromJust (lInsert (Left $ formula 0) a After p)) === lLength p + 1
 
 prop_lInsertlLookupFormulaBefore :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaBefore p =
-  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
-    lLookup a (fromJust (lInsert (Left $ Formula 0) a Before p)) === Just (Left $ Formula 0)
+  forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
+    lLookup a (fromJust (lInsert (Left $ formula 0) a Before p)) === Just (Left $ formula 0)
 
 prop_lInsertlLookupFormulaAfter :: Proof Formula Rule -> Property
 prop_lInsertlLookupFormulaAfter p =
-  forAll (arbitraryNodeAddrFor p Assumption) $ \a ->
-    lLookup (incrementNodeAddr a) (fromJust (lInsert (Left $ Formula 0) a After p)) === Just (Left $ Formula 0)
+  forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
+    lLookup (incrementNodeAddr a) (fromJust (lInsert (Left $ formula 0) a After p)) === Just (Left $ formula 0)
 
 prop_lInsertBeforeLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertBeforeLinePlus1 p =
-  forAll (arbitraryNodeAddrFor p Line) $ \a ->
-    lLength (fromJust (lInsert (Right . ProofLine $ Derivation (Formula 0) (Rule 0) []) a Before p)) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
+    lLength (fromJust (lInsert (Right . ProofLine $ derivation 0) a Before p)) === lLength p + 1
 
 prop_lInsertAfterLinePlus1 :: Proof Formula Rule -> Property
 prop_lInsertAfterLinePlus1 p =
-  forAll (arbitraryNodeAddrFor p Line) $ \a ->
-    lLength (fromJust (lInsert (Right . ProofLine $ Derivation (Formula 0) (Rule 0) []) a After p)) === lLength p + 1
+  forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
+    lLength (fromJust (lInsert (Right . ProofLine $ derivation 0) a After p)) === lLength p + 1
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
@@ -185,7 +199,7 @@ prop_fromLineNoInverse p = forAll (chooseInt (0, lLength p - 1)) $ \n ->
     fromNodeAddr (fromJust $ fromLineNo n p) p === Just n
 
 prop_fromNodeAddrInverse :: Proof Formula Rule -> Property
-prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p Any) $ \a ->
+prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
   isJust (fromNodeAddr a p) ==>
     fromLineNo (fromJust $ fromNodeAddr a p) p === Just a
 
@@ -199,8 +213,8 @@ lineNoQCTests =
 
 prop_compareLineNo :: Proof Formula Rule -> Property
 prop_compareLineNo p =
-  forAll (arbitraryNodeAddrFor p Any) $ \a ->
-    forAll (arbitraryNodeAddrFor p Any) $ \b ->
+  forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
+    forAll (arbitraryNodeAddrFor p AnyKind) $ \b ->
       isJust (fromNodeAddr a p) ==>
         isJust (fromNodeAddr b p) ==>
           compare a b === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)

@@ -28,18 +28,39 @@ updateAt _ _ [] = []
 updateAt 0 f (a : as) = f a : as
 updateAt n f (a : as) = a : updateAt (n - 1) f as
 
-data RuleSpec formula rule = RuleSpec rule [Either formula (Proof formula rule)] formula deriving (Show, Eq)
+class FromString a where
+  fromString :: String -> Either a String
+
+data ParseWrapper a where
+  Parsed :: a -> ParseWrapper a
+  Unparsed :: String -> String -> ParseWrapper a
+  deriving (Show, Eq)
+
+tryParse :: forall a. (FromString a) => String -> ParseWrapper a
+tryParse str = case fromString str :: Either a String of
+  Left result -> Parsed result
+  Right err -> Unparsed str err
+
+data RuleSpec formula rule
+  = RuleSpec rule [Either formula (Proof formula rule)] formula
+  deriving (Show, Eq)
 
 data Reference where
   -- | Referencing a single line
   LineReference :: Int -> Reference
-  -- | Referencing a subproof
+  -- | Referencing a subproof by a line interval, i.e. `ProofReference` @from@ @to@
   ProofReference :: Int -> Int -> Reference
   deriving (Show, Eq)
 
-type Assumption formula = formula
+type Assumption formula = ParseWrapper formula
 
-data Derivation formula rule = Derivation formula rule [Reference] deriving (Show, Eq)
+data RuleApplication rule
+  = RuleApplication rule [Reference]
+  deriving (Show, Eq)
+
+data Derivation formula rule
+  = Derivation (ParseWrapper formula) (ParseWrapper (RuleApplication rule))
+  deriving (Show, Eq)
 
 -- | A datatype for respresenting fitch-style proofs.
 data Proof formula rule where
@@ -59,7 +80,7 @@ instance (Show formula, Show rule) => Show (Proof formula rule) where
       showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
       showProof line level p@(SubProof {}) = show' line (level + 1) p
       show' :: Int -> Int -> Proof formula rule -> String
-      show' line level (ProofLine (Derivation f r _)) = show f ++ show r
+      show' line level (ProofLine (Derivation f r)) = show f ++ show r
       show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
         where
           (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withIndent ln level $ show f)) line fs
@@ -223,13 +244,13 @@ lLookup _ _ = Nothing
 -- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
 --
 -- Fails silently
-lUpdateFormula :: forall formula rule. formula -> NodeAddr -> Proof formula rule -> Proof formula rule
+lUpdateFormula :: forall formula rule. ParseWrapper formula -> NodeAddr -> Proof formula rule -> Proof formula rule
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
 lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
   where
-    updateProofLine :: formula -> Proof formula rule -> Proof formula rule
-    updateProofLine f (ProofLine (Derivation _ rule ref)) = ProofLine (Derivation f rule ref)
-lUpdateFormula f NAConclusion (SubProof fs ps (Derivation _ rule ref)) = SubProof fs ps (Derivation f rule ref)
+    updateProofLine :: ParseWrapper formula -> Proof formula rule -> Proof formula rule
+    updateProofLine f (ProofLine (Derivation _ rule)) = ProofLine (Derivation f rule)
+lUpdateFormula f NAConclusion (SubProof fs ps (Derivation _ rule)) = SubProof fs ps (Derivation f rule)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p
 

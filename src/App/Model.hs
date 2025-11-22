@@ -30,9 +30,6 @@ import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 
 -----------------------------------------------------------------------------
-class FromString a where
-  fromString :: String -> Either a String
-
 data DropLocation where
   LocationAddr :: NodeAddr -> InsertPosition -> DropLocation
   LocationBin :: DropLocation

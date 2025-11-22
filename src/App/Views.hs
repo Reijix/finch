@@ -132,7 +132,7 @@ viewLine ::
   View (Model formula rule) Action
 viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms $ show f
 -- TODO add container for rules
-viewLine m a _ (Right (Derivation f r _)) = lineContainer m False a $ ms $ show f
+viewLine m a _ (Right (Derivation f r)) = lineContainer m False a $ ms $ show f
 
 viewProof ::
   forall formula rule.

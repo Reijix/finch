@@ -4,13 +4,14 @@
 module Main where
 
 import App.Runner
+import Fitch.Proof (ParseWrapper (..), Reference, RuleApplication (RuleApplication))
 
 -----------------------------------------------------------------------------
 main :: IO ()
 main = runApp emptyModel
 
 -----------------------------------------------------------------------------
-data Rule = Rule deriving (Show, Eq)
+newtype Rule = Rule String deriving (Show, Eq)
 
 newtype Formula = Formula String deriving (Eq)
 
@@ -37,14 +38,20 @@ emptyModel =
       _dragging = False
     }
 
+formula :: String -> ParseWrapper Formula
+formula = Parsed . Formula
+
+rule :: String -> [Reference] -> ParseWrapper (RuleApplication Rule)
+rule str ref = Parsed (RuleApplication (Rule str) ref)
+
 exProof :: (Proof Formula Rule)
 exProof =
   SubProof
-    [Formula "Formula", Formula "Formula"]
-    [ ProofLine (Derivation (Formula "Formula") Rule []),
-      SubProof [Formula "Formula"] [ProofLine (Derivation (Formula "Formula") Rule [])] (Derivation (Formula "Formula") Rule []),
-      SubProof [Formula "Formula"] [ProofLine (Derivation (Formula "Formula") Rule [])] (Derivation (Formula "Formula") Rule [])
+    [formula "Formula", formula "Formula"]
+    [ ProofLine (Derivation (formula "Formula") (rule "rule" [])),
+      SubProof [formula "Formula"] [ProofLine (Derivation (formula "Formula") (rule "rule" []))] (Derivation (formula "Formula") (rule "rule" [])),
+      SubProof [formula "Formula"] [ProofLine (Derivation (formula "Formula") (rule "rule" []))] (Derivation (formula "Formula") (rule "rule" []))
     ]
-    (Derivation (Formula "Formula") Rule [])
+    (Derivation (formula "Formula") (rule "rule" []))
 
 -----------------------------------------------------------------------------
