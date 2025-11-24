@@ -71,6 +71,9 @@ library fitch-editor-lib
     App.Runner
     App.Views
     Fitch.Proof
+    Parser.Formula
+    Parser.Lexer
+    Parser.Rule
 
   default-extensions:
     OverloadedRecordDot
@@ -79,6 +82,7 @@ library fitch-editor-lib
   build-depends:
     base,
     containers,
+    megaparsec,
     miso,
     mtl,
 
