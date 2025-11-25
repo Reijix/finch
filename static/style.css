@@ -102,3 +102,11 @@
 .proof-view {
   display: grid;
 }
+
+.parse-success {
+  color: green;
+}
+
+.parse-fail {
+  color: red;
+}

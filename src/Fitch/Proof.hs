@@ -1,6 +1,7 @@
 module Fitch.Proof where
 
 import Control.Applicative
+import Control.Monad.State (evalState)
 import Data.List qualified as L
 import Data.Maybe
 
@@ -28,22 +29,43 @@ updateAt _ _ [] = []
 updateAt 0 f (a : as) = f a : as
 updateAt n f (a : as) = a : updateAt (n - 1) f as
 
-class FromString a where
-  fromString :: String -> Either a String
-
 data ParseWrapper a where
-  Parsed :: a -> ParseWrapper a
+  Parsed :: String -> a -> ParseWrapper a
   Unparsed :: String -> String -> ParseWrapper a
   deriving (Show, Eq)
 
-tryParse :: forall a. (FromString a) => String -> ParseWrapper a
-tryParse str = case fromString str :: Either a String of
-  Left result -> Parsed result
-  Right err -> Unparsed str err
-
-data RuleSpec formula rule
-  = RuleSpec rule [Either formula (Proof formula rule)] formula
+data Rule
+  = Rule Name [Either Formula Proof] Formula
   deriving (Show, Eq)
+
+type Name = String
+
+data Term
+  = Var Name
+  | Fun Name [Term]
+  deriving (Eq, Ord)
+
+instance Show Term where
+  -- TODO verify
+  show :: Term -> String
+  show (Var v) = v
+  show (Fun f []) = f
+  show (Fun f ts) = f ++ "(" ++ L.intercalate "," (map show ts)
+
+data Formula
+  = Predicate Name [Term]
+  | UnaryOp String Formula
+  | BinaryOp String Formula Formula
+  | Quantifier Name Name Formula
+  deriving (Eq, Ord)
+
+instance Show Formula where
+  show :: Formula -> String
+  show (Predicate p []) = p
+  show (Predicate p ts) = p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+  show (UnaryOp op f) = op ++ "(" ++ show f ++ ")"
+  show (BinaryOp op f1 f2) = "(" ++ show f1 ++ ") " ++ op ++ " (" ++ show f2 ++ ")"
+  show (Quantifier q v f) = q ++ " " ++ v ++ ". " ++ show f
 
 data Reference where
   -- | Referencing a single line
@@ -52,40 +74,34 @@ data Reference where
   ProofReference :: Int -> Int -> Reference
   deriving (Show, Eq)
 
-type Assumption formula = ParseWrapper formula
+type Assumption = ParseWrapper Formula
 
-data RuleApplication rule
-  = RuleApplication rule [Reference]
+data RuleApplication
+  = RuleApplication Rule [Reference]
   deriving (Show, Eq)
 
-instance (FromString rule) => FromString (RuleApplication rule) where
-  fromString :: String -> Either (RuleApplication rule) String
-  fromString str = case fromString str :: Either rule String of
-    Left r -> Left $ RuleApplication r []
-    Right e -> Right e
-
-data Derivation formula rule
-  = Derivation (ParseWrapper formula) (ParseWrapper (RuleApplication rule))
+data Derivation
+  = Derivation (ParseWrapper Formula) (ParseWrapper RuleApplication)
   deriving (Show, Eq)
 
 -- | A datatype for respresenting fitch-style proofs.
-data Proof formula rule where
+data Proof where
   -- | A single line of the proof consisting of a derivation.
-  ProofLine :: Derivation formula rule -> Proof formula rule
+  ProofLine :: Derivation -> Proof
   -- | A subproof consisting of a list of assumptions, a list of subproofs (or derivations) and a conclusion.
-  SubProof :: [Assumption formula] -> [Proof formula rule] -> Derivation formula rule -> Proof formula rule
+  SubProof :: [Assumption] -> [Proof] -> Derivation -> Proof
   deriving (Eq)
 
-instance (Show formula, Show rule) => Show (Proof formula rule) where
-  show :: (Show formula, Show rule) => Proof formula rule -> String
+instance Show Proof where
+  show :: Proof -> String
   show = show' 0 0
     where
       withIndent :: Int -> Int -> String -> String
       withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
-      showProof :: Int -> Int -> Proof formula rule -> String
+      showProof :: Int -> Int -> Proof -> String
       showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
       showProof line level p@(SubProof {}) = show' line (level + 1) p
-      show' :: Int -> Int -> Proof formula rule -> String
+      show' :: Int -> Int -> Proof -> String
       show' line level (ProofLine (Derivation f r)) = show f ++ show r
       show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
         where
@@ -93,16 +109,16 @@ instance (Show formula, Show rule) => Show (Proof formula rule) where
           (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + lLength p, showProof ln' level p)) line' ps
           conclusionShow = withIndent line'' level (show' line'' level (ProofLine l))
 
-isSubProof :: Proof formula rule -> Bool
+isSubProof :: Proof -> Bool
 isSubProof (ProofLine {}) = False
 isSubProof (SubProof {}) = True
 
-isProofLine :: Proof formula rule -> Bool
+isProofLine :: Proof -> Bool
 isProofLine (ProofLine {}) = True
 isProofLine (SubProof {}) = False
 
 -- | The `lLength` of a proof is its number of lines.
-lLength :: Proof formula rule -> Int
+lLength :: Proof -> Int
 lLength (ProofLine l) = 1
 lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 
@@ -143,11 +159,11 @@ instance Ord NodeAddr where
 -- ** Conversion between line numbers and `NodeAddr`
 
 -- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
-fromLineNo :: forall formula rule. Int -> Proof formula rule -> Maybe NodeAddr
+fromLineNo :: Int -> Proof -> Maybe NodeAddr
 fromLineNo 0 (ProofLine {}) = Just $ NAProof 0 Nothing
 fromLineNo n (SubProof [] ps _) = helper n 0 ps
   where
-    helper :: Int -> Int -> [Proof formula rule] -> Maybe NodeAddr
+    helper :: Int -> Int -> [Proof] -> Maybe NodeAddr
     helper 0 _ [] = Just NAConclusion
     helper n m [] = Nothing
     helper 0 m ((ProofLine {}) : ps) = Just $ NAProof m Nothing
@@ -160,10 +176,10 @@ fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l
 fromLineNo n p = Nothing
 
 -- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
-fromNodeAddr :: NodeAddr -> Proof formula rule -> Maybe Int
+fromNodeAddr :: NodeAddr -> Proof -> Maybe Int
 fromNodeAddr = go 0
   where
-    go :: Int -> NodeAddr -> Proof formula rule -> Maybe Int
+    go :: Int -> NodeAddr -> Proof -> Maybe Int
     go 0 (NAProof 0 Nothing) (ProofLine {}) = Just 0
     go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
     go n (NAAssumption m) (SubProof fs _ _) = Nothing
@@ -199,41 +215,41 @@ incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 -- * Querying proofs
 
 -- TODO remove all `l` prefixes!
-lIsFirstFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsFirstFormula :: NodeAddr -> Proof -> Bool
 lIsFirstFormula (NAAssumption 0) (SubProof fs _ _) = True
 lIsFirstFormula (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsFirstFormula a (ps !! n)
 lIsFirstFormula _ _ = False
 
-lIsFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsFormula :: NodeAddr -> Proof -> Bool
 lIsFormula (NAAssumption n) (SubProof fs _ _) = n < L.length fs
 lIsFormula (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsFormula a (ps !! n)
 lIsFormula _ _ = False
 
-lIsLastFormula :: NodeAddr -> Proof formula rule -> Bool
+lIsLastFormula :: NodeAddr -> Proof -> Bool
 lIsLastFormula (NAAssumption n) (SubProof fs _ _) = n == L.length fs - 1
 lIsLastFormula (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsLastFormula a (ps !! n)
 lIsLastFormula _ _ = False
 
-lIsFirstLine :: NodeAddr -> Proof formula rule -> Bool
+lIsFirstLine :: NodeAddr -> Proof -> Bool
 lIsFirstLine (NAProof 0 Nothing) (SubProof fs _ _) = True
 lIsFirstLine (NAProof n (Just a)) (SubProof _ ps _) =
   n < L.length ps && isSubProof (ps !! n) && lIsFirstLine a (ps !! n)
 lIsFirstLine _ _ = False
 
-lIsLine :: NodeAddr -> Proof formula rule -> Bool
+lIsLine :: NodeAddr -> Proof -> Bool
 lIsLine (NAProof n Nothing) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
 lIsLine (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && lIsLine a (ps !! n)
 lIsLine _ _ = False
 
-lIsConclusion :: NodeAddr -> Proof formula rule -> Bool
+lIsConclusion :: NodeAddr -> Proof -> Bool
 lIsConclusion NAConclusion _ = True
 lIsConclusion (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && lIsConclusion a (ps !! n)
 lIsConclusion _ _ = False
 
-lLookup :: NodeAddr -> Proof formula rule -> Maybe (Either (Assumption formula) (Proof formula rule))
+lLookup :: NodeAddr -> Proof -> Maybe (Either Assumption Proof)
 lLookup (NAAssumption n) (SubProof fs _ _)
   | n < L.length fs = Just . Left $ fs !! n
 lLookup (NAProof n Nothing) (SubProof _ ps _)
@@ -250,11 +266,11 @@ lLookup _ _ = Nothing
 -- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
 --
 -- Fails silently
-lUpdateFormula :: forall formula rule. ParseWrapper formula -> NodeAddr -> Proof formula rule -> Proof formula rule
+lUpdateFormula :: ParseWrapper Formula -> NodeAddr -> Proof -> Proof
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
 lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
   where
-    updateProofLine :: ParseWrapper formula -> Proof formula rule -> Proof formula rule
+    updateProofLine :: ParseWrapper Formula -> Proof -> Proof
     updateProofLine f (ProofLine (Derivation _ rule)) = ProofLine (Derivation f rule)
 lUpdateFormula f NAConclusion (SubProof fs ps (Derivation _ rule)) = SubProof fs ps (Derivation f rule)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
@@ -264,7 +280,7 @@ lUpdateFormula _ _ p = p
 
 -- | `lRemove` @addr@ @proof@ removes the element at @addr@ inside @proof@ if it exists (and is not a conclusion).
 -- Otherwise @proof@ is returned.
-lRemove :: NodeAddr -> Proof formula rule -> Proof formula rule
+lRemove :: NodeAddr -> Proof -> Proof
 lRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
 lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
 lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps = SubProof fs (removeAt n ps) l
@@ -284,7 +300,7 @@ data InsertPosition
 -- `lInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
 --
 -- Both formulae and derivations are either inserted `Before` or `After` the specified address.
-lInsert :: Either (Assumption formula) (Proof formula rule) -> NodeAddr -> InsertPosition -> Proof formula rule -> Maybe (Proof formula rule)
+lInsert :: Either Assumption Proof -> NodeAddr -> InsertPosition -> Proof -> Maybe Proof
 lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of
       Before -> Just $ SubProof (insertAt f n fs) ps l
@@ -304,7 +320,7 @@ lInsert e (NAProof n (Just a)) pos (SubProof fs ps l)
   | n < L.length ps && isSubProof (ps !! n) = lInsert e a pos (ps !! n) >>= (\p' -> pure $ SubProof fs (updateAt n (const p') ps) l)
 lInsert _ _ _ p = Nothing
 
-lMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof formula rule -> Proof formula rule
+lMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof -> Proof
 lMove targetAddr pos sourceAddr p = case (compare targetAddr sourceAddr, lLookup sourceAddr p) of
   (LT, Just node) | not (lIsConclusion sourceAddr p) -> let p' = lRemove sourceAddr p in fromMaybe p $ lInsert node targetAddr pos p'
   (GT, Just node) | not (lIsConclusion sourceAddr p) -> maybe p (lRemove sourceAddr) $ lInsert node targetAddr pos p

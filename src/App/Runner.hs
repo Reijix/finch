@@ -1,4 +1,4 @@
-module App.Runner (runApp, Proof (..), FromString (..), Model (..), Derivation (..)) where
+module App.Runner (runApp, runAppFirstOrder, Proof (..), FromString (..), Model (..), Derivation (..)) where
 
 import App.Model
 import App.Views
@@ -40,6 +40,7 @@ import Miso.Html.Event
 import Miso.Html.Property qualified as HP
 import Miso.Lens (Lens, use, (%=), (.=), (^.))
 import Miso.Svg (text_)
+import Parser.Formula
 
 (%=?) :: (MonadState record m) => Lens record field -> (field -> Maybe field) -> m ()
 (%=?) _lens f = _lens %= (\x -> fromMaybe x (f x))
@@ -47,31 +48,51 @@ import Miso.Svg (text_)
 -----------------------------------------------------------------------------
 
 -- | Test of Haddock
-runApp ::
-  forall formula rule.
-  (Eq formula) =>
-  (Show formula) =>
-  (FromString formula) =>
-  (Eq rule) =>
-  (Show rule) =>
-  (FromString rule) =>
-  Model formula rule ->
-  IO ()
-runApp emptyModel = run $ startApp app
+runApp :: Proof -> [String] -> [String] -> IO ()
+runApp p unaryOperators binaryOperators =
+  run . startApp $
+    (component m updateModel viewModel)
+      { styles = [Href "style.css"],
+        events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
+      }
   where
-    app :: App (Model formula rule) Action
-    app =
-      (component emptyModel updateModel viewModel)
-        { styles = [Href "style.css"],
-          events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
-        }
+    m = initialModel p unaryOperators binaryOperators
+
+runAppFirstOrder :: Proof -> [(String, Int)] -> [(String, Int)] -> [String] -> [String] -> [String] -> IO ()
+runAppFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
+  run . startApp $
+    (component m updateModel viewModelFirstOrder)
+      { styles = [Href "style.css"],
+        events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
+      }
+  where
+    m = initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
 
 -----------------------------------------------------------------------------
-updateModel ::
-  forall formula rule.
-  (FromString formula) =>
-  (FromString rule) =>
-  Action -> Effect ROOT (Model formula rule) Action
+class FromString a where
+  fromString :: Model -> String -> Either String a
+
+instance FromString Rule where
+  fromString :: Model -> String -> Either String Rule
+  fromString m str = Right $ Rule str [] (Predicate "" [])
+
+instance FromString Formula where
+  fromString :: Model -> String -> Either String Formula
+  fromString m = parseFormula (m ^. functionSymbols) (m ^. predicateSymbols) (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers) (m ^. firstOrder)
+
+instance FromString RuleApplication where
+  fromString :: Model -> String -> Either String RuleApplication
+  fromString m str = case fromString m str :: Either String Rule of
+    Left e -> Left e
+    Right r -> Right $ RuleApplication r []
+
+tryParse :: forall a. (FromString a) => Model -> String -> ParseWrapper a
+tryParse m str = case fromString m str :: Either String a of
+  Left err -> Unparsed str err
+  Right result -> Parsed str result
+
+-----------------------------------------------------------------------------
+updateModel :: Action -> Effect ROOT Model Action
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
@@ -79,6 +100,7 @@ updateModel (Drop LocationBin) = do
     Just addr -> proof %= lRemove addr
   io_ . consoleLog $ "dropped in bin"
 updateModel (Drop (LocationAddr targetAddr pos)) = do
+  m <- get
   use dragTarget >>= \case
     Nothing -> pure ()
     Just sourceAddr -> do
@@ -86,9 +108,9 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
       proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
-    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse "Formula") (tryParse "Rule")) targetAddr pos
-    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse "Formula") (tryParse "Rule"))) targetAddr pos
-    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse "Formula")) targetAddr pos
+    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m "Formula") (tryParse m "Rule")) targetAddr pos
+    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse m "Formula") (tryParse m "Rule"))) targetAddr pos
+    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -109,23 +131,29 @@ updateModel (DoubleClick a) = do
   io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
 -- TODO implement select upstream
 -- io_ . select . ms $ "proof-line" ++ show n
-updateModel Blur = do
-  focusedLine .= Nothing
+updateModel Blur = focusedLine .= Nothing
 updateModel Nop = pure ()
 updateModel (SpawnStart st) = spawnType .= Just st
 -- TODO: Maybe actual parse should only happen on enter, i.e. when `blur` fires.
 updateModel (Input str) = do
+  m <- get
   fline <- use focusedLine
-  mapM_ (\addr -> proof %= lUpdateFormula (tryParse (fromMisoString str :: String)) addr) fline
+  mapM_ (\addr -> proof %= lUpdateFormula (tryParse m (fromMisoString str :: String)) addr) fline
 
 -----------------------------------------------------------------------------
-viewModel ::
-  forall formula rule.
-  (Show formula) =>
-  (Show rule) =>
-  Model formula rule ->
-  View (Model formula rule) Action
+viewModel :: Model -> View Model Action
 viewModel model =
+  H.div_
+    []
+    [ viewProof model,
+      viewBin,
+      viewSpawnNode SpawnLine "Insert Line",
+      viewSpawnNode SpawnAssumption "Insert Assumption",
+      viewSpawnNode SpawnProof "Insert Proof"
+    ]
+
+viewModelFirstOrder :: Model -> View Model Action
+viewModelFirstOrder model =
   H.div_
     []
     [ viewProof model,

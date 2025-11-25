@@ -1,6 +1,7 @@
 module App.Views where
 
 import App.Model
+import Data.Either (isLeft)
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe)
 import Fitch.Proof
@@ -31,9 +32,6 @@ import Miso.Svg (onFocusOut, text_, tspan_)
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 
-viewDragIcon :: View (Model formula rule) Action
-viewDragIcon = H.img_ [HP.draggable_ False, HP.src_ "./draggable.svg", HP.height_ "16"]
-
 inert_ :: Bool -> Attribute action
 inert_ = boolProp "inert"
 
@@ -48,7 +46,7 @@ onPD f =
     (\action _ -> f action)
 
 -----------------------------------------------------------------------------
-viewBin :: View (Model formula rule) Action
+viewBin :: View Model Action
 viewBin =
   H.div_
     [ onDragOverWithOptions preventDefault Nop,
@@ -59,7 +57,7 @@ viewBin =
     ]
     [H.p_ [] ["Delete Node"]]
 
-viewSpawnNode :: SpawnType -> String -> View (Model formula rule) Action
+viewSpawnNode :: SpawnType -> String -> View Model Action
 viewSpawnNode tp str =
   H.div_
     [ HP.classList_
@@ -73,12 +71,8 @@ viewSpawnNode tp str =
     [H.p_ [] [text $ ms str]]
 
 -- VIEWS
-lineContainer ::
-  forall formula rule.
-  (Show formula) =>
-  (Show rule) =>
-  Model formula rule -> Bool -> NodeAddr -> MisoString -> View (Model formula rule) Action
-lineContainer m isLastAssumption a s =
+viewLine :: Model -> NodeAddr -> Bool -> Either Assumption Derivation -> View Model Action
+viewLine m a isLastAssumption e =
   H.div_
     [ HP.draggable_ True,
       HP.classList_
@@ -93,7 +87,7 @@ lineContainer m isLastAssumption a s =
     ]
     [ H.div_
         [ HP.class_ "upper-hover-zone",
-          HP.classList_ [("insert-before", (m ^. currentLineBefore) == Just a)],
+          HP.classList_ [("insert-before", m ^. currentLineBefore == Just a)],
           onDragOverWithOptions preventDefault Nop,
           onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a Before),
           onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave Before),
@@ -102,51 +96,35 @@ lineContainer m isLastAssumption a s =
         [],
       H.div_
         [ HP.class_ "lower-hover-zone",
-          HP.classList_ [("insert-after", (m ^. currentLineAfter) == Just a)],
+          HP.classList_ [("insert-after", m ^. currentLineAfter == Just a)],
           onDragOverWithOptions preventDefault Nop,
           onDragEnterWithOptions preventDefault (DragEnter a After),
           onDragLeaveWithOptions preventDefault (DragLeave After),
           onDropWithOptions defaultOptions (Drop (LocationAddr a After))
         ]
         [],
+      -- TODO RULES
       H.input_
-        [ inert_ (Just a /= (m ^. focusedLine)),
+        [ inert_ (Just a /= m ^. focusedLine),
           HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
-          HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption)],
+          HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
           onEnter Nop Blur,
           onInput Input,
           onDragStartWithOptions preventDefault Nop,
-          value_ s -- (ms $ show s ++ show a)
+          value_ txt
         ]
     ]
-
-viewLine ::
-  forall formula rule.
-  (Show formula) =>
-  (Show rule) =>
-  Model formula rule ->
-  NodeAddr ->
-  Bool ->
-  Either (Assumption formula) (Derivation formula rule) ->
-  View (Model formula rule) Action
-viewLine m a isLastAssumption (Left f) = lineContainer m isLastAssumption a $ ms text
   where
-    text = case f of
-      Parsed f -> show f
-      Unparsed str err -> str
--- TODO add container for rules
-viewLine m a _ (Right (Derivation f r)) = lineContainer m False a $ ms text
-  where
-    text = case f of
-      Parsed f -> show f
-      Unparsed str err -> str
+    (parseSuccess, txt) = case e of
+      Left a -> case a of
+        Parsed str a' -> (True, ms str)
+        Unparsed str err -> (False, ms str)
+      Right (Derivation f _) -> case f of
+        Parsed str f' -> (True, ms str)
+        Unparsed str err -> (False, ms str)
 
-viewProof ::
-  forall formula rule.
-  (Show formula) =>
-  (Show rule) =>
-  Model formula rule -> View (Model formula rule) Action
+viewProof :: Model -> View Model Action
 viewProof model = H.div_ [] [proofView]
   where
     proofView = case model ^. proof of
@@ -156,7 +134,7 @@ viewProof model = H.div_ [] [proofView]
           (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == L.length fs - 1) (Left f))) 0 fs
           (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
           viewConclusion = viewLine model NAConclusion False (Right d)
-    _viewProof :: Int -> Maybe NodeAddr -> Proof formula rule -> View (Model formula rule) Action
+    _viewProof :: Int -> Maybe NodeAddr -> Proof -> View Model Action
     _viewProof n Nothing (ProofLine d) = viewLine model (NAProof n Nothing) False (Right d)
     _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendProof n a) False (Right d)
     _viewProof n ma (SubProof fs ps d) =

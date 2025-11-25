@@ -58,42 +58,94 @@ data Action where
 
 -----------------------------------------------------------------------------
 
-data Model formula rule = Model
-  { _cursorX :: Double,
-    _cursorY :: Double,
-    _focusedLine :: Maybe NodeAddr,
-    _proof :: Proof formula rule,
+initialModel :: Proof -> [String] -> [String] -> Model
+initialModel p unaryOperators binaryOperators =
+  Model
+    { _focusedLine = Nothing,
+      _proof = p,
+      _dragTarget = Nothing,
+      _spawnType = Nothing,
+      _currentLineBefore = Nothing,
+      _currentLineAfter = Nothing,
+      _dragging = False,
+      _functionSymbols = [],
+      _predicateSymbols = [],
+      _unaryOperators = unaryOperators,
+      _binaryOperators = binaryOperators,
+      _quantifiers = [],
+      _firstOrder = False
+    }
+
+initialModelFirstOrder :: Proof -> [(String, Int)] -> [(String, Int)] -> [String] -> [String] -> [String] -> Model
+initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
+  Model
+    { _focusedLine = Nothing,
+      _proof = p,
+      _dragTarget = Nothing,
+      _spawnType = Nothing,
+      _currentLineBefore = Nothing,
+      _currentLineAfter = Nothing,
+      _dragging = False,
+      _functionSymbols = functionSymbols,
+      _predicateSymbols = predicateSymbols,
+      _unaryOperators = unaryOperators,
+      _binaryOperators = binaryOperators,
+      _quantifiers = quantifiers,
+      _firstOrder = True
+    }
+
+data Model = Model
+  { _focusedLine :: Maybe NodeAddr,
+    _proof :: Proof,
     _dragTarget :: Maybe NodeAddr,
     _spawnType :: Maybe SpawnType,
     _currentLineBefore :: Maybe NodeAddr,
     _currentLineAfter :: Maybe NodeAddr,
-    _dragging :: Bool
+    _dragging :: Bool,
+    _functionSymbols :: [(String, Int)],
+    _predicateSymbols :: [(String, Int)],
+    _unaryOperators :: [String],
+    _binaryOperators :: [String],
+    _quantifiers :: [String],
+    _firstOrder :: Bool
   }
   deriving (Show, Eq)
 
-focusedLine :: Lens (Model formula rule) (Maybe NodeAddr)
+focusedLine :: Lens Model (Maybe NodeAddr)
 focusedLine = lens (._focusedLine) $ \model a -> model {_focusedLine = a}
 
-cursorX :: Lens (Model formula rule) Double
-cursorX = lens (._cursorX) $ \model x -> model {_cursorX = x}
-
-cursorY :: Lens (Model formula rule) Double
-cursorY = lens (._cursorY) $ \model y -> model {_cursorY = y}
-
-proof :: Lens (Model formula rule) (Proof formula rule)
+proof :: Lens Model Proof
 proof = lens (._proof) $ \model p -> model {_proof = p}
 
-dragTarget :: Lens (Model formula rule) (Maybe NodeAddr)
+dragTarget :: Lens Model (Maybe NodeAddr)
 dragTarget = lens (._dragTarget) $ \model dt -> model {_dragTarget = dt}
 
-spawnType :: Lens (Model formula rule) (Maybe SpawnType)
+spawnType :: Lens Model (Maybe SpawnType)
 spawnType = lens (._spawnType) $ \model st -> model {_spawnType = st}
 
-currentLineBefore :: Lens (Model formula rule) (Maybe NodeAddr)
+currentLineBefore :: Lens Model (Maybe NodeAddr)
 currentLineBefore = lens (._currentLineBefore) $ \model dt -> model {_currentLineBefore = dt}
 
-currentLineAfter :: Lens (Model formula rule) (Maybe NodeAddr)
+currentLineAfter :: Lens Model (Maybe NodeAddr)
 currentLineAfter = lens (._currentLineAfter) $ \model dt -> model {_currentLineAfter = dt}
 
-dragging :: Lens (Model formula rule) Bool
-dragging = lens (._dragging) $ \model x -> model {_dragging = x}
+dragging :: Lens Model Bool
+dragging = lens (._dragging) $ \model d -> model {_dragging = d}
+
+functionSymbols :: Lens Model [(String, Int)]
+functionSymbols = lens (._functionSymbols) $ \model fs -> model {_functionSymbols = fs}
+
+predicateSymbols :: Lens Model [(String, Int)]
+predicateSymbols = lens (._predicateSymbols) $ \model ps -> model {_predicateSymbols = ps}
+
+unaryOperators :: Lens Model [String]
+unaryOperators = lens (._unaryOperators) $ \model uo -> model {_unaryOperators = uo}
+
+binaryOperators :: Lens Model [String]
+binaryOperators = lens (._binaryOperators) $ \model bo -> model {_binaryOperators = bo}
+
+quantifiers :: Lens Model [String]
+quantifiers = lens (._quantifiers) $ \model q -> model {_quantifiers = q}
+
+firstOrder :: Lens Model Bool
+firstOrder = lens (._firstOrder) $ \model fo -> model {_firstOrder = fo}

@@ -43,7 +43,7 @@ test-suite test
   build-depends:
     base,
     fitch-editor-lib,
-    tasty ==1.5 || >1.5.1,
+    tasty,
     tasty-coverage,
     tasty-hunit,
     tasty-quickcheck,
@@ -85,6 +85,7 @@ library fitch-editor-lib
     megaparsec,
     miso,
     mtl,
+    parser-combinators,
 
   hs-source-dirs:
     src
