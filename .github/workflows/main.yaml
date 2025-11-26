@@ -24,7 +24,7 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test using Nix
-        run: nix develop . --command bash -c "make test
+        run: nix develop . --command bash -c "make test"
 
       - name: Build using Nix
         run: nix develop . --command bash -c "make"
