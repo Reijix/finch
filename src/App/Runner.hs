@@ -1,4 +1,4 @@
-module App.Runner (runApp, runAppFirstOrder, Proof (..), FromText (..), Model (..), Derivation (..)) where
+module App.Runner (runApp, initialModel, tryParse, runAppFirstOrder, Proof (..), FromText (..), Model (..), Derivation (..)) where
 
 import App.Model
 import App.Views
@@ -133,11 +133,12 @@ updateModel (DoubleClick a) = do
   p <- use proof
   io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
 -- TODO implement select upstream
+-- TODO and implement setSelectionRange:
+-- https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/setSelectionRange
 -- io_ . select . ms $ "proof-line" ++ show n
 updateModel Blur = focusedLine .= Nothing
 updateModel Nop = pure ()
 updateModel (SpawnStart st) = spawnType .= Just st
--- TODO: Maybe actual parse should only happen on enter, i.e. when `blur` fires.
 updateModel (Input str) = do
   m <- get
   fline <- use focusedLine

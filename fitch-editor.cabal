@@ -65,6 +65,7 @@ executable fitch-editor-FOL
   build-depends:
     base,
     fitch-editor-lib,
+    text
 
   main-is:
     FOL.hs

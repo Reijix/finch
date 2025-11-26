@@ -1,12 +1,12 @@
 
-CABAL_OPTIONS = --allow-newer --with-compiler=javascript-unknown-ghcjs-ghc --with-hc-pkg=javascript-unknown-ghcjs-ghc-pkg
+CABAL_OPTIONS = --allow-newer --with-compiler=javascript-unknown-ghcjs-ghc --with-hc-pkg=javascript-unknown-ghcjs-ghc-pkg --with-hsc2hs=javascript-unknown-ghcjs-hsc2hs
 
 .PHONY: update build serve
 
 all: update build
 
 update:
-	cabal update
+	cabal update $(CABAL_OPTIONS)
 
 build:
 	cabal build $(CABAL_OPTIONS) fitch-editor-FOL
@@ -22,7 +22,9 @@ serve: all serve1
 clean:
 	rm -rf dist-newstyle public
 
-test: update
+test:
+# no CABAL_OPTIONS because ghcjs backend does not work with tests...
+	cabal update
 	cabal test
 
 report:

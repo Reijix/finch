@@ -16,18 +16,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: wimpysworld/nothing-but-nix@main
         with:
           nix-permission-edict: true
+      
       - uses: cachix/install-nix-action@v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test using Nix
-        run: nix develop . --command bash -c "make test"
+        run: nix develop . --command bash -c "make"
 
       - name: Build using Nix
-        run: nix develop . --command bash -c "make"
+        run: nix develop .#ghcjs --command bash -c "make"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
