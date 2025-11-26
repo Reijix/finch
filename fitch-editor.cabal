@@ -28,6 +28,9 @@ test-suite test
   default-language:
     GHC2024
 
+  default-extensions:
+    OverloadedStrings
+
   type:
     exitcode-stdio-1.0
 
@@ -47,6 +50,7 @@ test-suite test
     tasty-coverage,
     tasty-hunit,
     tasty-quickcheck,
+    text,
 
 executable fitch-editor-FOL
   import:

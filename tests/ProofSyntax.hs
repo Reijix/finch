@@ -4,6 +4,7 @@ import Control.Monad
 import Data.Functor
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Text (pack)
 import Fitch.Proof
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -15,7 +16,7 @@ import Test.Tasty.QuickCheck as QC
 -- Definitions for unit testing:
 
 formula :: Int -> ParseWrapper Formula
-formula n = Parsed "" $ Predicate (show n) []
+formula n = Parsed "" $ Predicate (pack $ show n) []
 
 rule :: Int -> [Reference] -> ParseWrapper RuleApplication
 rule str ref = Parsed "" (RuleApplication (Rule "Rule" [] (Predicate "Formula" [])) ref)
