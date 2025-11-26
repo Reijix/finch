@@ -22,7 +22,7 @@ serve: all serve1
 clean:
 	rm -rf dist-newstyle public
 
-test:
+test: update
 	cabal test
 
 report:
