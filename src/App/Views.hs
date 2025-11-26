@@ -20,6 +20,7 @@ import Miso
     preventDefault,
     stopPropagation,
     text,
+    valueDecoder,
   )
 import Miso.Html qualified as HP
 import Miso.Html.Element qualified as H
@@ -110,7 +111,7 @@ viewLine m a isLastAssumption e =
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
           onEnter Nop Blur,
-          onInput Input,
+          onWithOptions preventDefault "input" valueDecoder (\s _ -> Input s),
           onDragStartWithOptions preventDefault Nop,
           value_ txt
         ]

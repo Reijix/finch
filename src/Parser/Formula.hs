@@ -1,28 +1,29 @@
-module Parser.Formula (parseFormula, parseTestT, pFormula) where
+module Parser.Formula (parseFormula) where
 
 import Control.Monad
 import Control.Monad.Combinators.Expr
 import Control.Monad.State
+import Data.Text (Text, pack, unpack)
 import Fitch.Proof
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 data FormulaParserState = FormulaParserState
-  { functionSymbols :: [(String, Int)],
-    predicateSymbols :: [(String, Int)],
-    unaryOperators :: [String],
-    binaryOperators :: [String],
-    quantifiers :: [String],
+  { functionSymbols :: [(Text, Int)],
+    predicateSymbols :: [(Text, Int)],
+    unaryOperators :: [(Text, Text)],
+    binaryOperators :: [(Text, Text)],
+    quantifiers :: [(Text, Text)],
     firstOrder :: Bool
   }
 
 -- TODO work on error printing
-instance ShowErrorComponent String where
-  showErrorComponent :: String -> String
-  showErrorComponent = id
+instance ShowErrorComponent Text where
+  showErrorComponent :: Text -> String
+  showErrorComponent = unpack
 
-type FormulaParser = ParsecT String String (State FormulaParserState)
+type FormulaParser = ParsecT Text Text (State FormulaParserState)
 
 sc :: FormulaParser ()
 sc =
@@ -34,13 +35,13 @@ sc =
 lexeme :: FormulaParser a -> FormulaParser a
 lexeme = L.lexeme sc
 
-symbol :: String -> FormulaParser String
+symbol :: Text -> FormulaParser Text
 symbol = L.symbol sc
 
 pName :: FormulaParser Name
-pName = lexeme (some letterChar <?> "name")
+pName = lexeme (pack <$> some letterChar <?> "name")
 
-comma :: FormulaParser String
+comma :: FormulaParser Text
 comma = symbol ","
 
 pFunName :: FormulaParser Name
@@ -52,7 +53,7 @@ pFun :: FormulaParser Term
 pFun = lexeme $ liftM2 Fun pFunName (parens (pTerm `sepBy` comma))
 
 pVar :: FormulaParser Term
-pVar = Var <$> lexeme (some letterChar <?> "variable")
+pVar = Var <$> lexeme (pack <$> some letterChar <?> "variable")
 
 parens :: FormulaParser a -> FormulaParser a
 parens = between (symbol "(") (symbol ")")
@@ -77,7 +78,7 @@ pPropAtom = lexeme $ (`Predicate` []) <$> pName
 pQuantifierName :: FormulaParser Name
 pQuantifierName = do
   symbols <- gets quantifiers
-  foldr (\s p -> chunk s <|> p) empty symbols
+  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
 
 pQuantifier :: FormulaParser Formula
 pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme pName) (lexeme (string ".") >> pFormula)
@@ -88,10 +89,10 @@ pFormulaAtomic =
     True -> choice [try pQuantifier, try pPredicate, parens pFormula]
     False -> choice [try pPropAtom, parens pFormula]
 
-binary :: String -> (a -> a -> a) -> Operator FormulaParser a
+binary :: Text -> (a -> a -> a) -> Operator FormulaParser a
 binary name f = InfixL (f <$ symbol name)
 
-prefix, postfix :: String -> (a -> a) -> Operator FormulaParser a
+prefix, postfix :: Text -> (a -> a) -> Operator FormulaParser a
 prefix name f = Prefix (f <$ symbol name)
 postfix name f = Postfix (f <$ symbol name)
 
@@ -100,12 +101,12 @@ pFormula = do
   unaries <- gets unaryOperators
   binaries <- gets binaryOperators
   let operatorTable =
-        [ map (\u -> prefix u (UnaryOp u)) unaries,
-          map (\b -> binary b (BinaryOp b)) binaries
+        [ concatMap (\(alias, u) -> [prefix alias (UnaryOp u), prefix u (UnaryOp u)]) unaries,
+          concatMap (\(alias, b) -> [binary alias (BinaryOp b), binary b (BinaryOp b)]) binaries
         ]
    in makeExprParser pFormulaAtomic operatorTable
 
-parseFormula :: [(String, Int)] -> [(String, Int)] -> [String] -> [String] -> [String] -> Bool -> String -> Either String Formula
+parseFormula :: [(Text, Int)] -> [(Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Bool -> Text -> Either Text Formula
 parseFormula functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers firstOrder input = case evalState (runParserT (pFormula <* eof) "" input) initialState of
   Left e -> Left "error"
   Right f -> Right f
@@ -120,7 +121,7 @@ parseFormula functionSymbols predicateSymbols unaryOperators binaryOperators qua
           firstOrder
         }
 
-parseTestT :: (Show a) => ParsecT String String (State FormulaParserState) a -> String -> IO ()
-parseTestT p input = case evalState (runParserT p "" input) (FormulaParserState {functionSymbols = [("f", 1)], predicateSymbols = [("P", 1)], unaryOperators = ["~"], binaryOperators = ["/\\", "\\/", "->"], quantifiers = ["forall"], firstOrder = True}) of
-  Left e -> putStr $ errorBundlePretty e
-  Right x -> print x
+-- parseTestT :: (Show a) => ParsecT Text Text (State FormulaParserState) a -> Text -> IO ()
+-- parseTestT p input = case evalState (runParserT p "" input) (FormulaParserState {functionSymbols = [("f", 1)], predicateSymbols = [("P", 1)], unaryOperators = ["~"], binaryOperators = ["/\\", "\\/", "->"], quantifiers = ["forall"], firstOrder = True}) of
+--   Left e -> putStr $ errorBundlePretty e
+--   Right x -> print x

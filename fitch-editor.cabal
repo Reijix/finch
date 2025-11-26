@@ -55,6 +55,9 @@ executable fitch-editor-FOL
   hs-source-dirs:
     apps
 
+  default-extensions:
+    OverloadedStrings
+
   build-depends:
     base,
     fitch-editor-lib,
@@ -86,6 +89,7 @@ library fitch-editor-lib
     miso,
     mtl,
     parser-combinators,
+    text,
 
   hs-source-dirs:
     src

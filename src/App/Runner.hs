@@ -1,10 +1,11 @@
-module App.Runner (runApp, runAppFirstOrder, Proof (..), FromString (..), Model (..), Derivation (..)) where
+module App.Runner (runApp, runAppFirstOrder, Proof (..), FromText (..), Model (..), Derivation (..)) where
 
 import App.Model
 import App.Views
 import Control.Monad.State
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
+import Data.Text (Text, replace)
 import Fitch.Proof
 import Miso
   ( App,
@@ -48,7 +49,7 @@ import Parser.Formula
 -----------------------------------------------------------------------------
 
 -- | Test of Haddock
-runApp :: Proof -> [String] -> [String] -> IO ()
+runApp :: Proof -> [(Text, Text)] -> [(Text, Text)] -> IO ()
 runApp p unaryOperators binaryOperators =
   run . startApp $
     (component m updateModel viewModel)
@@ -58,7 +59,7 @@ runApp p unaryOperators binaryOperators =
   where
     m = initialModel p unaryOperators binaryOperators
 
-runAppFirstOrder :: Proof -> [(String, Int)] -> [(String, Int)] -> [String] -> [String] -> [String] -> IO ()
+runAppFirstOrder :: Proof -> [(Text, Int)] -> [(Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> IO ()
 runAppFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
   run . startApp $
     (component m updateModel viewModelFirstOrder)
@@ -69,27 +70,29 @@ runAppFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperato
     m = initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
 
 -----------------------------------------------------------------------------
-class FromString a where
-  fromString :: Model -> String -> Either String a
+class FromText a where
+  fromText :: Model -> Text -> Either Text a
 
-instance FromString Rule where
-  fromString :: Model -> String -> Either String Rule
-  fromString m str = Right $ Rule str [] (Predicate "" [])
+instance FromText Rule where
+  fromText :: Model -> Text -> Either Text Rule
+  fromText m str = Right $ Rule str [] (Predicate "" [])
 
-instance FromString Formula where
-  fromString :: Model -> String -> Either String Formula
-  fromString m = parseFormula (m ^. functionSymbols) (m ^. predicateSymbols) (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers) (m ^. firstOrder)
+instance FromText Formula where
+  fromText :: Model -> Text -> Either Text Formula
+  fromText m = parseFormula (m ^. functionSymbols) (m ^. predicateSymbols) (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers) (m ^. firstOrder)
 
-instance FromString RuleApplication where
-  fromString :: Model -> String -> Either String RuleApplication
-  fromString m str = case fromString m str :: Either String Rule of
+instance FromText RuleApplication where
+  fromText :: Model -> Text -> Either Text RuleApplication
+  fromText m txt = case fromText m txt :: Either Text Rule of
     Left e -> Left e
     Right r -> Right $ RuleApplication r []
 
-tryParse :: forall a. (FromString a) => Model -> String -> ParseWrapper a
-tryParse m str = case fromString m str :: Either String a of
-  Left err -> Unparsed str err
-  Right result -> Parsed str result
+tryParse :: forall a. (FromText a) => Model -> [(Text, Text)] -> Text -> ParseWrapper a
+tryParse m replacements txt = case fromText m replacedTxt :: Either Text a of
+  Left err -> Unparsed replacedTxt err
+  Right result -> Parsed replacedTxt result
+  where
+    replacedTxt = foldr (\(alias, name) t -> replace alias name t) txt replacements
 
 -----------------------------------------------------------------------------
 updateModel :: Action -> Effect ROOT Model Action
@@ -108,9 +111,9 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
       proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
-    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m "Formula") (tryParse m "Rule")) targetAddr pos
-    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse m "Formula") (tryParse m "Rule"))) targetAddr pos
-    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m "Formula")) targetAddr pos
+    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] "Formula") (tryParse m [] "Rule")) targetAddr pos
+    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse m [] "Formula") (tryParse m [] "Rule"))) targetAddr pos
+    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -138,7 +141,7 @@ updateModel (SpawnStart st) = spawnType .= Just st
 updateModel (Input str) = do
   m <- get
   fline <- use focusedLine
-  mapM_ (\addr -> proof %= lUpdateFormula (tryParse m (fromMisoString str :: String)) addr) fline
+  mapM_ (\addr -> proof %= lUpdateFormula (tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text)) addr) fline
 
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Model Action

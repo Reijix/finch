@@ -1,6 +1,7 @@
 module App.Model where
 
 import Data.List qualified as L
+import Data.Text (Text)
 import Fitch.Proof
 import Miso
   ( App,
@@ -58,7 +59,7 @@ data Action where
 
 -----------------------------------------------------------------------------
 
-initialModel :: Proof -> [String] -> [String] -> Model
+initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> Model
 initialModel p unaryOperators binaryOperators =
   Model
     { _focusedLine = Nothing,
@@ -76,7 +77,7 @@ initialModel p unaryOperators binaryOperators =
       _firstOrder = False
     }
 
-initialModelFirstOrder :: Proof -> [(String, Int)] -> [(String, Int)] -> [String] -> [String] -> [String] -> Model
+initialModelFirstOrder :: Proof -> [(Text, Int)] -> [(Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
 initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
   Model
     { _focusedLine = Nothing,
@@ -102,11 +103,11 @@ data Model = Model
     _currentLineBefore :: Maybe NodeAddr,
     _currentLineAfter :: Maybe NodeAddr,
     _dragging :: Bool,
-    _functionSymbols :: [(String, Int)],
-    _predicateSymbols :: [(String, Int)],
-    _unaryOperators :: [String],
-    _binaryOperators :: [String],
-    _quantifiers :: [String],
+    _functionSymbols :: [(Text, Int)],
+    _predicateSymbols :: [(Text, Int)],
+    _unaryOperators :: [(Text, Text)],
+    _binaryOperators :: [(Text, Text)],
+    _quantifiers :: [(Text, Text)],
     _firstOrder :: Bool
   }
   deriving (Show, Eq)
@@ -132,19 +133,19 @@ currentLineAfter = lens (._currentLineAfter) $ \model dt -> model {_currentLineA
 dragging :: Lens Model Bool
 dragging = lens (._dragging) $ \model d -> model {_dragging = d}
 
-functionSymbols :: Lens Model [(String, Int)]
+functionSymbols :: Lens Model [(Text, Int)]
 functionSymbols = lens (._functionSymbols) $ \model fs -> model {_functionSymbols = fs}
 
-predicateSymbols :: Lens Model [(String, Int)]
+predicateSymbols :: Lens Model [(Text, Int)]
 predicateSymbols = lens (._predicateSymbols) $ \model ps -> model {_predicateSymbols = ps}
 
-unaryOperators :: Lens Model [String]
+unaryOperators :: Lens Model [(Text, Text)]
 unaryOperators = lens (._unaryOperators) $ \model uo -> model {_unaryOperators = uo}
 
-binaryOperators :: Lens Model [String]
+binaryOperators :: Lens Model [(Text, Text)]
 binaryOperators = lens (._binaryOperators) $ \model bo -> model {_binaryOperators = bo}
 
-quantifiers :: Lens Model [String]
+quantifiers :: Lens Model [(Text, Text)]
 quantifiers = lens (._quantifiers) $ \model q -> model {_quantifiers = q}
 
 firstOrder :: Lens Model Bool

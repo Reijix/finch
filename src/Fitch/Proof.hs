@@ -4,6 +4,8 @@ import Control.Applicative
 import Control.Monad.State (evalState)
 import Data.List qualified as L
 import Data.Maybe
+import Data.Text (Text)
+import Data.Text qualified as T
 
 -- * Utilities that are not exported!
 
@@ -30,15 +32,15 @@ updateAt 0 f (a : as) = f a : as
 updateAt n f (a : as) = a : updateAt (n - 1) f as
 
 data ParseWrapper a where
-  Parsed :: String -> a -> ParseWrapper a
-  Unparsed :: String -> String -> ParseWrapper a
+  Parsed :: Text -> a -> ParseWrapper a
+  Unparsed :: Text -> Text -> ParseWrapper a
   deriving (Show, Eq)
 
 data Rule
   = Rule Name [Either Formula Proof] Formula
   deriving (Show, Eq)
 
-type Name = String
+type Name = Text
 
 data Term
   = Var Name
@@ -48,24 +50,24 @@ data Term
 instance Show Term where
   -- TODO verify
   show :: Term -> String
-  show (Var v) = v
-  show (Fun f []) = f
-  show (Fun f ts) = f ++ "(" ++ L.intercalate "," (map show ts)
+  show (Var v) = T.unpack v
+  show (Fun f []) = T.unpack f
+  show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts)
 
 data Formula
   = Predicate Name [Term]
-  | UnaryOp String Formula
-  | BinaryOp String Formula Formula
+  | UnaryOp Text Formula
+  | BinaryOp Text Formula Formula
   | Quantifier Name Name Formula
   deriving (Eq, Ord)
 
 instance Show Formula where
   show :: Formula -> String
-  show (Predicate p []) = p
-  show (Predicate p ts) = p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-  show (UnaryOp op f) = op ++ "(" ++ show f ++ ")"
-  show (BinaryOp op f1 f2) = "(" ++ show f1 ++ ") " ++ op ++ " (" ++ show f2 ++ ")"
-  show (Quantifier q v f) = q ++ " " ++ v ++ ". " ++ show f
+  show (Predicate p []) = T.unpack p
+  show (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+  show (UnaryOp op f) = T.unpack op ++ "(" ++ show f ++ ")"
+  show (BinaryOp op f1 f2) = "(" ++ show f1 ++ ") " ++ T.unpack op ++ " (" ++ show f2 ++ ")"
+  show (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
 
 data Reference where
   -- | Referencing a single line
