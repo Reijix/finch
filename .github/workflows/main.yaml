@@ -28,10 +28,10 @@ jobs:
       
 
       - name: Test using Nix
-        run: nix develop . --command bash -c "make test" && nix-collect-garbage -d
+        run: nix develop .#test --command bash -c "make test" && nix-collect-garbage -d
 
       - name: Build using Nix
-        run: nix develop .#ghcjs --command bash -c "make"
+        run: nix develop . --command bash -c "make"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
