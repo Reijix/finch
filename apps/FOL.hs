@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 module Main where
 
 import App.Model (binaryOperators)
@@ -9,11 +7,14 @@ import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof unaryOperators binaryOperators
+main = runAppFirstOrder exProof functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
   where
+    functionSymbols = [("f", 2)]
+    predicateSymbols = [("P", 1), ("A", 0), ("B", 0)]
     unaryOperators = [("~", "¬")]
     binaryOperators = [("/\\", "∧"), ("\\/", "∨"), ("->", "→")]
-    fakeModel = initialModel undefined unaryOperators binaryOperators
+    quantifiers = [("forall", "∀")]
+    fakeModel = initialModelFirstOrder undefined functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
     mkFormula :: Text -> Assumption
     mkFormula = tryParse fakeModel []
 
