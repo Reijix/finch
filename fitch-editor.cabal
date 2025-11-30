@@ -65,7 +65,7 @@ executable fitch-editor-FOL
   build-depends:
     base,
     fitch-editor-lib,
-    text
+    text,
 
   main-is:
     FOL.hs
@@ -90,6 +90,7 @@ library fitch-editor-lib
   build-depends:
     base,
     containers,
+    jsaddle,
     megaparsec,
     miso,
     mtl,

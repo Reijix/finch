@@ -5,8 +5,9 @@ import App.Views
 import Control.Monad.State
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
-import Data.Text (Text, replace)
+import Data.Text (Text, replace, unpack)
 import Fitch.Proof
+import Language.Javascript.JSaddle
 import Miso
   ( App,
     CSS (Href),
@@ -23,12 +24,15 @@ import Miso
     emptyDecoder,
     focus,
     fromMisoString,
+    io,
     io_,
     keyboardEvents,
     mouseSub,
     ms,
     preventDefault,
     run,
+    select,
+    setSelectionRange,
     startApp,
     text,
   )
@@ -132,17 +136,31 @@ updateModel (DoubleClick a) = do
   focusedLine .= Just a
   p <- use proof
   io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
--- TODO implement select upstream
--- TODO and implement setSelectionRange:
--- https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/setSelectionRange
--- io_ . select . ms $ "proof-line" ++ show n
+  io_ . select . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
 updateModel Blur = focusedLine .= Nothing
 updateModel Nop = pure ()
 updateModel (SpawnStart st) = spawnType .= Just st
-updateModel (Input str) = do
+updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
-  mapM_ (\addr -> proof %= lUpdateFormula (tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text)) addr) fline
+  -- save selectionStart and selectionEnd
+  case fline of
+    Nothing -> return ()
+    Just addr -> io $ do
+      start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
+      end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
+      return $ ProcessInput str start end addr
+updateModel (ProcessInput str start end addr) = do
+  m <- get
+  delta <- case tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text) :: ParseWrapper Formula of
+    p@(Parsed txt f) -> do
+      proof %= lUpdateFormula p addr
+      return (length (fromMisoString str :: String) - length (unpack txt))
+    p@(Unparsed txt _) -> do
+      proof %= lUpdateFormula p addr
+      return (length (fromMisoString str :: String) - length (unpack txt))
+  -- restore selectionStart and selectionEnd
+  io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
 
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Model Action

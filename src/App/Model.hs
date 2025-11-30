@@ -7,6 +7,7 @@ import Miso
   ( App,
     Attribute,
     Component (events, subs),
+    DOMRef,
     Effect,
     MisoString,
     PointerEvent (client),
@@ -44,7 +45,8 @@ data SpawnType where
 
 data Action where
   Blur :: Action
-  Input :: MisoString -> Action
+  Input :: MisoString -> DOMRef -> Action
+  ProcessInput :: MisoString -> Int -> Int -> NodeAddr -> Action
   DoubleClick :: NodeAddr -> Action
   Drop :: DropLocation -> Action
   DragEnter :: NodeAddr -> InsertPosition -> Action
@@ -55,7 +57,6 @@ data Action where
   DragEnd :: Action
   Drag :: Action
   Nop :: Action
-  deriving (Show, Eq)
 
 -----------------------------------------------------------------------------
 

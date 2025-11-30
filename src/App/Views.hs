@@ -111,7 +111,7 @@ viewLine m a isLastAssumption e =
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
           onEnter Nop Blur,
-          onWithOptions preventDefault "input" valueDecoder (\s _ -> Input s),
+          onWithOptions preventDefault "input" valueDecoder Input,
           onDragStartWithOptions preventDefault Nop,
           value_ txt
         ]
