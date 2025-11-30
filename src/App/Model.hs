@@ -9,6 +9,8 @@ import Miso
     Component (events, subs),
     DOMRef,
     Effect,
+    KeyCode,
+    KeyInfo,
     MisoString,
     PointerEvent (client),
     ROOT,
@@ -26,8 +28,7 @@ import Miso
     text,
   )
 import Miso.CSS qualified as CSS
-import Miso.Lens (Lens, lens, this, use, (.=), (^.))
-import Miso.Svg (text_, tspan_)
+import Miso.Lens (Lens, lens, use, (.=), (^.))
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 
@@ -57,6 +58,8 @@ data Action where
   DragEnd :: Action
   Drag :: Action
   Nop :: Action
+  KeyDown :: NodeAddr -> KeyInfo -> Action
+  ProcessParens :: NodeAddr -> Int -> Int -> Action
 
 -----------------------------------------------------------------------------
 

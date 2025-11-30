@@ -36,6 +36,10 @@ data ParseWrapper a where
   Unparsed :: Text -> Text -> ParseWrapper a
   deriving (Show, Eq)
 
+getText :: ParseWrapper a -> Text
+getText (Parsed txt _) = txt
+getText (Unparsed txt _) = txt
+
 data Rule
   = Rule Name [Either Formula Proof] Formula
   deriving (Show, Eq)
@@ -268,13 +272,13 @@ lLookup _ _ = Nothing
 -- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
 --
 -- Fails silently
-lUpdateFormula :: ParseWrapper Formula -> NodeAddr -> Proof -> Proof
-lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (const f) fs) ps l
-lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (updateProofLine f) ps) l
+lUpdateFormula :: (ParseWrapper Formula -> ParseWrapper Formula) -> NodeAddr -> Proof -> Proof
+lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
+lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
   where
-    updateProofLine :: ParseWrapper Formula -> Proof -> Proof
-    updateProofLine f (ProofLine (Derivation _ rule)) = ProofLine (Derivation f rule)
-lUpdateFormula f NAConclusion (SubProof fs ps (Derivation _ rule)) = SubProof fs ps (Derivation f rule)
+    updateProofLine :: Proof -> Proof
+    updateProofLine (ProofLine (Derivation formula rule)) = ProofLine (Derivation (f formula) rule)
+lUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) = SubProof fs ps (Derivation (f formula) rule)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p
 

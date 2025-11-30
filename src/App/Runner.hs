@@ -1,11 +1,12 @@
-module App.Runner (runApp, initialModel, tryParse, runAppFirstOrder, Proof (..), FromText (..), Model (..), Derivation (..)) where
+module App.Runner (runApp, runAppFirstOrder, initialModel, initialModelFirstOrder, tryParse, Proof (..), FromText (..), Model (..), Derivation (..)) where
 
 import App.Model
 import App.Views
 import Control.Monad.State
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
-import Data.Text (Text, replace, unpack)
+import Data.Text (Text)
+import Data.Text qualified as T
 import Fitch.Proof
 import Language.Javascript.JSaddle
 import Miso
@@ -13,6 +14,7 @@ import Miso
     CSS (Href),
     Component (events, styles, subs),
     Effect,
+    KeyInfo (keyCode, shiftKey),
     PointerEvent (client),
     ROOT,
     View,
@@ -24,8 +26,10 @@ import Miso
     emptyDecoder,
     focus,
     fromMisoString,
+    getElementById,
     io,
     io_,
+    issue,
     keyboardEvents,
     mouseSub,
     ms,
@@ -96,7 +100,7 @@ tryParse m replacements txt = case fromText m replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
   Right result -> Parsed replacedTxt result
   where
-    replacedTxt = foldr (\(alias, name) t -> replace alias name t) txt replacements
+    replacedTxt = foldr (\(alias, name) t -> T.replace alias name t) txt replacements
 
 -----------------------------------------------------------------------------
 updateModel :: Action -> Effect ROOT Model Action
@@ -152,15 +156,33 @@ updateModel (Input str ref) = do
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end addr) = do
   m <- get
-  delta <- case tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text) :: ParseWrapper Formula of
-    p@(Parsed txt f) -> do
-      proof %= lUpdateFormula p addr
-      return (length (fromMisoString str :: String) - length (unpack txt))
-    p@(Unparsed txt _) -> do
-      proof %= lUpdateFormula p addr
-      return (length (fromMisoString str :: String) - length (unpack txt))
-  -- restore selectionStart and selectionEnd
+  let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text) :: ParseWrapper Formula
+  proof %= lUpdateFormula (const p) addr
+  let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
+  -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
+updateModel (KeyDown a info) | keyCode info == 13 = issue Blur
+updateModel (KeyDown a info) | keyCode info == 57 && shiftKey info = do
+  p <- use proof
+  io $ do
+    ref <- getElementById . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
+    start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
+    end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
+    if start < end then return $ ProcessParens a start end else return Nop
+updateModel (KeyDown a n) = do
+  io_ $ consoleLog $ ms $ show n
+updateModel (ProcessParens a start end) = do
+  m <- get
+  p <- use proof
+  proof %= lUpdateFormula (update m) a
+  where
+    update :: Model -> ParseWrapper Formula -> ParseWrapper Formula
+    update m p =
+      let txt = getText p
+          (first, rest) = T.splitAt start txt
+          (second, third) = T.splitAt (end - start) rest
+          newTxt = T.concat [first, "(", second, ")", third]
+       in tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) newTxt
 
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Model Action

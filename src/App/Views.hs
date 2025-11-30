@@ -14,6 +14,7 @@ import Miso
     defaultOptions,
     emptyDecoder,
     focus,
+    keyInfoDecoder,
     ms,
     onWithOptions,
     pointerDecoder,
@@ -29,7 +30,7 @@ import Miso.Html.Property (value_)
 import Miso.Html.Property qualified as HP
 import Miso.Lens
 import Miso.Property (boolProp, textProp)
-import Miso.Svg (onFocusOut, text_, tspan_)
+import Miso.Svg (onFocusOut, onMouseDown, text_, tspan_)
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 
@@ -75,10 +76,10 @@ viewSpawnNode tp str =
 viewLine :: Model -> NodeAddr -> Bool -> Either Assumption Derivation -> View Model Action
 viewLine m a isLastAssumption e =
   H.div_
-    [ HP.draggable_ True,
+    [ HP.draggable_ $ (m ^. focusedLine) /= Just a,
       HP.classList_
         [ ("proof-line", True),
-          ("draggable", True),
+          ("draggable", (m ^. focusedLine) /= Just a),
           ("can-hover", not (m ^. dragging))
         ],
       onDragStartWithOptions stopPropagation $ DragStart a,
@@ -89,19 +90,23 @@ viewLine m a isLastAssumption e =
     [ H.div_
         [ HP.class_ "upper-hover-zone",
           HP.classList_ [("insert-before", m ^. currentLineBefore == Just a)],
-          onDragOverWithOptions preventDefault Nop,
+          -- hide while focused, so that the input field is clickable for mouse movement
+          HP.hidden_ $ m ^. focusedLine == Just a,
+          onDragOverWithOptions (Options {_preventDefault = True, _stopPropagation = True}) Nop,
           onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a Before),
           onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave Before),
-          onDropWithOptions defaultOptions (Drop (LocationAddr a Before))
+          onDropWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (Drop (LocationAddr a Before))
         ]
         [],
       H.div_
         [ HP.class_ "lower-hover-zone",
           HP.classList_ [("insert-after", m ^. currentLineAfter == Just a)],
-          onDragOverWithOptions preventDefault Nop,
-          onDragEnterWithOptions preventDefault (DragEnter a After),
-          onDragLeaveWithOptions preventDefault (DragLeave After),
-          onDropWithOptions defaultOptions (Drop (LocationAddr a After))
+          -- hide while focused, so that the input field is clickable for mouse movement
+          HP.hidden_ $ m ^. focusedLine == Just a,
+          onDragOverWithOptions (Options {_preventDefault = True, _stopPropagation = True}) Nop,
+          onDragEnterWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragEnter a After),
+          onDragLeaveWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (DragLeave After),
+          onDropWithOptions (Options {_preventDefault = True, _stopPropagation = True}) (Drop (LocationAddr a After))
         ]
         [],
       -- TODO RULES
@@ -110,8 +115,9 @@ viewLine m a isLastAssumption e =
           HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
-          onEnter Nop Blur,
-          onWithOptions preventDefault "input" valueDecoder Input,
+          -- TODO conditional options
+          -- onWithOptions preventDefault "keydown" keyInfoDecoder (\info _ -> KeyDown a info),
+          onWithOptions defaultOptions "input" valueDecoder Input,
           onDragStartWithOptions preventDefault Nop,
           value_ txt
         ]

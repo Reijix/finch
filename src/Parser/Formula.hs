@@ -50,7 +50,7 @@ pFunName = do
   foldr (\(smb, _) p -> chunk smb <|> p) empty symbols
 
 pFun :: FormulaParser Term
-pFun = lexeme $ liftM2 Fun pFunName (parens (pTerm `sepBy` comma))
+pFun = lexeme $ liftM2 Fun pFunName $ choice [try $ parens (pTerm `sepBy` comma), return []]
 
 pVar :: FormulaParser Term
 pVar = Var <$> lexeme (pack <$> some letterChar <?> "variable")
@@ -70,7 +70,7 @@ pPredicateName = do
   foldr (\(smb, _) p -> chunk smb <|> p) empty symbols
 
 pPredicate :: FormulaParser Formula
-pPredicate = lexeme $ liftM2 Predicate pPredicateName (parens (pTerm `sepBy` comma))
+pPredicate = lexeme $ liftM2 Predicate pPredicateName $ choice [try $ parens (pTerm `sepBy` comma), return []]
 
 pPropAtom :: FormulaParser Formula
 pPropAtom = lexeme $ (`Predicate` []) <$> pName
@@ -81,7 +81,7 @@ pQuantifierName = do
   foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
 
 pQuantifier :: FormulaParser Formula
-pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme pName) (lexeme (string ".") >> pFormula)
+pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme pName) (lexeme (string ".") >> lexeme pFormula)
 
 pFormulaAtomic :: FormulaParser Formula
 pFormulaAtomic =
