@@ -16,6 +16,8 @@ import Miso
     focus,
     keyInfoDecoder,
     ms,
+    onBeforeDestroyed,
+    onCreatedWith,
     onWithOptions,
     pointerDecoder,
     preventDefault,
@@ -115,9 +117,9 @@ viewLine m a isLastAssumption e =
           HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof))),
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
-          -- TODO conditional options
-          -- onWithOptions preventDefault "keydown" keyInfoDecoder (\info _ -> KeyDown a info),
           onWithOptions defaultOptions "input" valueDecoder Input,
+          onCreatedWith KeyDownStart,
+          onBeforeDestroyed KeyDownStop,
           onDragStartWithOptions preventDefault Nop,
           value_ txt
         ]

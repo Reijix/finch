@@ -2,6 +2,7 @@ module App.Runner (runApp, runAppFirstOrder, initialModel, initialModelFirstOrde
 
 import App.Model
 import App.Views
+import Control.Monad (when)
 import Control.Monad.State
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
@@ -13,17 +14,22 @@ import Miso
   ( App,
     CSS (Href),
     Component (events, styles, subs),
+    DOMRef,
     Effect,
     KeyInfo (keyCode, shiftKey),
+    MisoString,
     PointerEvent (client),
     ROOT,
     View,
+    addEventListener,
     component,
     consoleLog,
     defaultEvents,
     defaultOptions,
+    dispatchEvent,
     dragEvents,
     emptyDecoder,
+    eventPreventDefault,
     focus,
     fromMisoString,
     getElementById,
@@ -33,11 +39,15 @@ import Miso
     keyboardEvents,
     mouseSub,
     ms,
+    newEvent,
     preventDefault,
+    removeEventListener,
     run,
     select,
     setSelectionRange,
     startApp,
+    startSub,
+    stopSub,
     text,
   )
 import Miso.CSS qualified as CSS
@@ -48,6 +58,7 @@ import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property qualified as HP
 import Miso.Lens (Lens, use, (%=), (.=), (^.))
+import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula
 
@@ -101,6 +112,27 @@ tryParse m replacements txt = case fromText m replacedTxt :: Either Text a of
   Right result -> Parsed replacedTxt result
   where
     replacedTxt = foldr (\(alias, name) t -> T.replace alias name t) txt replacements
+
+-----------------------------------------------------------------------------
+onKeyDownSub :: DOMRef -> Sub action
+onKeyDownSub domRef = createSub acquire (removeEventListener domRef "keydown")
+  where
+    acquire = do
+      addEventListener domRef "keydown" $ \evt -> do
+        Just (keyCode :: Int) <- fromJSVal =<< evt ! ("keyCode" :: MisoString)
+        Just shiftKey <- fromJSVal =<< evt ! ("shiftKey" :: MisoString)
+        start :: Int <- fromJSValUnchecked =<< (domRef ! "selectionStart")
+        end :: Int <- fromJSValUnchecked =<< (domRef ! "selectionEnd")
+        consoleLog $ ms $ "start,end: " ++ show start ++ "," ++ show end
+        when (keyCode == 57 && shiftKey && start < end) $ do
+          eventPreventDefault evt
+          value :: Text <- fromJSValUnchecked =<< (domRef ! "value")
+          let (first, rest) = T.splitAt start value
+          let (second, third) = T.splitAt (end - start) rest
+          let newTxt = T.concat [first, "(", second, ")", third]
+          domRef <# "value" $ newTxt
+          inputEvent <- newEvent "input"
+          dispatchEvent inputEvent
 
 -----------------------------------------------------------------------------
 updateModel :: Action -> Effect ROOT Model Action
@@ -161,16 +193,16 @@ updateModel (ProcessInput str start end addr) = do
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
-updateModel (KeyDown a info) | keyCode info == 13 = issue Blur
-updateModel (KeyDown a info) | keyCode info == 57 && shiftKey info = do
-  p <- use proof
-  io $ do
-    ref <- getElementById . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
-    start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
-    end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
-    if start < end then return $ ProcessParens a start end else return Nop
-updateModel (KeyDown a n) = do
-  io_ $ consoleLog $ ms $ show n
+-- updateModel (KeyDown a info) | keyCode info == 13 = issue Blur
+-- updateModel (KeyDown a info) | keyCode info == 57 && shiftKey info = do
+--   p <- use proof
+--   io $ do
+--     ref <- getElementById . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
+--     start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
+--     end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
+--     if start < end then return $ ProcessParens a start end else return Nop
+-- updateModel (KeyDown a n) = do
+--   io_ $ consoleLog $ ms $ show n
 updateModel (ProcessParens a start end) = do
   m <- get
   p <- use proof
@@ -183,6 +215,8 @@ updateModel (ProcessParens a start end) = do
           (second, third) = T.splitAt (end - start) rest
           newTxt = T.concat [first, "(", second, ")", third]
        in tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) newTxt
+updateModel (KeyDownStart ref) = startSub "keyDownSub" (onKeyDownSub ref)
+updateModel KeyDownStop = stopSub "keyDownSub"
 
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Model Action
