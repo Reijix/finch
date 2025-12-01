@@ -118,8 +118,8 @@ viewLine m a isLastAssumption e =
           HP.classList_ [("proof-input", True), ("last-assumption", isLastAssumption), ("parse-success", parseSuccess), ("parse-fail", not parseSuccess)],
           HP.draggable_ False,
           onWithOptions defaultOptions "input" valueDecoder Input,
-          onCreatedWith KeyDownStart,
-          onBeforeDestroyed KeyDownStop,
+          onCreatedWith (KeyDownStart a),
+          onBeforeDestroyed (KeyDownStop a),
           onDragStartWithOptions preventDefault Nop,
           value_ txt
         ]

@@ -114,8 +114,8 @@ tryParse m replacements txt = case fromText m replacedTxt :: Either Text a of
     replacedTxt = foldr (\(alias, name) t -> T.replace alias name t) txt replacements
 
 -----------------------------------------------------------------------------
-onKeyDownSub :: DOMRef -> Sub action
-onKeyDownSub domRef = createSub acquire (removeEventListener domRef "keydown")
+onKeyDownSub :: NodeAddr -> DOMRef -> Sub Action
+onKeyDownSub addr domRef sink = createSub acquire (removeEventListener domRef "keydown") sink
   where
     acquire = do
       addEventListener domRef "keydown" $ \evt -> do
@@ -123,16 +123,15 @@ onKeyDownSub domRef = createSub acquire (removeEventListener domRef "keydown")
         Just shiftKey <- fromJSVal =<< evt ! ("shiftKey" :: MisoString)
         start :: Int <- fromJSValUnchecked =<< (domRef ! "selectionStart")
         end :: Int <- fromJSValUnchecked =<< (domRef ! "selectionEnd")
-        consoleLog $ ms $ "start,end: " ++ show start ++ "," ++ show end
         when (keyCode == 57 && shiftKey && start < end) $ do
           eventPreventDefault evt
           value :: Text <- fromJSValUnchecked =<< (domRef ! "value")
           let (first, rest) = T.splitAt start value
-          let (second, third) = T.splitAt (end - start) rest
-          let newTxt = T.concat [first, "(", second, ")", third]
-          domRef <# "value" $ newTxt
-          inputEvent <- newEvent "input"
-          dispatchEvent inputEvent
+              (second, third) = T.splitAt (end - start) rest
+              newTxt = T.concat [first, "(", second, ")", third]
+          -- domRef # "setSelectionRange" $ (end + 2, end + 2, "none")
+          sink (ProcessInput (ms newTxt) (end + 2) (end + 2) addr)
+        when (keyCode == 13) $ sink Blur
 
 -----------------------------------------------------------------------------
 updateModel :: Action -> Effect ROOT Model Action
@@ -193,16 +192,6 @@ updateModel (ProcessInput str start end addr) = do
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
--- updateModel (KeyDown a info) | keyCode info == 13 = issue Blur
--- updateModel (KeyDown a info) | keyCode info == 57 && shiftKey info = do
---   p <- use proof
---   io $ do
---     ref <- getElementById . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
---     start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
---     end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
---     if start < end then return $ ProcessParens a start end else return Nop
--- updateModel (KeyDown a n) = do
---   io_ $ consoleLog $ ms $ show n
 updateModel (ProcessParens a start end) = do
   m <- get
   p <- use proof
@@ -215,8 +204,8 @@ updateModel (ProcessParens a start end) = do
           (second, third) = T.splitAt (end - start) rest
           newTxt = T.concat [first, "(", second, ")", third]
        in tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) newTxt
-updateModel (KeyDownStart ref) = startSub "keyDownSub" (onKeyDownSub ref)
-updateModel KeyDownStop = stopSub "keyDownSub"
+updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
+updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
 
 -----------------------------------------------------------------------------
 viewModel :: Model -> View Model Action
