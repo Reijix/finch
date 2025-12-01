@@ -7,14 +7,12 @@ import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runAppFirstOrder exProof functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
+main = runApp exProof unaryOperators binaryOperators quantifiers
   where
-    functionSymbols = [("f", 2)]
-    predicateSymbols = [("P", 1), ("A", 0), ("B", 0)]
     unaryOperators = [("~", "¬")]
     binaryOperators = [("/\\", "∧"), ("\\/", "∨"), ("->", "→")]
     quantifiers = [("forall", "∀")]
-    fakeModel = initialModelFirstOrder undefined functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
+    fakeModel = initialModel undefined unaryOperators binaryOperators quantifiers
     mkFormula :: Text -> Assumption
     mkFormula = tryParse fakeModel []
 

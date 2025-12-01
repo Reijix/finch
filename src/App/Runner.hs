@@ -1,4 +1,4 @@
-module App.Runner (runApp, runAppFirstOrder, initialModel, initialModelFirstOrder, tryParse, Proof (..), FromText (..), Model (..), Derivation (..)) where
+module App.Runner (runApp, initialModel, tryParse, Proof (..), FromText (..), Model (..), Derivation (..)) where
 
 import App.Model
 import App.Views
@@ -68,25 +68,15 @@ import Parser.Formula
 -----------------------------------------------------------------------------
 
 -- | Test of Haddock
-runApp :: Proof -> [(Text, Text)] -> [(Text, Text)] -> IO ()
-runApp p unaryOperators binaryOperators =
+runApp :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> IO ()
+runApp p unaryOperators binaryOperators quantifiers =
   run . startApp $
     (component m updateModel viewModel)
       { styles = [Href "style.css"],
         events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
       }
   where
-    m = initialModel p unaryOperators binaryOperators
-
-runAppFirstOrder :: Proof -> [(Text, Int)] -> [(Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> IO ()
-runAppFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
-  run . startApp $
-    (component m updateModel viewModelFirstOrder)
-      { styles = [Href "style.css"],
-        events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
-      }
-  where
-    m = initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers
+    m = initialModel p unaryOperators binaryOperators quantifiers
 
 -----------------------------------------------------------------------------
 class FromText a where

@@ -63,9 +63,8 @@ data Action where
   KeyDownStop :: NodeAddr -> Action
 
 -----------------------------------------------------------------------------
-
-initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> Model
-initialModel p unaryOperators binaryOperators =
+initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
+initialModel p unaryOperators binaryOperators quantifiers =
   Model
     { _focusedLine = Nothing,
       _proof = p,
@@ -74,30 +73,9 @@ initialModel p unaryOperators binaryOperators =
       _currentLineBefore = Nothing,
       _currentLineAfter = Nothing,
       _dragging = False,
-      _functionSymbols = [],
-      _predicateSymbols = [],
       _unaryOperators = unaryOperators,
       _binaryOperators = binaryOperators,
-      _quantifiers = [],
-      _firstOrder = False
-    }
-
-initialModelFirstOrder :: Proof -> [(Text, Int)] -> [(Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
-initialModelFirstOrder p functionSymbols predicateSymbols unaryOperators binaryOperators quantifiers =
-  Model
-    { _focusedLine = Nothing,
-      _proof = p,
-      _dragTarget = Nothing,
-      _spawnType = Nothing,
-      _currentLineBefore = Nothing,
-      _currentLineAfter = Nothing,
-      _dragging = False,
-      _functionSymbols = functionSymbols,
-      _predicateSymbols = predicateSymbols,
-      _unaryOperators = unaryOperators,
-      _binaryOperators = binaryOperators,
-      _quantifiers = quantifiers,
-      _firstOrder = True
+      _quantifiers = quantifiers
     }
 
 data Model = Model
@@ -108,12 +86,9 @@ data Model = Model
     _currentLineBefore :: Maybe NodeAddr,
     _currentLineAfter :: Maybe NodeAddr,
     _dragging :: Bool,
-    _functionSymbols :: [(Text, Int)],
-    _predicateSymbols :: [(Text, Int)],
     _unaryOperators :: [(Text, Text)],
     _binaryOperators :: [(Text, Text)],
-    _quantifiers :: [(Text, Text)],
-    _firstOrder :: Bool
+    _quantifiers :: [(Text, Text)]
   }
   deriving (Show, Eq)
 
@@ -138,12 +113,6 @@ currentLineAfter = lens (._currentLineAfter) $ \model dt -> model {_currentLineA
 dragging :: Lens Model Bool
 dragging = lens (._dragging) $ \model d -> model {_dragging = d}
 
-functionSymbols :: Lens Model [(Text, Int)]
-functionSymbols = lens (._functionSymbols) $ \model fs -> model {_functionSymbols = fs}
-
-predicateSymbols :: Lens Model [(Text, Int)]
-predicateSymbols = lens (._predicateSymbols) $ \model ps -> model {_predicateSymbols = ps}
-
 unaryOperators :: Lens Model [(Text, Text)]
 unaryOperators = lens (._unaryOperators) $ \model uo -> model {_unaryOperators = uo}
 
@@ -152,6 +121,3 @@ binaryOperators = lens (._binaryOperators) $ \model bo -> model {_binaryOperator
 
 quantifiers :: Lens Model [(Text, Text)]
 quantifiers = lens (._quantifiers) $ \model q -> model {_quantifiers = q}
-
-firstOrder :: Lens Model Bool
-firstOrder = lens (._firstOrder) $ \model fo -> model {_firstOrder = fo}
