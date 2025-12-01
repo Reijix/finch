@@ -98,7 +98,7 @@ instance FromText Rule where
 
 instance FromText Formula where
   fromText :: Model -> Text -> Either Text Formula
-  fromText m = parseFormula (m ^. functionSymbols) (m ^. predicateSymbols) (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers) (m ^. firstOrder)
+  fromText m = parseFormula (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers)
 
 instance FromText RuleApplication where
   fromText :: Model -> Text -> Either Text RuleApplication
