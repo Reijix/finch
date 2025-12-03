@@ -115,3 +115,14 @@
 .parse-fail {
   color: red;
 }
+
+.error code {
+  display: none;
+}
+
+/* TODO better styling */
+.error:hover code {
+  display: block;
+  position: absolute;
+  white-space: pre-wrap;
+}

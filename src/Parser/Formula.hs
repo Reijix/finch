@@ -103,7 +103,7 @@ pFormula = do
 
 parseFormula :: [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Formula
 parseFormula unaryOperators binaryOperators quantifiers input = case evalState (runParserT (pFormula <* eof) "" input) initialState of
-  Left e -> Left $ T.replace "\t" (pack "        ") $ pack $ errorBundlePretty e
+  Left e -> Left . pack $ errorBundlePretty e
   Right f -> Right f
  where
   initialState =

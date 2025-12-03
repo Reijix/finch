@@ -23,6 +23,7 @@ import Miso (
   preventDefault,
   stopPropagation,
   text,
+  textRaw,
   valueDecoder,
  )
 import Miso.Html.Element qualified as H
@@ -57,7 +58,7 @@ conditionalList ((False, _) : xs) = conditionalList xs
 -- TODO: tooltip needs to be reimplented such that title can be displayed in <code>
 -- https://stackoverflow.com/questions/12539006/tooltips-for-mobile-browsers
 viewErrorIcon :: MisoString -> View Model Action
-viewErrorIcon err = H.img_ [HP.draggable_ False, HP.src_ "./error-icon.svg", HP.height_ "16", HP.title_ err]
+viewErrorIcon err = H.div_ [HP.class_ "error"] [H.img_ [HP.draggable_ False, HP.src_ "./error-icon.svg", HP.height_ "16"], H.code_ [] [text err]]
 
 viewBin :: View Model Action
 viewBin =
