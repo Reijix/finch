@@ -116,7 +116,12 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
   use spawnType >>= \case
     Nothing -> pure ()
     Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] "Formula") (tryParse m [] "Rule")) targetAddr pos
-    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [] [] (Derivation (tryParse m [] "Formula") (tryParse m [] "Rule"))) targetAddr pos
+    Just SpawnProof -> do
+      -- p <- use proof
+      -- let newP = lInsert (Right $ SubProof [tryParse m [] "Formula"] [] (Derivation (tryParse m [] "Formula") (tryParse m [] "Rule"))) targetAddr pos p
+      proof %=? lInsert (Right $ SubProof [tryParse m [] "Formula"] [] (Derivation (tryParse m [] "Formula") (tryParse m [] "Rule"))) targetAddr pos
+      p <- use proof
+      io_ $ consoleLog $ ms $ show p
     Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a

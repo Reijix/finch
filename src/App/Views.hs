@@ -55,10 +55,18 @@ conditionalList [] = []
 conditionalList ((True, x) : xs) = x : conditionalList xs
 conditionalList ((False, _) : xs) = conditionalList xs
 
--- TODO: tooltip needs to be reimplented such that title can be displayed in <code>
--- https://stackoverflow.com/questions/12539006/tooltips-for-mobile-browsers
-viewErrorIcon :: MisoString -> View Model Action
-viewErrorIcon err = H.div_ [HP.class_ "error"] [H.img_ [HP.draggable_ False, HP.src_ "./error-icon.svg", HP.height_ "16"], H.code_ [] [text err]]
+viewErrorIcon :: Bool -> MisoString -> View Model Action
+viewErrorIcon hidden err =
+  H.div_
+    [HP.class_ "error"]
+    [ H.img_
+        [ HP.draggable_ False
+        , HP.src_ "./error-icon.svg"
+        , HP.height_ "16"
+        , HP.hidden_ hidden
+        ]
+    , H.code_ [HP.draggable_ False] [text err]
+    ]
 
 viewBin :: View Model Action
 viewBin =
@@ -94,6 +102,7 @@ viewLine m a isLastAssumption e =
         , ("draggable", (m ^. focusedLine) /= Just a)
         , ("can-hover", not (m ^. dragging))
         ]
+    , HP.hidden_ False
     , onDragStartWithOptions stopPropagation $ DragStart a
     , onDragEndWithOptions stopPropagation DragEnd
     , onDoubleClick (DoubleClick a)
@@ -124,36 +133,26 @@ viewLine m a isLastAssumption e =
     , -- TODO RULES
       H.div_
         [HP.class_ "line-container"]
-        $ conditionalList
-          [
-            ( True
-            , H.input_
-                [ inert_ (Just a /= m ^. focusedLine)
-                , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
-                , HP.classList_
-                    [ ("proof-input", True)
-                    , ("last-assumption", isLastAssumption)
-                    , ("parse-success", parseSuccess)
-                    , ("parse-fail", not parseSuccess)
-                    ]
-                , HP.draggable_ False
-                , onWithOptions defaultOptions "input" valueDecoder Input
-                , onCreatedWith (KeyDownStart a)
-                , onBeforeDestroyed (KeyDownStop a)
-                , onDragStartWithOptions preventDefault Nop
-                , value_ txt
+        [ H.input_
+            [ inert_ (Just a /= m ^. focusedLine)
+            , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+            , HP.classList_
+                [ ("proof-input", True)
+                , ("last-assumption", isLastAssumption)
+                , ("parse-success", parseSuccess)
+                , ("parse-fail", not parseSuccess)
                 ]
-            )
-          ,
-            ( True
-            , H.input_
-                [value_ "rule"]
-            )
-          ,
-            ( not parseSuccess
-            , viewErrorIcon err
-            )
-          ]
+            , HP.draggable_ False
+            , onWithOptions defaultOptions "input" valueDecoder Input
+            , onCreatedWith (KeyDownStart a)
+            , onBeforeDestroyed (KeyDownStop a)
+            , onDragStartWithOptions preventDefault Nop
+            , value_ txt
+            ]
+        , H.input_
+            [HP.class_ "rule-input", value_ "rule"]
+        , viewErrorIcon parseSuccess err
+        ]
     ]
  where
   (parseSuccess, txt, err) = case e of
@@ -181,6 +180,7 @@ viewProof model = H.div_ [] [proofView]
     H.div_
       [ HP.class_ "subproof"
       , HP.draggable_ True
+      , HP.hidden_ False
       , onDragStartWithOptions stopPropagation $ DragStart a
       , onDragEndWithOptions stopPropagation DragEnd
       ]

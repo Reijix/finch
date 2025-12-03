@@ -24,6 +24,10 @@
   min-width: 15rem;
 }
 
+.rule-input {
+  border: none;
+}
+
 .proof-line {
   position: relative;
   max-width: 15rem;
@@ -118,11 +122,20 @@
 
 .error code {
   display: none;
+  position: relative;
+  justify-content: center;
 }
 
 /* TODO better styling */
 .error:hover code {
-  display: block;
+  display: inline-flex;
   position: absolute;
-  white-space: pre-wrap;
+  top: 90%;
+  font-size: 6px;
+  border: 1px solid;
+  width: fit-content;
+  padding: 3px;
+  white-space: pre;
+  background: #fff;
+  color: #000;
 }
