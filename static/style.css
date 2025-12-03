@@ -21,14 +21,19 @@
 
 .proof-input {
   border: none;
-  min-width: 30rem;
+  min-width: 15rem;
 }
 
 .proof-line {
   position: relative;
-  max-width: 30rem;
+  max-width: 15rem;
   height: 1.3rem;
   box-sizing: border-box;
+}
+
+.line-container {
+  display: flex;
+  flex-direction: row;
 }
 
 .can-hover:hover {

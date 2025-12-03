@@ -77,7 +77,17 @@ import Parser.Formula (parseFormula)
 Runs the fitch-editor app with a given initial @proof@,
 a list of unary operators, binary operators and quantifiers.
 -}
-runApp :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> IO ()
+runApp ::
+  -- | Initial proof
+  Proof ->
+  -- | List of unary operators with aliases (alias, operator)
+  [(Text, Text)] ->
+  -- | List of binary operators with aliases (alias, operator)
+  [(Text, Text)] ->
+  -- | List of quantifiers with aliases (alias, operator)
+  [(Text, Text)] ->
+  -- | Resulting program
+  IO ()
 runApp proof unaryOperators binaryOperators quantifiers =
   run . startApp $
     (component m updateModel viewModel)
@@ -138,8 +148,8 @@ updateModel (Input str ref) = do
   case fline of
     Nothing -> return ()
     Just addr -> io $ do
-      start :: Int <- fromJSValUnchecked =<< (ref ! "selectionStart")
-      end :: Int <- fromJSValUnchecked =<< (ref ! "selectionEnd")
+      Just (start :: Int) <- fromJSVal =<< ref ! "selectionStart"
+      Just (end :: Int) <- fromJSVal =<< ref ! "selectionEnd"
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end addr) = do
   m <- get
@@ -192,13 +202,13 @@ onKeyDownSub addr domRef sink = createSub acquire (removeEventListener domRef "k
  where
   acquire = do
     addEventListener domRef "keydown" $ \evt -> do
-      Just (keyCode :: Int) <- fromJSVal =<< evt ! ("keyCode" :: MisoString)
-      Just shiftKey <- fromJSVal =<< evt ! ("shiftKey" :: MisoString)
-      start :: Int <- fromJSValUnchecked =<< (domRef ! "selectionStart")
-      end :: Int <- fromJSValUnchecked =<< (domRef ! "selectionEnd")
+      Just (keyCode :: Int) <- fromJSVal =<< evt ! "keyCode"
+      Just (shiftKey :: Bool) <- fromJSVal =<< evt ! "shiftKey"
+      Just (start :: Int) <- fromJSVal =<< domRef ! "selectionStart"
+      Just (end :: Int) <- fromJSVal =<< domRef ! "selectionEnd"
       when (keyCode == 57 && shiftKey && start < end) $ do
         eventPreventDefault evt
-        value :: Text <- fromJSValUnchecked =<< (domRef ! "value")
+        Just (value :: Text) <- fromJSVal =<< domRef ! "value"
         let (first, rest) = T.splitAt start value
             (second, third) = T.splitAt (end - start) rest
             newTxt = T.concat [first, "(", second, ")", third]
