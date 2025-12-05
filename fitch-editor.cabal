@@ -1,8 +1,8 @@
 cabal-version: 3.0
 name: fitch-editor
 version: 0.1.0.0
-synopsis: TODO
-description: TODO
+synopsis: Editing fitch-style natural deduction proofs.
+description: A web application for editing fitch-style natural deduction proofs with builtin checker.
 license: BSD-3-Clause
 license-file: LICENSE
 author: Reijix
@@ -10,6 +10,10 @@ maintainer: Reijix
 copyright: Leon Vatthauer @ 2025
 category: Web
 build-type: Simple
+
+source-repository head
+  type: git
+  location: https://github.com/Reijix/fitch-editor.git
 
 common warnings
   ghc-options:
@@ -44,13 +48,14 @@ test-suite test
     test.hs
 
   build-depends:
-    base,
+    base >=4.21.0 && <4.22,
     fitch-editor-lib,
-    tasty,
-    tasty-coverage,
-    tasty-hunit,
-    tasty-quickcheck,
-    text,
+    miso >=1.9 && <1.9.1,
+    tasty >=1.5.2 && <1.6,
+    tasty-coverage >=0.1.4 && <0.2,
+    tasty-hunit >=0.10.2 && <0.11,
+    tasty-quickcheck >=0.11.1 && <0.12,
+    text >=2.1.2 && <2.2,
 
 executable fitch-editor-FOL
   import:
@@ -63,9 +68,9 @@ executable fitch-editor-FOL
     OverloadedStrings
 
   build-depends:
-    base,
+    base >=4.21.0 && <5,
     fitch-editor-lib,
-    text,
+    text >=2.1.2 && <2.2,
 
   main-is:
     FOL.hs
@@ -84,9 +89,9 @@ executable fitch-editor-Prop
     OverloadedStrings
 
   build-depends:
-    base,
+    base >=4.21.0 && <5,
     fitch-editor-lib,
-    text,
+    text >=2.1.2 && <2.2,
 
   main-is:
     Prop.hs
@@ -109,13 +114,13 @@ library fitch-editor-lib
     OverloadedStrings
 
   build-depends:
-    base,
-    containers,
-    megaparsec,
-    miso,
-    mtl,
-    parser-combinators,
-    text,
+    base >=4.21.0 && <5,
+    containers >=0.7 && <0.9,
+    megaparsec >=9.7.0 && <9.8,
+    miso >=1.9 && <1.9.1,
+    mtl >=2.3.1 && <3,
+    parser-combinators >=1.3.0 && <2,
+    text >=2.1.2 && <2.2,
 
   hs-source-dirs:
     src

@@ -1,11 +1,11 @@
 packages:
   ./*.cabal
   
-package *
-  documentation: true
-
 constraints:
   zlib +bundled-c-zlib
+
+package fitch-editor-lib
+  documentation: true
 
 source-repository-package
   type: git
