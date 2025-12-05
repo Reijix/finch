@@ -19,7 +19,6 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fitch.Proof
-import Language.Javascript.JSaddle
 import Miso (
   App,
   CSS (Href),
@@ -41,8 +40,10 @@ import Miso (
   emptyDecoder,
   eventPreventDefault,
   focus,
+  fromDOMRef,
   fromMisoString,
   getElementById,
+  getProperty,
   io,
   io_,
   issue,
@@ -153,8 +154,8 @@ updateModel (Input str ref) = do
   case fline of
     Nothing -> return ()
     Just addr -> io $ do
-      Just (start :: Int) <- fromJSVal =<< ref ! "selectionStart"
-      Just (end :: Int) <- fromJSVal =<< ref ! "selectionEnd"
+      Just (start :: Int) <- fromDOMRef =<< getProperty ref "selectionStart"
+      Just (end :: Int) <- fromDOMRef =<< getProperty ref "selectionEnd"
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end addr) = do
   m <- get
@@ -207,13 +208,13 @@ onKeyDownSub addr domRef sink = createSub acquire (removeEventListener domRef "k
  where
   acquire = do
     addEventListener domRef "keydown" $ \evt -> do
-      Just (keyCode :: Int) <- fromJSVal =<< evt ! "keyCode"
-      Just (shiftKey :: Bool) <- fromJSVal =<< evt ! "shiftKey"
-      Just (start :: Int) <- fromJSVal =<< domRef ! "selectionStart"
-      Just (end :: Int) <- fromJSVal =<< domRef ! "selectionEnd"
+      Just (keyCode :: Int) <- fromDOMRef =<< getProperty evt "keyCode"
+      Just (shiftKey :: Bool) <- fromDOMRef =<< getProperty evt "shiftKey"
+      Just (start :: Int) <- fromDOMRef =<< getProperty domRef "selectionStart"
+      Just (end :: Int) <- fromDOMRef =<< getProperty domRef "selectionEnd"
       when (keyCode == 57 && shiftKey && start < end) $ do
         eventPreventDefault evt
-        Just (value :: Text) <- fromJSVal =<< domRef ! "value"
+        Just (value :: Text) <- fromDOMRef =<< getProperty domRef "value"
         let (first, rest) = T.splitAt start value
             (second, third) = T.splitAt (end - start) rest
             newTxt = T.concat [first, "(", second, ")", third]

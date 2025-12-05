@@ -3,30 +3,30 @@ module App.Model where
 import Data.List qualified as L
 import Data.Text (Text)
 import Fitch.Proof
-import Miso
-  ( App,
-    Attribute,
-    Component (events, subs),
-    DOMRef,
-    Effect,
-    KeyCode,
-    KeyInfo,
-    MisoString,
-    PointerEvent (client),
-    ROOT,
-    View,
-    component,
-    consoleLog,
-    io_,
-    mouseSub,
-    ms,
-    onWithOptions,
-    pointerDecoder,
-    preventDefault,
-    run,
-    startApp,
-    text,
-  )
+import Miso (
+  App,
+  Attribute,
+  Component (events, subs),
+  DOMRef,
+  Effect,
+  KeyCode,
+  KeyInfo,
+  MisoString,
+  PointerEvent (client),
+  ROOT,
+  View,
+  component,
+  consoleLog,
+  io_,
+  mouseSub,
+  ms,
+  onWithOptions,
+  pointerDecoder,
+  preventDefault,
+  run,
+  startApp,
+  text,
+ )
 import Miso.CSS qualified as CSS
 import Miso.Lens (Lens, lens, use, (.=), (^.))
 import Miso.Svg.Element qualified as S
@@ -66,58 +66,58 @@ data Action where
 initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
 initialModel p unaryOperators binaryOperators quantifiers =
   Model
-    { _focusedLine = Nothing,
-      _proof = p,
-      _dragTarget = Nothing,
-      _spawnType = Nothing,
-      _currentLineBefore = Nothing,
-      _currentLineAfter = Nothing,
-      _dragging = False,
-      _unaryOperators = unaryOperators,
-      _binaryOperators = binaryOperators,
-      _quantifiers = quantifiers
+    { _focusedLine = Nothing
+    , _proof = p
+    , _dragTarget = Nothing
+    , _spawnType = Nothing
+    , _currentLineBefore = Nothing
+    , _currentLineAfter = Nothing
+    , _dragging = False
+    , _unaryOperators = unaryOperators
+    , _binaryOperators = binaryOperators
+    , _quantifiers = quantifiers
     }
 
 data Model = Model
-  { _focusedLine :: Maybe NodeAddr,
-    _proof :: Proof,
-    _dragTarget :: Maybe NodeAddr,
-    _spawnType :: Maybe SpawnType,
-    _currentLineBefore :: Maybe NodeAddr,
-    _currentLineAfter :: Maybe NodeAddr,
-    _dragging :: Bool,
-    _unaryOperators :: [(Text, Text)],
-    _binaryOperators :: [(Text, Text)],
-    _quantifiers :: [(Text, Text)]
+  { _focusedLine :: Maybe NodeAddr
+  , _proof :: Proof
+  , _dragTarget :: Maybe NodeAddr
+  , _spawnType :: Maybe SpawnType
+  , _currentLineBefore :: Maybe NodeAddr
+  , _currentLineAfter :: Maybe NodeAddr
+  , _dragging :: Bool
+  , _unaryOperators :: [(Text, Text)]
+  , _binaryOperators :: [(Text, Text)]
+  , _quantifiers :: [(Text, Text)]
   }
   deriving (Show, Eq)
 
 focusedLine :: Lens Model (Maybe NodeAddr)
-focusedLine = lens (._focusedLine) $ \model a -> model {_focusedLine = a}
+focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
 
 proof :: Lens Model Proof
-proof = lens (._proof) $ \model p -> model {_proof = p}
+proof = lens (._proof) $ \model p -> model{_proof = p}
 
 dragTarget :: Lens Model (Maybe NodeAddr)
-dragTarget = lens (._dragTarget) $ \model dt -> model {_dragTarget = dt}
+dragTarget = lens (._dragTarget) $ \model dt -> model{_dragTarget = dt}
 
 spawnType :: Lens Model (Maybe SpawnType)
-spawnType = lens (._spawnType) $ \model st -> model {_spawnType = st}
+spawnType = lens (._spawnType) $ \model st -> model{_spawnType = st}
 
 currentLineBefore :: Lens Model (Maybe NodeAddr)
-currentLineBefore = lens (._currentLineBefore) $ \model dt -> model {_currentLineBefore = dt}
+currentLineBefore = lens (._currentLineBefore) $ \model dt -> model{_currentLineBefore = dt}
 
 currentLineAfter :: Lens Model (Maybe NodeAddr)
-currentLineAfter = lens (._currentLineAfter) $ \model dt -> model {_currentLineAfter = dt}
+currentLineAfter = lens (._currentLineAfter) $ \model dt -> model{_currentLineAfter = dt}
 
 dragging :: Lens Model Bool
-dragging = lens (._dragging) $ \model d -> model {_dragging = d}
+dragging = lens (._dragging) $ \model d -> model{_dragging = d}
 
 unaryOperators :: Lens Model [(Text, Text)]
-unaryOperators = lens (._unaryOperators) $ \model uo -> model {_unaryOperators = uo}
+unaryOperators = lens (._unaryOperators) $ \model uo -> model{_unaryOperators = uo}
 
 binaryOperators :: Lens Model [(Text, Text)]
-binaryOperators = lens (._binaryOperators) $ \model bo -> model {_binaryOperators = bo}
+binaryOperators = lens (._binaryOperators) $ \model bo -> model{_binaryOperators = bo}
 
 quantifiers :: Lens Model [(Text, Text)]
-quantifiers = lens (._quantifiers) $ \model q -> model {_quantifiers = q}
+quantifiers = lens (._quantifiers) $ \model q -> model{_quantifiers = q}

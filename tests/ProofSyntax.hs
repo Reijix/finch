@@ -49,8 +49,8 @@ exProof2 :: Proof
 exProof2 =
   SubProof
     []
-    [ SubProof [] [line 0, line 1] $ derivation 2,
-      SubProof
+    [ SubProof [] [line 0, line 1] $ derivation 2
+    , SubProof
         [formula 3, formula 4]
         [line 5, line 6, line 7]
         (derivation 8)
@@ -85,20 +85,20 @@ instance Arbitrary Derivation where
 instance Arbitrary Proof where
   arbitrary :: Gen Proof
   arbitrary = sized proof'
-    where
-      proof' :: Int -> Gen Proof
-      proof' 0 = fmap ProofLine arbitrary
-      proof' n | n > 0 = oneof [fmap ProofLine arbitrary, liftM3 SubProof arbitrary ps arbitrary]
-        where
-          ps :: Gen [Proof]
-          ps = do
-            l <- chooseInt (1, 8)
-            vectorOf l (proof' (n `div` 2))
+   where
+    proof' :: Int -> Gen Proof
+    proof' 0 = fmap ProofLine arbitrary
+    proof' n | n > 0 = oneof [fmap ProofLine arbitrary, liftM3 SubProof arbitrary ps arbitrary]
+     where
+      ps :: Gen [Proof]
+      ps = do
+        l <- chooseInt (1, 8)
+        vectorOf l (proof' (n `div` 2))
 
 data AddrKind = AssumptionKind | LineKind | ProofKind | ConclusionKind | AnyKind
 
 arbitraryNodeAddrFor :: Proof -> AddrKind -> Gen NodeAddr
-arbitraryNodeAddrFor (ProofLine {}) _ = discard -- return $ NAProof 0 Nothing
+arbitraryNodeAddrFor (ProofLine{}) _ = discard -- return $ NAProof 0 Nothing
 arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   ([], AssumptionKind) -> discard
   ([], AnyKind) -> oneof [naLine ps, naSubProof AnyKind, naConclusion]
@@ -107,41 +107,42 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   (_, ProofKind) -> oneof [naProof ps, naSubProof ProofKind]
   (_, ConclusionKind) -> oneof [naConclusion, naSubProof ConclusionKind]
   (_, AnyKind) -> oneof [naAssumption, naLine ps, naSubProof AnyKind, naConclusion]
-  where
-    naConclusion = return NAConclusion
-    naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isProofLine $ ps !! n)
-    naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isSubProof $ ps !! n)
-    naAssumption = fmap NAAssumption (chooseInt (0, L.length fs - 1))
-    naSubProof ak = do
-      mn <- chooseInt (0, L.length ps - 1) `suchThatMaybe` (\n -> isSubProof $ ps !! n)
-      case mn of
-        Nothing -> discard
-        Just n -> arbitraryNodeAddrFor (ps !! n) ak <&> (NAProof n . Just)
+ where
+  naConclusion = return NAConclusion
+  naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isProofLine $ ps !! n)
+  naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isSubProof $ ps !! n)
+  naAssumption = fmap NAAssumption (chooseInt (0, L.length fs - 1))
+  naSubProof ak = do
+    mn <- chooseInt (0, L.length ps - 1) `suchThatMaybe` (\n -> isSubProof $ ps !! n)
+    case mn of
+      Nothing -> discard
+      Just n -> arbitraryNodeAddrFor (ps !! n) ak <&> (NAProof n . Just)
 
 prop_lRemoveMinus1 :: Proof -> Property
-prop_lRemoveMinus1 (ProofLine {}) = discard
-prop_lRemoveMinus1 p@(SubProof {}) =
+prop_lRemoveMinus1 (ProofLine{}) = discard
+prop_lRemoveMinus1 p@(SubProof{}) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     lLength (lRemove a p) === lLength p - 1
 
 prop_lRemoveShift :: Proof -> Property
 prop_lRemoveShift p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    lIsLine (incrementNodeAddr a) p ==>
-      lLookup a (lRemove a p) === lLookup (incrementNodeAddr a) p
+    lIsLine (incrementNodeAddr a) p
+      ==> lLookup a (lRemove a p)
+      === lLookup (incrementNodeAddr a) p
 
 lRemoveQCTests :: TestTree
 lRemoveQCTests =
   testGroup
     "Testing lRemove"
-    [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1,
-      QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
+    [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1
+    , QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
 -- TESTING lInsert
 prop_lInsertBeforeFormulaPlus1 :: Proof -> Property
-prop_lInsertBeforeFormulaPlus1 (ProofLine {}) = discard
-prop_lInsertBeforeFormulaPlus1 p@(SubProof {}) =
+prop_lInsertBeforeFormulaPlus1 (ProofLine{}) = discard
+prop_lInsertBeforeFormulaPlus1 p@(SubProof{}) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
     lLength (fromJust (lInsert (Left $ formula 0) a Before p)) === lLength p + 1
 
@@ -174,39 +175,42 @@ lInsertQCTests :: TestTree
 lInsertQCTests =
   testGroup
     "Testing lInsert"
-    [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1,
-      QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1,
-      QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore,
-      QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter,
-      QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1,
-      QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
+    [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1
+    , QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1
+    , QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore
+    , QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter
+    , QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1
+    , QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
     ]
 
 prop_fromLineNoInverse :: Proof -> Property
 prop_fromLineNoInverse p = forAll (chooseInt (0, lLength p - 1)) $ \n ->
-  isJust (fromLineNo n p) ==>
-    fromNodeAddr (fromJust $ fromLineNo n p) p === Just n
+  isJust (fromLineNo n p)
+    ==> fromNodeAddr (fromJust $ fromLineNo n p) p
+    === Just n
 
 prop_fromNodeAddrInverse :: Proof -> Property
 prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
-  isJust (fromNodeAddr a p) ==>
-    fromLineNo (fromJust $ fromNodeAddr a p) p === Just a
+  isJust (fromNodeAddr a p)
+    ==> fromLineNo (fromJust $ fromNodeAddr a p) p
+    === Just a
 
 lineNoQCTests :: TestTree
 lineNoQCTests =
   testGroup
     "testing conversion of lineNo and NodeAddr"
-    [ QC.testProperty "prop_fromLineNoInverse" prop_fromLineNoInverse,
-      QC.testProperty "prop_fromNodeAddrInverse" prop_fromNodeAddrInverse
+    [ QC.testProperty "prop_fromLineNoInverse" prop_fromLineNoInverse
+    , QC.testProperty "prop_fromNodeAddrInverse" prop_fromNodeAddrInverse
     ]
 
 prop_compareLineNo :: Proof -> Property
 prop_compareLineNo p =
   forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
     forAll (arbitraryNodeAddrFor p AnyKind) $ \b ->
-      isJust (fromNodeAddr a p) ==>
-        isJust (fromNodeAddr b p) ==>
-          compare a b === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)
+      isJust (fromNodeAddr a p)
+        ==> isJust (fromNodeAddr b p)
+        ==> compare a b
+        === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)
 
 compareQCTests :: TestTree
 compareQCTests =
@@ -218,6 +222,6 @@ proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests],
-      testGroup "HUnit" []
+    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests]
+    , testGroup "HUnit" []
     ]

@@ -111,7 +111,6 @@ library fitch-editor-lib
   build-depends:
     base,
     containers,
-    jsaddle,
     megaparsec,
     miso,
     mtl,

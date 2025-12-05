@@ -21,11 +21,12 @@ removeAt n (x : xs)
   | n == 0 = xs
   | n > 0 = x : removeAt (n - 1) xs
 
--- | Update nth element of a list, if it exists.
---   @O(min index n)@.
---
---   Precondition: the index is >= 0.
--- (Taken from Agda.Utils.List)
+{- | Update nth element of a list, if it exists.
+  @O(min index n)@.
+
+  Precondition: the index is >= 0.
+(Taken from Agda.Utils.List)
+-}
 updateAt :: Int -> (a -> a) -> [a] -> [a]
 updateAt _ _ [] = []
 updateAt 0 f (a : as) = f a : as
@@ -101,27 +102,27 @@ data Proof where
 instance Show Proof where
   show :: Proof -> String
   show = show' 0 0
-    where
-      withIndent :: Int -> Int -> String -> String
-      withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
-      showProof :: Int -> Int -> Proof -> String
-      showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
-      showProof line level p@(SubProof {}) = show' line (level + 1) p
-      show' :: Int -> Int -> Proof -> String
-      show' line level (ProofLine (Derivation f r)) = show f ++ show r
-      show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
-        where
-          (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withIndent ln level $ show f)) line fs
-          (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + lLength p, showProof ln' level p)) line' ps
-          conclusionShow = withIndent line'' level (show' line'' level (ProofLine l))
+   where
+    withIndent :: Int -> Int -> String -> String
+    withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
+    showProof :: Int -> Int -> Proof -> String
+    showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
+    showProof line level p@(SubProof{}) = show' line (level + 1) p
+    show' :: Int -> Int -> Proof -> String
+    show' line level (ProofLine (Derivation f r)) = show f ++ show r
+    show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
+     where
+      (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withIndent ln level $ show f)) line fs
+      (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + lLength p, showProof ln' level p)) line' ps
+      conclusionShow = withIndent line'' level (show' line'' level (ProofLine l))
 
 isSubProof :: Proof -> Bool
-isSubProof (ProofLine {}) = False
-isSubProof (SubProof {}) = True
+isSubProof (ProofLine{}) = False
+isSubProof (SubProof{}) = True
 
 isProofLine :: Proof -> Bool
-isProofLine (ProofLine {}) = True
-isProofLine (SubProof {}) = False
+isProofLine (ProofLine{}) = True
+isProofLine (SubProof{}) = False
 
 -- | The `lLength` of a proof is its number of lines.
 lLength :: Proof -> Int
@@ -130,16 +131,17 @@ lLength (SubProof fs ps _) = foldr (\p n -> lLength p + n) (L.length fs + 1) ps
 
 -- * Indexing proofs
 
--- | This type is used for indexing lines in a proof.
---   Its recursive structure makes defining functions that manipulate proofs more convenient
---
--- ==== Usage
---
--- A `NodeAddr` may either be a reference to
--- * a single assumption `NAAssumption` @n@,
--- * the conclusion `NAConclusion` of the proof
--- * a single proof or line inside the proof `NAProof` @n@ `Nothing`
--- * a reference to a nested element inside a subproof `NAProof` @n@ (`Just` @a@)
+{- | This type is used for indexing lines in a proof.
+  Its recursive structure makes defining functions that manipulate proofs more convenient
+
+==== Usage
+
+A `NodeAddr` may either be a reference to
+* a single assumption `NAAssumption` @n@,
+* the conclusion `NAConclusion` of the proof
+* a single proof or line inside the proof `NAProof` @n@ `Nothing`
+* a reference to a nested element inside a subproof `NAProof` @n@ (`Just` @a@)
+-}
 data NodeAddr
   = NAAssumption Int
   | NAConclusion
@@ -166,17 +168,17 @@ instance Ord NodeAddr where
 
 -- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
 fromLineNo :: Int -> Proof -> Maybe NodeAddr
-fromLineNo 0 (ProofLine {}) = Just $ NAProof 0 Nothing
+fromLineNo 0 (ProofLine{}) = Just $ NAProof 0 Nothing
 fromLineNo n (SubProof [] ps _) = helper n 0 ps
-  where
-    helper :: Int -> Int -> [Proof] -> Maybe NodeAddr
-    helper 0 _ [] = Just NAConclusion
-    helper n m [] = Nothing
-    helper 0 m ((ProofLine {}) : ps) = Just $ NAProof m Nothing
-    helper n m (p : ps) | n < lLength p = do
-      addr <- fromLineNo n p
-      return $ NAProof m (Just addr)
-    helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
+ where
+  helper :: Int -> Int -> [Proof] -> Maybe NodeAddr
+  helper 0 _ [] = Just NAConclusion
+  helper n m [] = Nothing
+  helper 0 m ((ProofLine{}) : ps) = Just $ NAProof m Nothing
+  helper n m (p : ps) | n < lLength p = do
+    addr <- fromLineNo n p
+    return $ NAProof m (Just addr)
+  helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
 fromLineNo n (SubProof fs _ _) | n < L.length fs = Just $ NAAssumption n
 fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
 fromLineNo n p = Nothing
@@ -184,16 +186,16 @@ fromLineNo n p = Nothing
 -- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
 fromNodeAddr :: NodeAddr -> Proof -> Maybe Int
 fromNodeAddr = go 0
-  where
-    go :: Int -> NodeAddr -> Proof -> Maybe Int
-    go 0 (NAProof 0 Nothing) (ProofLine {}) = Just 0
-    go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
-    go n (NAAssumption m) (SubProof fs _ _) = Nothing
-    go 0 (NAProof 0 Nothing) (SubProof [] [] _) = Just 0
-    go n (NAProof m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
-    go n NAConclusion (SubProof fs ps _) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 ps
-    go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)
-    go _ _ _ = Nothing
+ where
+  go :: Int -> NodeAddr -> Proof -> Maybe Int
+  go 0 (NAProof 0 Nothing) (ProofLine{}) = Just 0
+  go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
+  go n (NAAssumption m) (SubProof fs _ _) = Nothing
+  go 0 (NAProof 0 Nothing) (SubProof [] [] _) = Just 0
+  go n (NAProof m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
+  go n NAConclusion (SubProof fs ps _) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 ps
+  go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)
+  go _ _ _ = Nothing
 
 -- ** Utilities for working with addresses
 
@@ -269,23 +271,25 @@ lLookup _ _ = Nothing
 
 -- * Updating proof contents
 
--- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
---
--- Fails silently
+{- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
+
+Fails silently
+-}
 lUpdateFormula :: (ParseWrapper Formula -> ParseWrapper Formula) -> NodeAddr -> Proof -> Proof
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
 lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
-  where
-    updateProofLine :: Proof -> Proof
-    updateProofLine (ProofLine (Derivation formula rule)) = ProofLine (Derivation (f formula) rule)
+ where
+  updateProofLine :: Proof -> Proof
+  updateProofLine (ProofLine (Derivation formula rule)) = ProofLine (Derivation (f formula) rule)
 lUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) = SubProof fs ps (Derivation (f formula) rule)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p
 
 -- * (Re-)moving proofs
 
--- | `lRemove` @addr@ @proof@ removes the element at @addr@ inside @proof@ if it exists (and is not a conclusion).
--- Otherwise @proof@ is returned.
+{- | `lRemove` @addr@ @proof@ removes the element at @addr@ inside @proof@ if it exists (and is not a conclusion).
+Otherwise @proof@ is returned.
+-}
 lRemove :: NodeAddr -> Proof -> Proof
 lRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
 lRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
@@ -301,11 +305,12 @@ data InsertPosition
     After
   deriving (Show, Eq)
 
--- | `lInsert` (`Left` @f@) @addr@ @pos@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
---
--- `lInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
---
--- Both formulae and derivations are either inserted `Before` or `After` the specified address.
+{- | `lInsert` (`Left` @f@) @addr@ @pos@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
+
+`lInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
+
+Both formulae and derivations are either inserted `Before` or `After` the specified address.
+-}
 lInsert :: Either Assumption Proof -> NodeAddr -> InsertPosition -> Proof -> Maybe Proof
 lInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
   | n < L.length fs = case pos of

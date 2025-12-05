@@ -2,11 +2,12 @@ packages:
   ./*.cabal
   
 package *
+  documentation: true
 
 constraints:
   zlib +bundled-c-zlib
 
 source-repository-package
   type: git
-  location: https://github.com/dmjio/miso.git
-  branch: master
+  location: https://github.com/Reijix/miso.git
+  tag: f4437721b6a49adaff43f5d913bc6509e0382635
