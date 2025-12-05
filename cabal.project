@@ -4,8 +4,12 @@ packages:
 constraints:
   zlib +bundled-c-zlib
 
-package fitch-editor-lib
-  documentation: true
+  -- ghcjs does not support documentation, 
+  -- because of missing dynamic linking
+if(arch(javascript))
+else
+  package *
+    documentation: true
 
 source-repository-package
   type: git
