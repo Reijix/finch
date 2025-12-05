@@ -8,7 +8,6 @@ import Fitch.Proof
 import Miso (
   Attribute,
   MisoString,
-  Options (..),
   PointerEvent,
   View,
   defaultOptions,
@@ -40,20 +39,6 @@ inert_ :: Bool -> Attribute action
 inert_ = boolProp "inert"
 
 -----------------------------------------------------------------------------
--- disable text-highlighting during drag and drop. `preventDefault`
-onPD :: (PointerEvent -> Action) -> Attribute Action
-onPD f =
-  onWithOptions
-    preventDefault
-    "pointerdown"
-    pointerDecoder
-    (\action _ -> f action)
-
------------------------------------------------------------------------------
-conditionalList :: [(Bool, a)] -> [a]
-conditionalList [] = []
-conditionalList ((True, x) : xs) = x : conditionalList xs
-conditionalList ((False, _) : xs) = conditionalList xs
 
 viewErrorIcon :: Bool -> MisoString -> View Model Action
 viewErrorIcon hidden err =
@@ -87,8 +72,8 @@ viewSpawnNode tp str =
         , ("draggable", True)
         ]
     , HP.draggable_ True
-    , onDragStartWithOptions (Options{_preventDefault = False, _stopPropagation = True}) $ SpawnStart tp
-    , onDragEnd DragEnd
+    , onDragStartWithOptions stopPropagation $ SpawnStart tp
+    , onDragEndWithOptions stopPropagation DragEnd
     ]
     [H.p_ [] [text $ ms str]]
 
@@ -106,17 +91,17 @@ viewLine m a isLastAssumption e =
     , onDragStartWithOptions stopPropagation $ DragStart a
     , onDragEndWithOptions stopPropagation DragEnd
     , onDoubleClick (DoubleClick a)
-    , onFocusOut Blur
+    , onBlur Blur
     ]
     [ H.div_
         [ HP.class_ "upper-hover-zone"
         , HP.classList_ [("insert-before", m ^. currentLineBefore == Just a)]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ m ^. focusedLine == Just a
-        , onDragOverWithOptions (Options{_preventDefault = True, _stopPropagation = True}) Nop
-        , onDragEnterWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (DragEnter a Before)
-        , onDragLeaveWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (DragLeave Before)
-        , onDropWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (Drop (LocationAddr a Before))
+        , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
+        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter a Before)
+        , onDragLeaveWithOptions (preventDefault <> stopPropagation) (DragLeave Before)
+        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr a Before))
         ]
         []
     , H.div_
@@ -124,10 +109,10 @@ viewLine m a isLastAssumption e =
         , HP.classList_ [("insert-after", m ^. currentLineAfter == Just a)]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ m ^. focusedLine == Just a
-        , onDragOverWithOptions (Options{_preventDefault = True, _stopPropagation = True}) Nop
-        , onDragEnterWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (DragEnter a After)
-        , onDragLeaveWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (DragLeave After)
-        , onDropWithOptions (Options{_preventDefault = True, _stopPropagation = True}) (Drop (LocationAddr a After))
+        , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
+        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter a After)
+        , onDragLeaveWithOptions (preventDefault <> stopPropagation) (DragLeave After)
+        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr a After))
         ]
         []
     , -- TODO RULES

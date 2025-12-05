@@ -92,7 +92,7 @@ runApp proof unaryOperators binaryOperators quantifiers =
   run . startApp $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
-      , events = dragEvents <> M.fromList [("dblclick", False), ("focusout", False)] <> keyboardEvents <> defaultEvents
+      , events = dragEvents <> M.fromList [("dblclick", False)] <> keyboardEvents <> defaultEvents
       }
  where
   m = initialModel proof unaryOperators binaryOperators quantifiers
