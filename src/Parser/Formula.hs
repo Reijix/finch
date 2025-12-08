@@ -8,6 +8,7 @@ import Control.Monad.Combinators.Expr (
 import Control.Monad.State
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
+import Data.Void
 import Fitch.Proof
 import Text.Megaparsec (
   MonadParsec (eof, hidden),
@@ -34,12 +35,7 @@ data FormulaParserState = FormulaParserState
   , quantifiers :: [(Text, Text)]
   }
 
--- TODO work on error printing
-instance ShowErrorComponent Text where
-  showErrorComponent :: Text -> String
-  showErrorComponent = unpack
-
-type FormulaParser = ParsecT Text Text (State FormulaParserState)
+type FormulaParser = ParsecT Void Text (State FormulaParserState)
 
 sc :: FormulaParser ()
 sc =

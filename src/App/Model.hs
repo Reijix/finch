@@ -47,8 +47,8 @@ data SpawnType where
 data Action where
   Blur :: Action
   Input :: MisoString -> DOMRef -> Action
-  ProcessInput :: MisoString -> Int -> Int -> NodeAddr -> Action
-  DoubleClick :: NodeAddr -> Action
+  ProcessInput :: MisoString -> Int -> Int -> Either NodeAddr NodeAddr -> Action
+  DoubleClick :: Either NodeAddr NodeAddr -> Action
   Drop :: DropLocation -> Action
   DragEnter :: NodeAddr -> InsertPosition -> Action
   DragLeave :: InsertPosition -> Action
@@ -58,9 +58,9 @@ data Action where
   DragEnd :: Action
   Drag :: Action
   Nop :: Action
-  ProcessParens :: NodeAddr -> Int -> Int -> Action
-  KeyDownStart :: NodeAddr -> DOMRef -> Action
-  KeyDownStop :: NodeAddr -> Action
+  ProcessParens :: Either NodeAddr NodeAddr -> Int -> Int -> Action
+  KeyDownStart :: Either NodeAddr NodeAddr -> DOMRef -> Action
+  KeyDownStop :: Either NodeAddr NodeAddr -> Action
 
 -----------------------------------------------------------------------------
 initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
@@ -79,7 +79,7 @@ initialModel p unaryOperators binaryOperators quantifiers =
     }
 
 data Model = Model
-  { _focusedLine :: Maybe NodeAddr
+  { _focusedLine :: Maybe (Either NodeAddr NodeAddr)
   , _proof :: Proof
   , _dragTarget :: Maybe NodeAddr
   , _spawnType :: Maybe SpawnType
@@ -92,7 +92,7 @@ data Model = Model
   }
   deriving (Show, Eq)
 
-focusedLine :: Lens Model (Maybe NodeAddr)
+focusedLine :: Lens Model (Maybe (Either NodeAddr NodeAddr))
 focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
 
 proof :: Lens Model Proof

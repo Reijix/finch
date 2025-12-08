@@ -15,18 +15,31 @@
   cursor: move;
   /* fallback if grab cursor is unsupported */
   cursor: grab;
-  cursor: -moz-grab;
   cursor: -webkit-grab;
 }
 
-.proof-input {
+.to-foreground {
+  z-index: 100;
+}
+
+.formula-input {
   border: none;
-  min-width: 15rem;
+  width: 100%;
+}
+
+.formula-container {
+  width: 5rem;
 }
 
 .rule-input {
   border: none;
+  width: 100%;
 }
+
+.rule-container {
+  width: 5rem;
+}
+
 
 .proof-line {
   position: relative;
@@ -56,17 +69,17 @@
   background-color: orange;
 }
 
+/* TODO: maybe pointer-events: none??
+https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elements  
+*/
 .upper-hover-zone {
   position: absolute;
-  /* x: 0px;
-  y: 0px; */
   height: 50%;
   width: 100%;
 }
 
 .lower-hover-zone {
   position: absolute;
-  /* x: 0px; */
   top: 50%;
   height: 50%;
   width: 100%;
@@ -96,7 +109,6 @@
   cursor: move;
   /* fallback if grab cursor is unsupported */
   cursor: grab;
-  cursor: -moz-grab;
   cursor: -webkit-grab;
   /* transform: translateY(-1px); */
   /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
@@ -118,6 +130,10 @@
 
 .parse-fail {
   color: red;
+}
+
+.error {
+  z-index: 10;
 }
 
 .error code {

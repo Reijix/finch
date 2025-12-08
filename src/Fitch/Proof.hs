@@ -84,7 +84,7 @@ data Reference where
 type Assumption = ParseWrapper Formula
 
 data RuleApplication
-  = RuleApplication Rule [Reference]
+  = RuleApplication Name [Reference]
   deriving (Show, Eq)
 
 data Derivation
@@ -271,7 +271,7 @@ lLookup _ _ = Nothing
 
 -- * Updating proof contents
 
-{- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ with @f@.
+{- | `lUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ using @f@.
 
 Fails silently
 -}
@@ -284,6 +284,16 @@ lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isP
 lUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) = SubProof fs ps (Derivation (f formula) rule)
 lUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (lUpdateFormula f addr) ps) l
 lUpdateFormula _ _ p = p
+
+{- | `lUpdateRule` @f@ @addr@ @proof@ replaces the rule at @addr@ in @proof@ using @f@.
+
+Fails silently
+-}
+lUpdateRule :: (ParseWrapper RuleApplication -> ParseWrapper RuleApplication) -> NodeAddr -> Proof -> Proof
+lUpdateRule f (NAProof n Nothing) (SubProof fs ps d)
+  | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (\(ProofLine (Derivation form rule)) -> ProofLine (Derivation form (f rule))) ps) d
+lUpdateRule f NAConclusion (SubProof fs ps (Derivation form rule)) = SubProof fs ps (Derivation form (f rule))
+lUpdateRule _ _ p = p
 
 -- * (Re-)moving proofs
 

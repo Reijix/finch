@@ -17,7 +17,7 @@ main = runApp exProof unaryOperators binaryOperators quantifiers
   mkFormula = tryParse fakeModel []
 
   mkRuleApplication :: Text -> ParseWrapper RuleApplication
-  mkRuleApplication txt = Unparsed txt ""
+  mkRuleApplication = tryParse fakeModel []
 
   mkDerivation :: Text -> Text -> Derivation
   mkDerivation f r = Derivation (mkFormula f) (mkRuleApplication r)
@@ -29,13 +29,13 @@ main = runApp exProof unaryOperators binaryOperators quantifiers
   exProof =
     SubProof
       [mkFormula "A", mkFormula "A → B"]
-      [ mkLine "B" ""
+      [ mkLine "B" "(→E) 1, 2"
       , SubProof
           [mkFormula "A"]
           []
-          (mkDerivation "A ∨ B" "")
+          (mkDerivation "A ∨ B" "(∨I) 4")
       ]
-      (mkDerivation "A ∧ B" "")
+      (mkDerivation "A ∧ B" "(∧I)")
 
 -----------------------------------------------------------------------------
 

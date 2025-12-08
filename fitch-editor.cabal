@@ -106,7 +106,6 @@ library fitch-editor-lib
     App.Views
     Fitch.Proof
     Parser.Formula
-    Parser.Lexer
     Parser.Rule
 
   default-extensions:
@@ -116,6 +115,7 @@ library fitch-editor-lib
   build-depends:
     base >=4.21.0 && <5,
     containers >=0.7 && <0.9,
+    jsaddle,
     megaparsec >=9.7.0 && <9.8,
     miso >=1.9 && <1.9.1,
     mtl >=2.3.1 && <3,
