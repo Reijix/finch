@@ -1,16 +1,3 @@
-/* body {
-  counter-reset: line-counter;
-}
-
-.proof-line::before {
-  counter-increment: line-counter;
-  position: absolute;
-  left: -10px;
-  height: 100%;
-  width: 10px;
-  content: counter(line-counter);
-} */
-
 .draggable {
   cursor: move;
   /* fallback if grab cursor is unsupported */
@@ -28,7 +15,7 @@
 }
 
 .formula-container {
-  width: 5rem;
+  grid-column: 2;
 }
 
 .rule-input {
@@ -36,12 +23,22 @@
   width: 100%;
 }
 
+.line-no {
+  grid-column: 1;
+}
+
 .rule-container {
-  width: 5rem;
+  grid-column: 3;
 }
 
 
 .proof-line {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  /* grid-row: attr(data-line-no); */
+  /* grid-row: span 1; */
+  grid-column: span 3;
   position: relative;
   max-width: 15rem;
   height: 1.3rem;
@@ -49,8 +46,8 @@
 }
 
 .line-container {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: subgrid;
 }
 
 .can-hover:hover {
@@ -69,9 +66,6 @@
   background-color: orange;
 }
 
-/* TODO: maybe pointer-events: none??
-https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elements  
-*/
 .upper-hover-zone {
   position: absolute;
   height: 50%;
@@ -95,7 +89,18 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
   box-sizing: border-box;
 }
 
+.outer-subproof {
+  display: grid;
+  grid-template-rows: repeat(attr(data-lines), 1fr);
+  grid-template-columns: 2rem 8rem 4rem;
+}
+
 .subproof {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  grid-row: span attr(data-lines);
+  grid-column: span 3;
   position: relative;
   box-sizing: border-box;
   border-left: 3px solid black;
@@ -118,10 +123,6 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
 
 .last-assumption {
   border-bottom: 3px solid black;
-}
-
-.proof-view {
-  display: grid;
 }
 
 .parse-success {
