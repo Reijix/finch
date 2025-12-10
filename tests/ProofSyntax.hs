@@ -19,7 +19,7 @@ formula :: Int -> ParseWrapper Formula
 formula n = Parsed "" $ Predicate (pack $ show n) []
 
 rule :: Int -> [Reference] -> ParseWrapper RuleApplication
-rule str ref = Parsed "" (RuleApplication (Rule "Rule" [] (Predicate "Formula" [])) ref)
+rule str ref = Parsed "" (RuleApplication "Rule" ref)
 
 derivation :: Int -> Derivation
 derivation n = Derivation (formula n) (rule n [])
@@ -62,6 +62,10 @@ exProof3 = SubProof [] [SubProof [formula 0] [line 1] (derivation 2), line 3] (d
 
 --------------------------------------------
 -- PROPERTIES
+instance Arbitrary Name where
+  arbitrary :: Gen Name
+  arbitrary = return "Rule"
+
 instance Arbitrary Formula where
   arbitrary :: Gen Formula
   arbitrary = return $ Predicate "Formula" []

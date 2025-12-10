@@ -29,6 +29,7 @@ import Miso (
   Effect,
   KeyInfo (keyCode, shiftKey),
   MisoString,
+  Phase (..),
   PointerEvent (client),
   ROOT,
   View,
@@ -97,7 +98,7 @@ runApp proof unaryOperators binaryOperators quantifiers =
   run . startApp $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
-      , events = dragEvents <> M.fromList [("dblclick", False)] <> keyboardEvents <> defaultEvents
+      , events = dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents
       }
  where
   m = initialModel proof unaryOperators binaryOperators quantifiers
@@ -131,6 +132,9 @@ updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
 updateModel (DragLeave Before) = currentLineBefore .= Nothing
 updateModel (DragLeave After) = currentLineAfter .= Nothing
+updateModel (SpawnStart st) = do
+  spawnType .= Just st
+  dragging .= True
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   dragging .= True
@@ -153,7 +157,6 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
 updateModel Blur = focusedLine .= Nothing
-updateModel (SpawnStart st) = spawnType .= Just st
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
