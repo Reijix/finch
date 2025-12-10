@@ -9,28 +9,68 @@
   z-index: 100;
 }
 
-.formula-input {
-  border: none;
-  width: 100%;
-}
-
-.formula-container {
-  grid-column: 2;
-}
-
-.rule-input {
-  border: none;
-  width: 100%;
-}
-
 .line-no {
   grid-column: 1;
 }
 
-.rule-container {
-  grid-column: 3;
+.formula-rule-container {
+  display: grid;
+  border-left: 2px solid black;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  grid-column: 2/4;
 }
 
+.formula-input {
+  border: none;
+  /* width: 100%; */
+  padding: 0;
+}
+
+.formula-container {
+  grid-column: 1;
+  pointer-events: all;
+}
+
+.rule-input {
+  border: none;
+  /* width: 100%; */
+  padding: 0;
+}
+
+.rule-container {
+  grid-column: 2;
+  pointer-events: all;
+}
+
+.error {
+  grid-column: 4;
+  z-index: 10;
+}
+
+.error code {
+  display: none;
+  position: relative;
+  justify-content: center;
+}
+
+/* TODO better styling */
+.error:hover code {
+  display: inline-flex;
+  position: absolute;
+  top: 90%;
+  font-size: 6px;
+  border: 1px solid;
+  width: fit-content;
+  padding: 3px;
+  white-space: pre;
+  background: #fff;
+  color: #000;
+}
+
+.no-pointer-events {
+  pointer-events: none;
+}
 
 .proof-line {
   display: grid;
@@ -38,7 +78,7 @@
   grid-template-rows: subgrid;
   /* grid-row: attr(data-line-no); */
   /* grid-row: span 1; */
-  grid-column: span 3;
+  grid-column: span 4;
   position: relative;
   max-width: 15rem;
   height: 1.3rem;
@@ -70,6 +110,8 @@
   position: absolute;
   height: 50%;
   width: 100%;
+  /* move to foreground */
+  z-index: 101;
 }
 
 .lower-hover-zone {
@@ -77,6 +119,8 @@
   top: 50%;
   height: 50%;
   width: 100%;
+  /* move to foreground */
+  z-index: 101;
 }
 
 .insert-before {
@@ -92,20 +136,27 @@
 .outer-subproof {
   display: grid;
   grid-template-rows: repeat(attr(data-lines), 1fr);
-  grid-template-columns: 2rem 8rem 4rem;
+  grid-template-columns: 2rem 8rem 4rem 16px;
 }
+
+/* .subproof .formula-container {
+  border-left: 3px solid black;
+  margin-left: 5px;
+} */
+
+/* TODO invisible div behind subproof! */
 
 .subproof {
   display: grid;
   grid-template-columns: subgrid;
   grid-template-rows: subgrid;
   grid-row: span attr(data-lines);
-  grid-column: span 3;
+  grid-column: span 4;
   position: relative;
   box-sizing: border-box;
-  border-left: 3px solid black;
+  /* border-left: 3px solid black; */
   margin-left: 5px;
-  margin-top: 5px;
+  /* margin-top: 5px; */
 }
 
 .subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
@@ -131,28 +182,4 @@
 
 .parse-fail {
   color: red;
-}
-
-.error {
-  z-index: 10;
-}
-
-.error code {
-  display: none;
-  position: relative;
-  justify-content: center;
-}
-
-/* TODO better styling */
-.error:hover code {
-  display: inline-flex;
-  position: absolute;
-  top: 90%;
-  font-size: 6px;
-  border: 1px solid;
-  width: fit-content;
-  padding: 3px;
-  white-space: pre;
-  background: #fff;
-  color: #000;
 }
