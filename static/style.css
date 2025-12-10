@@ -1,16 +1,3 @@
-/* body {
-  counter-reset: line-counter;
-}
-
-.proof-line::before {
-  counter-increment: line-counter;
-  position: absolute;
-  left: -10px;
-  height: 100%;
-  width: 10px;
-  content: counter(line-counter);
-} */
-
 .draggable {
   cursor: move;
   /* fallback if grab cursor is unsupported */
@@ -18,26 +5,62 @@
   cursor: -webkit-grab;
 }
 
+.non-selectable {
+  cursor: pointer;
+}
+
 .to-foreground {
   z-index: 100;
+}
+
+.proof-container {
+  display: flex;
+  flex-direction: row;
+}
+
+.line-no-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.line-no {
+  padding: 0;
+  margin: 0;
+  height: 1.3rem;
+}
+
+.empty-rule {
+  padding: 0;
+  margin: 0;
+  height: 1.3rem;
 }
 
 .formula-input {
   border: none;
   width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .formula-container {
+  display: flex;
+  flex-direction: row;
   width: 5rem;
+  padding: 0;
+  margin: 0;
 }
 
 .rule-input {
   border: none;
   width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .rule-container {
   width: 5rem;
+  padding: 0;
+  margin: 0;
 }
 
 
@@ -48,9 +71,8 @@
   box-sizing: border-box;
 }
 
-.line-container {
-  display: flex;
-  flex-direction: row;
+.no-pointer-events {
+  pointer-events: none;
 }
 
 .can-hover:hover {
@@ -76,6 +98,7 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
   position: absolute;
   height: 50%;
   width: 100%;
+  z-index: 101;
 }
 
 .lower-hover-zone {
@@ -83,6 +106,7 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
   top: 50%;
   height: 50%;
   width: 100%;
+  z-index: 101;
 }
 
 .insert-before {
@@ -95,12 +119,19 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
   box-sizing: border-box;
 }
 
+.outer-subproof {
+  position: relative;
+  box-sizing: border-box;
+  border-left: 3px solid black;
+  margin-left: 5px;
+}
+
 .subproof {
   position: relative;
   box-sizing: border-box;
   border-left: 3px solid black;
   margin-left: 5px;
-  margin-top: 5px;
+  /* margin-top: 5px; */
 }
 
 .subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
@@ -130,28 +161,4 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
 
 .parse-fail {
   color: red;
-}
-
-.error {
-  z-index: 10;
-}
-
-.error code {
-  display: none;
-  position: relative;
-  justify-content: center;
-}
-
-/* TODO better styling */
-.error:hover code {
-  display: inline-flex;
-  position: absolute;
-  top: 90%;
-  font-size: 6px;
-  border: 1px solid;
-  width: fit-content;
-  padding: 3px;
-  white-space: pre;
-  background: #fff;
-  color: #000;
 }

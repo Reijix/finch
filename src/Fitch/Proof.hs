@@ -6,6 +6,7 @@ import Data.List qualified as L
 import Data.Maybe
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Traversable (mapAccumL)
 
 -- * Utilities that are not exported!
 
@@ -98,6 +99,21 @@ data Proof where
   -- | A subproof consisting of a list of assumptions, a list of subproofs (or derivations) and a conclusion.
   SubProof :: [Assumption] -> [Proof] -> Derivation -> Proof
   deriving (Eq)
+
+mapP :: (Either Assumption Derivation -> a) -> Proof -> [a]
+mapP f (ProofLine d) = [f (Right d)]
+mapP f (SubProof fs ps d) = map (f . Left) fs ++ concatMap (mapP f) ps ++ [f (Right d)]
+
+mapPWithAddr :: (Either Assumption Derivation -> NodeAddr -> a) -> Proof -> [a]
+mapPWithAddr = go Nothing
+ where
+  go :: Maybe NodeAddr -> (Either Assumption Derivation -> NodeAddr -> a) -> Proof -> [a]
+  go Nothing f (ProofLine d) = [f (Right d) (NAProof 0 Nothing)]
+  go (Just addr) f (ProofLine d) = [f (Right d) addr]
+  go mna f (SubProof fs ps d) = mappedFs ++ concat mappedPs ++ [f (Right d) (naAppendConclusionMaybe mna)]
+   where
+    (_, mappedFs) = mapAccumL (\m frm -> (m + 1, f (Left frm) (naAppendAssumptionMaybe m mna))) 0 fs
+    (_, mappedPs) = mapAccumL (\m prf -> (m + 1, go (Just $ naAppendProofMaybe m mna) f prf)) 0 ps
 
 instance Show Proof where
   show :: Proof -> String
@@ -204,15 +220,33 @@ naAppendAssumption m (NAProof n (Just a)) = NAProof n (Just $ naAppendAssumption
 naAppendAssumption m (NAProof n Nothing) = NAProof n (Just $ NAAssumption m)
 naAppendAssumption m a = error $ show a ++ "\n cannot append assumption."
 
+naAppendAssumptionMaybe :: Int -> Maybe NodeAddr -> NodeAddr
+naAppendAssumptionMaybe m Nothing = NAAssumption m
+naAppendAssumptionMaybe m (Just (NAProof n (Just a))) = NAProof n (Just $ naAppendAssumption m a)
+naAppendAssumptionMaybe m (Just (NAProof n Nothing)) = NAProof n (Just $ NAAssumption m)
+naAppendAssumptionMaybe m a = error $ show a ++ "\n cannot append assumption."
+
 naAppendProof :: Int -> NodeAddr -> NodeAddr
 naAppendProof m (NAProof n (Just a)) = NAProof n (Just $ naAppendProof m a)
 naAppendProof m (NAProof n Nothing) = NAProof n (Just $ NAProof m Nothing)
 naAppendProof m a = error $ show a ++ "\n cannot append line."
 
+naAppendProofMaybe :: Int -> Maybe NodeAddr -> NodeAddr
+naAppendProofMaybe m Nothing = NAProof m Nothing
+naAppendProofMaybe m (Just (NAProof n (Just a))) = NAProof n (Just $ naAppendProof m a)
+naAppendProofMaybe m (Just (NAProof n Nothing)) = NAProof n (Just $ NAProof m Nothing)
+naAppendProofMaybe m a = error $ show a ++ "\n cannot append line."
+
 naAppendConclusion :: NodeAddr -> NodeAddr
 naAppendConclusion (NAProof n (Just a)) = NAProof n (Just $ naAppendConclusion a)
 naAppendConclusion (NAProof n Nothing) = NAProof n (Just NAConclusion)
 naAppendConclusion a = error $ show a ++ "\n cannot append conclusion."
+
+naAppendConclusionMaybe :: Maybe NodeAddr -> NodeAddr
+naAppendConclusionMaybe Nothing = NAConclusion
+naAppendConclusionMaybe (Just (NAProof n (Just a))) = NAProof n (Just $ naAppendConclusion a)
+naAppendConclusionMaybe (Just (NAProof n Nothing)) = NAProof n (Just NAConclusion)
+naAppendConclusionMaybe a = error $ show a ++ "\n cannot append conclusion."
 
 -- | `incrementNodeAddr` increments an address by 1, while keeping the nesting structure unchanged.
 incrementNodeAddr :: NodeAddr -> NodeAddr
@@ -292,6 +326,8 @@ Fails silently
 lUpdateRule :: (ParseWrapper RuleApplication -> ParseWrapper RuleApplication) -> NodeAddr -> Proof -> Proof
 lUpdateRule f (NAProof n Nothing) (SubProof fs ps d)
   | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (\(ProofLine (Derivation form rule)) -> ProofLine (Derivation form (f rule))) ps) d
+lUpdateRule f (NAProof n (Just addr)) (SubProof fs ps d)
+  | n < L.length ps && isSubProof (ps !! n) = SubProof fs (updateAt n (lUpdateRule f addr) ps) d
 lUpdateRule f NAConclusion (SubProof fs ps (Derivation form rule)) = SubProof fs ps (Derivation form (f rule))
 lUpdateRule _ _ p = p
 

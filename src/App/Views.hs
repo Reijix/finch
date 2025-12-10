@@ -40,19 +40,6 @@ contentEditable_ :: Bool -> Attribute action
 contentEditable_ = boolProp "contentEditable"
 
 -----------------------------------------------------------------------------
-
-viewErrorIcon :: MisoString -> View Model Action
-viewErrorIcon err =
-  H.div_
-    [HP.class_ "error"]
-    [ H.img_
-        [ HP.draggable_ False
-        , HP.src_ "./error-icon.svg"
-        , HP.height_ "16"
-        ]
-    , H.code_ [HP.draggable_ False] [text err]
-    ]
-
 viewBin :: View Model Action
 viewBin =
   H.div_
@@ -90,11 +77,10 @@ viewLine m a isLastAssumption e =
     , HP.hidden_ False
     , onDragStartWithOptions stopPropagation $ DragStart a
     , onDragEndWithOptions stopPropagation DragEnd
-    , onBlur Blur
     ]
     [ H.div_
         [ HP.class_ "upper-hover-zone"
-        , HP.classList_ [("insert-before", m ^. currentLineBefore == Just a)]
+        , HP.classList_ [("insert-before", m ^. currentLineBefore == Just a), ("no-pointer-events", not (m ^. dragging))]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ m ^. focusedLine == Just (Left a)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
@@ -105,7 +91,7 @@ viewLine m a isLastAssumption e =
         []
     , H.div_
         [ HP.class_ "lower-hover-zone"
-        , HP.classList_ [("insert-after", m ^. currentLineAfter == Just a)]
+        , HP.classList_ [("insert-after", m ^. currentLineAfter == Just a), ("no-pointer-events", not (m ^. dragging))]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ m ^. focusedLine == Just (Left a)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
@@ -115,79 +101,89 @@ viewLine m a isLastAssumption e =
         ]
         []
     , H.div_
-        [HP.class_ "line-container"]
-        $ [ H.div_
-              [ onDoubleClick $ DoubleClick (Left a)
-              , HP.class_ "formula-container"
-              , HP.classList_ [("to-foreground", Just (Left a) /= m ^. focusedLine)]
-              ]
-              [ H.input_
-                  [ HP.inert_ (Just (Left a) /= m ^. focusedLine)
-                  , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
-                  , HP.classList_
-                      [ ("formula-input", True)
-                      , ("last-assumption", isLastAssumption)
-                      , ("parse-success", parseSuccessFormula)
-                      , ("parse-fail", not parseSuccessFormula)
-                      , ("draggable", Just (Left a) /= m ^. focusedLine)
-                      , ("to-foreground", Just (Left a) == m ^. focusedLine)
-                      ]
-                  , HP.draggable_ False
-                  , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-                  , onCreatedWith (KeyDownStart (Left a))
-                  , onBeforeDestroyed (KeyDownStop (Left a))
-                  , onDragStartWithOptions preventDefault Nop
-                  , value_ txt
-                  ]
-              ]
+        ( [ onDoubleClick $ DoubleClick (Left a)
+          , HP.class_ "formula-container"
+          , HP.hidden_ False
+          , HP.classList_ [("to-foreground", Just (Left a) /= m ^. focusedLine)]
           ]
-          ++ [ H.div_
-                 [ onDoubleClick $ DoubleClick (Right a)
-                 , HP.class_ "rule-container"
-                 , HP.classList_ [("to-foreground", Just (Right a) /= m ^. focusedLine)]
-                 ]
-                 [ H.input_
-                     [ HP.class_ "rule-input"
-                     , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
-                     , HP.classList_
-                         [ ("parse-success", parseSuccessRule)
-                         , ("parse-fail", not parseSuccessRule)
-                         , ("draggable", Just (Right a) /= m ^. focusedLine)
-                         , ("to-foreground", Just (Right a) == m ^. focusedLine)
-                         ]
-                     , HP.draggable_ False
-                     , HP.inert_ (Just (Right a) /= m ^. focusedLine)
-                     , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-                     , onCreatedWith (KeyDownStart (Right a))
-                     , onBeforeDestroyed (KeyDownStop (Right a))
-                     , onDragStartWithOptions preventDefault Nop
-                     , value_ ruleTxt
-                     ]
-                 | hasRule
-                 ]
-             ]
-          ++ if not parseSuccessFormula
-            then
-              [viewErrorIcon err]
-            else ([viewErrorIcon ruleErr | hasRule && not parseSuccessRule])
+            ++ [HP.title_ err | not parseSuccess]
+        )
+        [ H.input_
+            [ HP.inert_ (Just (Left a) /= m ^. focusedLine)
+            , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+            , HP.classList_
+                [ ("formula-input", True)
+                , ("last-assumption", isLastAssumption)
+                , ("parse-success", parseSuccess)
+                , ("parse-fail", not parseSuccess)
+                , ("draggable", Just (Left a) /= m ^. focusedLine)
+                , ("to-foreground", Just (Left a) == m ^. focusedLine)
+                ]
+            , HP.draggable_ False
+            , onBlur Blur
+            , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+            , onCreatedWith (KeyDownStart (Left a))
+            , onBeforeDestroyed (KeyDownStop (Left a))
+            , onDragStartWithOptions preventDefault Nop
+            , value_ txt
+            ]
+        ]
     ]
  where
-  (parseSuccessFormula, txt, err, hasRule, parseSuccessRule, ruleTxt, ruleErr) = case e of
+  (parseSuccess, txt, err) = case e of
     Left a -> case a of
-      Parsed str a' -> (True, ms str, "", False, True, "", "")
-      Unparsed str err -> (False, ms str, ms err, False, True, "", "")
-    Right (Derivation f r) -> case (f, r) of
-      (Parsed str f', Parsed str' r') -> (True, ms str, "", True, True, ms str', "")
-      (Parsed str f', Unparsed str' err') -> (True, ms str, "", True, False, ms str', ms err')
-      (Unparsed str err, Parsed str' r') -> (False, ms str, ms err, True, True, ms str', "")
-      (Unparsed str err, Unparsed str' err') -> (False, ms str, ms err, True, False, ms str', ms err')
+      Parsed str a' -> (True, ms str, "")
+      Unparsed str err -> (False, ms str, ms err)
+    Right (Derivation f r) -> case f of
+      (Parsed str f') -> (True, ms str, "")
+      (Unparsed str err) -> (False, ms str, ms err)
+
+-- TODO BUG: Nested rules are not editable!!
 
 viewProof :: Model -> View Model Action
-viewProof model = H.div_ [] [proofView]
+viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rules]
  where
+  mapRules :: Either Assumption Derivation -> NodeAddr -> View Model Action
+  mapRules (Left a) addr = H.p_ [HP.class_ "empty-rule"] []
+  mapRules (Right (Derivation _ p)) addr =
+    H.div_
+      ( [ onDoubleClick $ DoubleClick (Right addr)
+        , HP.class_ "rule-container"
+        , HP.classList_ [("to-foreground", Just (Right addr) /= model ^. focusedLine), ("non-selectable", Just (Right addr) /= model ^. focusedLine)]
+        ]
+          ++ [HP.title_ err | not parseSuccess]
+      )
+      [ H.input_
+          [ HP.class_ "rule-input"
+          , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
+          , HP.classList_
+              [ ("parse-success", parseSuccess)
+              , ("parse-fail", not parseSuccess)
+              , ("to-foreground", Just (Right addr) == model ^. focusedLine)
+              ]
+          , HP.draggable_ False
+          , HP.inert_ (Just (Right addr) /= model ^. focusedLine)
+          , onBlur Blur
+          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+          , onCreatedWith (KeyDownStart (Right addr))
+          , onBeforeDestroyed (KeyDownStop (Right addr))
+          , onDragStartWithOptions preventDefault Nop
+          , value_ ruleTxt
+          ]
+      ]
+   where
+    (parseSuccess, ruleTxt, err) = case p of
+      (Parsed str _) -> (True, ms str, "")
+      (Unparsed str err) -> (False, ms str, ms err)
+  rules = H.div_ [HP.class_ "rules-container"] $ mapPWithAddr mapRules (model ^. proof)
+  lineNos =
+    H.div_ [HP.class_ "line-no-container"] $
+      map
+        (\n -> H.p_ [HP.class_ "line-no"] [text $ ms n])
+        (take (lLength $ model ^. proof) [1 :: Int ..])
   proofView = case model ^. proof of
     ProofLine _ -> error "Tried calling viewProof on a ProofLine"
-    SubProof fs ps d -> H.div_ [HP.class_ "subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
+    SubProof fs ps d -> H.div_ [HP.class_ "outer-subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
      where
       (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == L.length fs - 1) (Left f))) 0 fs
       (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
