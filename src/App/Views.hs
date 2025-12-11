@@ -73,12 +73,14 @@ viewLine m a isLastAssumption e =
         [ ("proof-line", True)
         , ("draggable", (m ^. focusedLine) /= Just (Left a))
         , ("can-hover", not (m ^. dragging))
+        , ("has-error", not parseSuccess)
         ]
     , HP.hidden_ False
     , onDragStartWithOptions stopPropagation $ DragStart a
     , onDragEndWithOptions stopPropagation DragEnd
     ]
-    [ H.div_
+    [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
+    , H.div_
         [ HP.class_ "upper-hover-zone"
         , HP.classList_ [("insert-before", m ^. currentLineBefore == Just a), ("no-pointer-events", not (m ^. dragging))]
         , -- hide while focused, so that the input field is clickable for mouse movement
@@ -101,13 +103,11 @@ viewLine m a isLastAssumption e =
         ]
         []
     , H.div_
-        ( [ onDoubleClick $ DoubleClick (Left a)
-          , HP.class_ "formula-container"
-          , HP.hidden_ False
-          , HP.classList_ [("to-foreground", Just (Left a) /= m ^. focusedLine)]
-          ]
-            ++ [HP.title_ err | not parseSuccess]
-        )
+        [ onDoubleClick $ DoubleClick (Left a)
+        , HP.class_ "formula-container"
+        , HP.hidden_ False
+        , HP.classList_ [("to-foreground", Just (Left a) /= m ^. focusedLine)]
+        ]
         [ H.input_
             [ HP.inert_ (Just (Left a) /= m ^. focusedLine)
             , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
@@ -137,8 +137,6 @@ viewLine m a isLastAssumption e =
     Right (Derivation f r) -> case f of
       (Parsed str f') -> (True, ms str, "")
       (Unparsed str err) -> (False, ms str, ms err)
-
--- TODO BUG: Nested rules are not editable!!
 
 viewProof :: Model -> View Model Action
 viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rules]

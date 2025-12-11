@@ -45,6 +45,7 @@
 .formula-container {
   display: flex;
   flex-direction: row;
+  position: relative;
   width: 5rem;
   padding: 0;
   margin: 0;
@@ -76,7 +77,8 @@
 }
 
 .can-hover:hover {
-  transform: translateX(2px);
+  /* TODO translateX hides the absolute child. */
+  /* transform: translateX(2px); */
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
@@ -141,11 +143,9 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
   /* fallback if grab cursor is unsupported */
   cursor: grab;
   cursor: -webkit-grab;
-  /* transform: translateY(-1px); */
-  /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
-
-/* TODO: last assumption should have border-bottom, first assumption should have margin-top */
 
 .last-assumption {
   border-bottom: 3px solid black;
@@ -161,4 +161,28 @@ https://stackoverflow.com/questions/3680429/click-through-div-to-underlying-elem
 
 .parse-fail {
   color: red;
+}
+
+/* TODO when dragging dont show hover */
+
+.error {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  top: 100%;
+  font-size: 6px;
+  border: 1px solid;
+  border-radius: 2px;
+  width: fit-content;
+  padding: 3px;
+  white-space: pre;
+  background: #fff;
+  color: #000;
+  z-index: 110;
+  transition: visibility 0s, opacity .5s;
+}
+
+.has-error:hover .error {
+  visibility: visible;
+  opacity: 1;
 }

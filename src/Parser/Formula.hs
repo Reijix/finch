@@ -5,29 +5,18 @@ import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),
   makeExprParser,
  )
-import Control.Monad.State
+import Control.Monad.State qualified as ST
+import Data.Data (Proxy (Proxy))
+import Data.Set qualified as E
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Data.Void
 import Fitch.Proof
-import Text.Megaparsec (
-  MonadParsec (eof, hidden),
-  ParsecT,
-  ShowErrorComponent (showErrorComponent),
-  between,
-  chunk,
-  empty,
-  errorBundlePretty,
-  errorBundlePrettyWith,
-  parseErrorPretty,
-  runParserT,
-  sepBy,
-  some,
-  (<?>),
-  (<|>),
- )
+import Miso.Router (RoutingError (ParseError))
+import Text.Megaparsec
 import Text.Megaparsec.Char (letterChar, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
+import Text.Megaparsec.Unicode qualified as Unicode
 
 data FormulaParserState = FormulaParserState
   { unaryOperators :: [(Text, Text)]
@@ -35,7 +24,7 @@ data FormulaParserState = FormulaParserState
   , quantifiers :: [(Text, Text)]
   }
 
-type FormulaParser = ParsecT Void Text (State FormulaParserState)
+type FormulaParser = ParsecT Void Text (ST.State FormulaParserState)
 
 sc :: FormulaParser ()
 sc =
@@ -72,7 +61,7 @@ pPropAtom = lexeme $ (`Predicate` []) <$> pName
 
 pQuantifierName :: FormulaParser Name
 pQuantifierName = do
-  symbols <- gets quantifiers
+  symbols <- ST.gets quantifiers
   foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
 
 pQuantifier :: FormulaParser Formula
@@ -89,19 +78,33 @@ prefix name f = Prefix $ foldr1 (.) <$> some (f <$ hidden (symbol name))
 
 pFormula :: FormulaParser Formula
 pFormula = do
-  unaries <- gets unaryOperators
-  binaries <- gets binaryOperators
+  unaries <- ST.gets unaryOperators
+  binaries <- ST.gets binaryOperators
   let operatorTable =
         [ concatMap (\(alias, u) -> [prefix alias (UnaryOp u), prefix u (UnaryOp u)]) unaries
         , concatMap (\(alias, b) -> [binary alias (BinaryOp b), binary b (BinaryOp b)]) binaries
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
-parseFormula :: [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Formula
-parseFormula unaryOperators binaryOperators quantifiers input = case evalState (runParserT (pFormula <* eof) "" input) initialState of
-  Left e -> Left . pack $ errorBundlePretty e
-  Right f -> Right f
+parseFormula :: [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
+parseFormula unaryOperators binaryOperators quantifiers lineNo input = case ST.evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
+  (_, Left e) -> Left $ pack $ errorBundlePretty e
+  (_, Right f) -> Right f
  where
+  initialParserState =
+    State
+      { stateInput = input
+      , stateOffset = 0
+      , statePosState =
+          PosState
+            { pstateInput = input
+            , pstateOffset = 0
+            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
+            , pstateTabWidth = defaultTabWidth
+            , pstateLinePrefix = ""
+            }
+      , stateParseErrors = []
+      }
   initialState =
     FormulaParserState
       { unaryOperators

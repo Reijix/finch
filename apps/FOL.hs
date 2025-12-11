@@ -14,10 +14,10 @@ main = runApp exProof unaryOperators binaryOperators quantifiers
   quantifiers = [("forall", "∀")]
   fakeModel = initialModel undefined unaryOperators binaryOperators quantifiers
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel []
+  mkFormula = tryParse fakeModel [] 0
 
   mkRuleApplication :: Text -> ParseWrapper RuleApplication
-  mkRuleApplication = tryParse fakeModel []
+  mkRuleApplication = tryParse fakeModel [] 0
 
   mkDerivation :: Text -> Text -> Derivation
   mkDerivation f r = Derivation (mkFormula f) (mkRuleApplication r)

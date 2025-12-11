@@ -13,7 +13,7 @@ main = runApp exProof unaryOperators binaryOperators []
   binaryOperators = [("/\\", "∧"), ("\\/", "∨"), ("->", "→")]
   fakeModel = initialModel undefined unaryOperators binaryOperators []
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel []
+  mkFormula = tryParse fakeModel [] 0
 
   mkRuleApplication :: Text -> ParseWrapper RuleApplication
   mkRuleApplication txt = Unparsed txt ""

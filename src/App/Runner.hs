@@ -121,12 +121,13 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
       proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
-    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] "Formula") (tryParse m [] "Rule")) targetAddr pos
+    -- TODO adjust linenos
+    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] 0 "Formula") (tryParse m [] 0 "Rule")) targetAddr pos
     Just SpawnProof -> do
-      proof %=? lInsert (Right $ SubProof [tryParse m [] "Formula"] [] (Derivation (tryParse m [] "Formula") (tryParse m [] "Rule"))) targetAddr pos
+      proof %=? lInsert (Right $ SubProof [tryParse m [] 0 "Formula"] [] (Derivation (tryParse m [] 0 "Formula") (tryParse m [] 0 "Rule"))) targetAddr pos
       p <- use proof
       io_ $ consoleLog $ ms $ show p
-    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] "Formula")) targetAddr pos
+    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] 0 "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -169,14 +170,14 @@ updateModel (Input str ref) = do
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text) :: ParseWrapper Formula
+  let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: ParseWrapper Formula
   proof %= lUpdateFormula (const p) addr
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
 updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
-  let r = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromMisoString str :: Text) :: ParseWrapper RuleApplication
+  let r = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: ParseWrapper RuleApplication
   proof %= lUpdateRule (const r) addr
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
@@ -196,8 +197,8 @@ updateModel (ProcessParens eaddr start end) = do
         (second, third) = T.splitAt (end - start) rest
         newTxt = T.concat [first, "(", second, ")", third]
      in case eaddr of
-          Left addr -> Left $ tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) newTxt
-          Right addr -> Right $ tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) newTxt
+          Left addr -> Left $ tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
+          Right addr -> Right $ tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
 updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
 updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
 ------------------------------------
@@ -267,25 +268,25 @@ class FromText a where
   {- | Takes a `Model` and some `Text` and tries to parse it to the desired type.
   On failure returns an error message.
   -}
-  fromText :: Model -> Text -> Either Text a
+  fromText :: Model -> Int -> Text -> Either Text a
 
 instance FromText Rule where
-  fromText :: Model -> Text -> Either Text Rule
-  fromText m str = Right $ Rule str [] (Predicate "" [])
+  fromText :: Model -> Int -> Text -> Either Text Rule
+  fromText m n str = Right $ Rule str [] (Predicate "" [])
 
 instance FromText Formula where
-  fromText :: Model -> Text -> Either Text Formula
+  fromText :: Model -> Int -> Text -> Either Text Formula
   fromText m = parseFormula (m ^. unaryOperators) (m ^. binaryOperators) (m ^. quantifiers)
 
 instance FromText RuleApplication where
-  fromText :: Model -> Text -> Either Text RuleApplication
-  fromText _ = parseRuleApplication
+  fromText :: Model -> Int -> Text -> Either Text RuleApplication
+  fromText _ _ = parseRuleApplication
 
 {- | Wrapper for `fromText` that also takes a list of aliases and
 tries to replace these aliases in the `Text`
 -}
-tryParse :: forall a. (FromText a) => Model -> [(Text, Text)] -> Text -> ParseWrapper a
-tryParse m replacements txt = case fromText m replacedTxt :: Either Text a of
+tryParse :: forall a. (FromText a) => Model -> [(Text, Text)] -> Int -> Text -> ParseWrapper a
+tryParse m replacements n txt = case fromText m n replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
   Right result -> Parsed replacedTxt result
  where
