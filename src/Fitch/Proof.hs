@@ -117,7 +117,7 @@ mapPWithAddr = go Nothing
 
 instance Show Proof where
   show :: Proof -> String
-  show = show' 0 0
+  show = show' 1 0
    where
     withIndent :: Int -> Int -> String -> String
     withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
@@ -182,32 +182,39 @@ instance Ord NodeAddr where
 
 -- ** Conversion between line numbers and `NodeAddr`
 
--- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
+{- | Takes a line index and returns the corresponding `NodeAddr` for a given proof.
+
+NOTE: indices of NodeAddr start at 0, but line numbers start at 1!
+-}
 fromLineNo :: Int -> Proof -> Maybe NodeAddr
-fromLineNo 0 (ProofLine{}) = Just $ NAProof 0 Nothing
+fromLineNo n _ | n < 1 = Nothing
+fromLineNo 1 (ProofLine{}) = Just $ NAProof 0 Nothing
 fromLineNo n (SubProof [] ps _) = helper n 0 ps
  where
   helper :: Int -> Int -> [Proof] -> Maybe NodeAddr
-  helper 0 _ [] = Just NAConclusion
-  helper n m [] = Nothing
-  helper 0 m ((ProofLine{}) : ps) = Just $ NAProof m Nothing
-  helper n m (p : ps) | n < lLength p = do
+  helper 1 _ [] = Just NAConclusion
+  helper n _ [] = Nothing
+  helper 1 m ((ProofLine{}) : ps) = Just $ NAProof m Nothing
+  helper n m (p : ps) | (n - 1) < lLength p = do
     addr <- fromLineNo n p
     return $ NAProof m (Just addr)
   helper n m (p : ps) = helper (n - lLength p) (m + 1) ps
-fromLineNo n (SubProof fs _ _) | n < L.length fs = Just $ NAAssumption n
+fromLineNo n (SubProof fs _ _) | (n - 1) < L.length fs = Just $ NAAssumption (n - 1)
 fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
 fromLineNo n p = Nothing
 
--- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
+{- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
+
+NOTE: indices of NodeAddr start at 0, but line numbers start at 1!
+-}
 fromNodeAddr :: NodeAddr -> Proof -> Maybe Int
-fromNodeAddr = go 0
+fromNodeAddr = go 1
  where
   go :: Int -> NodeAddr -> Proof -> Maybe Int
-  go 0 (NAProof 0 Nothing) (ProofLine{}) = Just 0
+  go 1 (NAProof 0 Nothing) (ProofLine{}) = Just 1
   go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
   go n (NAAssumption m) (SubProof fs _ _) = Nothing
-  go 0 (NAProof 0 Nothing) (SubProof [] [] _) = Just 0
+  go 1 (NAProof 0 Nothing) (SubProof [] [] _) = Just 1
   go n (NAProof m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)
   go n NAConclusion (SubProof fs ps _) = return $ L.length fs + n + foldr (\p n -> n + lLength p) 0 ps
   go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + lLength p) 0 (take m ps)) addr (ps !! m)

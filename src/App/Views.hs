@@ -66,64 +66,62 @@ viewSpawnNode tp str =
 
 -- VIEWS
 viewLine :: Model -> NodeAddr -> Bool -> Either Assumption Derivation -> View Model Action
-viewLine m a isLastAssumption e =
+viewLine model addr isLastAssumption e =
   H.div_
-    [ HP.draggable_ $ (m ^. focusedLine) /= Just (Left a)
+    [ HP.draggable_ $ (model ^. focusedLine) /= Just (Left addr)
     , HP.classList_
         [ ("proof-line", True)
-        , ("draggable", (m ^. focusedLine) /= Just (Left a))
-        , ("can-hover", not (m ^. dragging))
-        , ("has-error", not parseSuccess)
+        , ("draggable", (model ^. focusedLine) /= Just (Left addr))
+        , ("can-hover", not (model ^. dragging))
         ]
     , HP.hidden_ False
-    , onDragStartWithOptions stopPropagation $ DragStart a
+    , onDragStartWithOptions stopPropagation $ DragStart addr
     , onDragEndWithOptions stopPropagation DragEnd
     ]
-    [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
-    , H.div_
+    [ H.div_
         [ HP.class_ "upper-hover-zone"
-        , HP.classList_ [("insert-before", m ^. currentLineBefore == Just a), ("no-pointer-events", not (m ^. dragging))]
+        , HP.classList_ [("insert-before", model ^. currentLineBefore == Just addr), ("no-pointer-events", not (model ^. dragging))]
         , -- hide while focused, so that the input field is clickable for mouse movement
-          HP.hidden_ $ m ^. focusedLine == Just (Left a)
+          HP.hidden_ $ model ^. focusedLine == Just (Left addr)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
-        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter a Before)
+        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter addr Before)
         , onDragLeaveWithOptions (preventDefault <> stopPropagation) (DragLeave Before)
-        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr a Before))
+        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr addr Before))
         ]
         []
     , H.div_
         [ HP.class_ "lower-hover-zone"
-        , HP.classList_ [("insert-after", m ^. currentLineAfter == Just a), ("no-pointer-events", not (m ^. dragging))]
+        , HP.classList_ [("insert-after", model ^. currentLineAfter == Just addr), ("no-pointer-events", not (model ^. dragging))]
         , -- hide while focused, so that the input field is clickable for mouse movement
-          HP.hidden_ $ m ^. focusedLine == Just (Left a)
+          HP.hidden_ $ model ^. focusedLine == Just (Left addr)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
-        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter a After)
+        , onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter addr After)
         , onDragLeaveWithOptions (preventDefault <> stopPropagation) (DragLeave After)
-        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr a After))
+        , onDropWithOptions (preventDefault <> stopPropagation) (Drop (LocationAddr addr After))
         ]
         []
     , H.div_
-        [ onDoubleClick $ DoubleClick (Left a)
+        [ onDoubleClick $ DoubleClick (Left addr)
         , HP.class_ "formula-container"
         , HP.hidden_ False
-        , HP.classList_ [("to-foreground", Just (Left a) /= m ^. focusedLine)]
+        , HP.classList_ [("has-error", not parseSuccess)]
         ]
-        [ H.input_
-            [ HP.inert_ (Just (Left a) /= m ^. focusedLine)
-            , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a (m ^. proof)))
+        [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
+        , H.input_
+            [ HP.inert_ (Just (Left addr) /= model ^. focusedLine)
+            , HP.id_ . ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
             , HP.classList_
                 [ ("formula-input", True)
                 , ("last-assumption", isLastAssumption)
                 , ("parse-success", parseSuccess)
                 , ("parse-fail", not parseSuccess)
-                , ("draggable", Just (Left a) /= m ^. focusedLine)
-                , ("to-foreground", Just (Left a) == m ^. focusedLine)
+                , ("draggable", Just (Left addr) /= model ^. focusedLine)
                 ]
             , HP.draggable_ False
             , onBlur Blur
             , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-            , onCreatedWith (KeyDownStart (Left a))
-            , onBeforeDestroyed (KeyDownStop (Left a))
+            , onCreatedWith (KeyDownStart (Left addr))
+            , onBeforeDestroyed (KeyDownStop (Left addr))
             , onDragStartWithOptions preventDefault Nop
             , value_ txt
             ]
@@ -145,19 +143,17 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
   mapRules (Left a) addr = H.p_ [HP.class_ "empty-rule"] []
   mapRules (Right (Derivation _ p)) addr =
     H.div_
-      ( [ onDoubleClick $ DoubleClick (Right addr)
-        , HP.class_ "rule-container"
-        , HP.classList_ [("to-foreground", Just (Right addr) /= model ^. focusedLine), ("non-selectable", Just (Right addr) /= model ^. focusedLine)]
-        ]
-          ++ [HP.title_ err | not parseSuccess]
-      )
-      [ H.input_
+      [ onDoubleClick $ DoubleClick (Right addr)
+      , HP.class_ "rule-container"
+      , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess)]
+      ]
+      [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
+      , H.input_
           [ HP.class_ "rule-input"
           , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
           , HP.classList_
               [ ("parse-success", parseSuccess)
               , ("parse-fail", not parseSuccess)
-              , ("to-foreground", Just (Right addr) == model ^. focusedLine)
               ]
           , HP.draggable_ False
           , HP.inert_ (Just (Right addr) /= model ^. focusedLine)

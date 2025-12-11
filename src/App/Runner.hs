@@ -111,23 +111,17 @@ updateModel (Drop LocationBin) = do
   case dt of
     Nothing -> pure ()
     Just addr -> proof %= lRemove addr
-  io_ . consoleLog $ "dropped in bin"
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pure ()
-    Just sourceAddr -> do
-      io_ . consoleLog . ms $ "dropping (" ++ show sourceAddr ++ ") into (" ++ show targetAddr ++ ")"
-      proof %= lMove targetAddr pos sourceAddr
+    Just sourceAddr -> proof %= lMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
     -- TODO adjust linenos
-    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] 0 "Formula") (tryParse m [] 0 "Rule")) targetAddr pos
-    Just SpawnProof -> do
-      proof %=? lInsert (Right $ SubProof [tryParse m [] 0 "Formula"] [] (Derivation (tryParse m [] 0 "Formula") (tryParse m [] 0 "Rule"))) targetAddr pos
-      p <- use proof
-      io_ $ consoleLog $ ms $ show p
-    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] 0 "Formula")) targetAddr pos
+    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")) targetAddr pos
+    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"] [] (Derivation (tryParse m [] 0 "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))) targetAddr pos
+    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -280,7 +274,7 @@ instance FromText Formula where
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication
-  fromText _ _ = parseRuleApplication
+  fromText _ = parseRuleApplication
 
 {- | Wrapper for `fromText` that also takes a list of aliases and
 tries to replace these aliases in the `Text`

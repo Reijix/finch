@@ -9,10 +9,6 @@
   cursor: pointer;
 }
 
-.to-foreground {
-  z-index: 100;
-}
-
 .proof-container {
   display: flex;
   flex-direction: row;
@@ -62,6 +58,7 @@
   width: 5rem;
   padding: 0;
   margin: 0;
+  position: relative;
 }
 
 

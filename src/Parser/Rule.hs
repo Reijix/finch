@@ -5,29 +5,12 @@ import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),
   makeExprParser,
  )
-import Control.Monad.State
 import Data.Char (digitToInt)
 import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Data.Void
 import Fitch.Proof
-import Text.Megaparsec (
-  MonadParsec (eof, hidden, try),
-  Parsec,
-  between,
-  chunk,
-  empty,
-  errorBundlePretty,
-  errorBundlePrettyWith,
-  noneOf,
-  parseErrorPretty,
-  runParser,
-  satisfy,
-  sepBy,
-  some,
-  (<?>),
-  (<|>),
- )
+import Text.Megaparsec
 import Text.Megaparsec.Char (digitChar, letterChar, printChar, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
@@ -70,7 +53,22 @@ pReference = proofReference <|> lineReference
 pRule :: Parser RuleApplication
 pRule = liftM2 RuleApplication (parens pName) (lexeme pReference `sepBy` comma)
 
-parseRuleApplication :: Text -> Either Text RuleApplication
-parseRuleApplication input = case runParser (pRule <* eof) "" input of
-  Left e -> Left . pack $ errorBundlePretty e
-  Right ra -> Right ra
+parseRuleApplication :: Int -> Text -> Either Text RuleApplication
+parseRuleApplication lineNo input = case runParser' (pRule <* eof) initialParserState of
+  (_, Left e) -> Left . pack $ errorBundlePretty e
+  (_, Right ra) -> Right ra
+ where
+  initialParserState =
+    State
+      { stateInput = input
+      , stateOffset = 0
+      , statePosState =
+          PosState
+            { pstateInput = input
+            , pstateOffset = 0
+            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
+            , pstateTabWidth = defaultTabWidth
+            , pstateLinePrefix = ""
+            }
+      , stateParseErrors = []
+      }

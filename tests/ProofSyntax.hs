@@ -188,7 +188,7 @@ lInsertQCTests =
     ]
 
 prop_fromLineNoInverse :: Proof -> Property
-prop_fromLineNoInverse p = forAll (chooseInt (0, lLength p - 1)) $ \n ->
+prop_fromLineNoInverse p = forAll (chooseInt (1, lLength p - 1)) $ \n ->
   isJust (fromLineNo n p)
     ==> fromNodeAddr (fromJust $ fromLineNo n p) p
     === Just n
