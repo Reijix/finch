@@ -33,13 +33,36 @@ updateAt _ _ [] = []
 updateAt 0 f (a : as) = f a : as
 updateAt n f (a : as) = a : updateAt (n - 1) f as
 
-data ParseWrapper a where
-  Parsed :: Text -> a -> ParseWrapper a
-  Unparsed :: Text -> Text -> ParseWrapper a
+data Wrapper a where
+  -- | Semantically valid parse success
+  ParsedValid :: Text -> a -> Wrapper a
+  -- | Semantically invalid parse success
+  ParsedInvalid ::
+    -- | User input
+    Text ->
+    -- | Error message
+    Text ->
+    -- | Inner value
+    a ->
+    Wrapper a
+  -- | Parse failure
+  Unparsed :: Text -> Text -> Wrapper a
   deriving (Show, Eq)
 
-getText :: ParseWrapper a -> Text
-getText (Parsed txt _) = txt
+instance Functor Wrapper where
+  fmap :: (a -> b) -> Wrapper a -> Wrapper b
+  fmap f (ParsedValid txt x) = ParsedValid txt (f x)
+  fmap f (ParsedInvalid txt err x) = ParsedInvalid txt err (f x)
+  fmap _ (Unparsed txt err) = Unparsed txt err
+
+fromWrapper :: Wrapper a -> a
+fromWrapper (ParsedValid _ x) = x
+fromWrapper (ParsedInvalid _ _ x) = x
+fromWrapper (Unparsed{}) = error "fromWrapper called on Unparsed"
+
+getText :: Wrapper a -> Text
+getText (ParsedValid txt _) = txt
+getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
 data Rule
@@ -82,14 +105,14 @@ data Reference where
   ProofReference :: Int -> Int -> Reference
   deriving (Show, Eq)
 
-type Assumption = ParseWrapper Formula
+type Assumption = Wrapper Formula
 
 data RuleApplication
   = RuleApplication Name [Reference]
   deriving (Show, Eq)
 
 data Derivation
-  = Derivation (ParseWrapper Formula) (ParseWrapper RuleApplication)
+  = Derivation (Wrapper Formula) (Wrapper RuleApplication)
   deriving (Show, Eq)
 
 -- | A datatype for respresenting fitch-style proofs.
@@ -100,12 +123,12 @@ data Proof where
   SubProof :: [Assumption] -> [Proof] -> Derivation -> Proof
   deriving (Eq)
 
-mapP :: (Either Assumption Derivation -> a) -> Proof -> [a]
-mapP f (ProofLine d) = [f (Right d)]
-mapP f (SubProof fs ps d) = map (f . Left) fs ++ concatMap (mapP f) ps ++ [f (Right d)]
+mapPList :: (Either Assumption Derivation -> a) -> Proof -> [a]
+mapPList f (ProofLine d) = [f (Right d)]
+mapPList f (SubProof fs ps d) = map (f . Left) fs ++ concatMap (mapPList f) ps ++ [f (Right d)]
 
-mapPWithAddr :: (Either Assumption Derivation -> NodeAddr -> a) -> Proof -> [a]
-mapPWithAddr = go Nothing
+mapPListWithAddr :: (Either Assumption Derivation -> NodeAddr -> a) -> Proof -> [a]
+mapPListWithAddr = go Nothing
  where
   go :: Maybe NodeAddr -> (Either Assumption Derivation -> NodeAddr -> a) -> Proof -> [a]
   go Nothing f (ProofLine d) = [f (Right d) (NAProof 0 Nothing)]
@@ -316,7 +339,7 @@ lLookup _ _ = Nothing
 
 Fails silently
 -}
-lUpdateFormula :: (ParseWrapper Formula -> ParseWrapper Formula) -> NodeAddr -> Proof -> Proof
+lUpdateFormula :: (Wrapper Formula -> Wrapper Formula) -> NodeAddr -> Proof -> Proof
 lUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
 lUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
  where
@@ -330,7 +353,7 @@ lUpdateFormula _ _ p = p
 
 Fails silently
 -}
-lUpdateRule :: (ParseWrapper RuleApplication -> ParseWrapper RuleApplication) -> NodeAddr -> Proof -> Proof
+lUpdateRule :: (Wrapper RuleApplication -> Wrapper RuleApplication) -> NodeAddr -> Proof -> Proof
 lUpdateRule f (NAProof n Nothing) (SubProof fs ps d)
   | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (\(ProofLine (Derivation form rule)) -> ProofLine (Derivation form (f rule))) ps) d
 lUpdateRule f (NAProof n (Just addr)) (SubProof fs ps d)

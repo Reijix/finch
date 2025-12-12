@@ -12,9 +12,13 @@ module App.Runner (
 -----------------------------------------------------------------------------
 import App.Model
 import App.Views
-import Control.Monad (void, when)
-import Control.Monad.State
+import Control.Monad (liftM2, liftM3, void, when)
+import Control.Monad.RWS
+import Control.Monad.State (MonadState (get), State)
+import Control.Monad.State qualified as ST
+import Data.Bifunctor (Bifunctor (first), bimap)
 import Data.Either (fromLeft, fromRight)
+import Data.Map (Map)
 import Data.Map qualified as M
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
@@ -25,6 +29,7 @@ import Miso (
   App,
   CSS (Href),
   Component (events, styles, subs),
+  ComponentInfo,
   DOMRef,
   Effect,
   KeyInfo (keyCode, shiftKey),
@@ -32,6 +37,7 @@ import Miso (
   Phase (..),
   PointerEvent (client),
   ROOT,
+  Schedule,
   View,
   addEventListener,
   callFunction,
@@ -68,7 +74,7 @@ import Miso (
 import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
-import Miso.Lens (Lens, use, (%=), (.=), (^.))
+import Miso.Lens
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (parseFormula)
@@ -102,6 +108,62 @@ runApp proof unaryOperators binaryOperators quantifiers =
       }
  where
   m = initialModel proof unaryOperators binaryOperators quantifiers
+
+-- TODO mapPAccumL such that I can take the line number with me...
+
+mapP ::
+  (MonadState Model m) =>
+  (Assumption -> m Assumption) ->
+  (Derivation -> m Derivation) ->
+  Proof ->
+  m Proof
+mapP af df (ProofLine d) = ProofLine <$> df d
+mapP af df (SubProof fs ps d) = liftM3 SubProof (mapM af fs) (mapM (mapP af df) ps) (df d)
+
+type EffectState inner = RWS (ComponentInfo ROOT) [Schedule Action] Model inner
+
+updateSymbols :: Effect ROOT Model Action
+updateSymbols = do
+  functionSymbols .= M.empty
+  predicateSymbols .= M.empty
+  proof <~ (use proof >>= mapP goFormula goLine)
+ where
+  goFormula :: Assumption -> EffectState Assumption
+  goFormula a@(Unparsed{}) = pure a
+  goFormula a =
+    let (formula, txt) = (fromWrapper a, getText a)
+     in do
+          fsyms <- use functionSymbols
+          psyms <- use predicateSymbols
+          go fsyms psyms txt formula
+   where
+    go :: Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> EffectState Assumption
+    go fsyms psyms txt formula@(Predicate name args) = case psyms M.!? name of
+      Nothing -> do
+        predicateSymbols %= M.insert name (length args, Pos (0, 0))
+        return $ ParsedValid txt formula
+      Just (n, pos) ->
+        return $
+          if n == length args
+            then ParsedValid txt formula
+            -- TODO error message
+            else ParsedInvalid txt "error" formula
+    go fsyms psyms txt (UnaryOp name formula) = go fsyms psyms txt formula <&> (<$>) (UnaryOp name)
+    go fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
+      f1 <- go fsyms psyms txt formula1
+      f2 <- go fsyms psyms txt formula2
+      case f1 of
+        (Unparsed _ err) -> return $ Unparsed txt err
+        (ParsedInvalid _ err _) -> return $ ParsedInvalid txt err f
+        (ParsedValid _ _) -> case f2 of
+          (Unparsed _ err) -> return $ Unparsed txt err
+          (ParsedInvalid _ err _) -> return $ ParsedInvalid txt err f
+          (ParsedValid _ _) -> return $ ParsedValid txt f
+    go fsyms psyms txt (Quantifier name variable formula) = go fsyms psyms txt formula <&> (<$>) (Quantifier name variable)
+  goLine :: Derivation -> EffectState Derivation
+  goLine (Derivation f r) = do
+    f' <- goFormula f
+    return $ Derivation f' r
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
@@ -152,6 +214,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
 updateModel Blur = focusedLine .= Nothing
+updateModel Change = updateSymbols
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -164,14 +227,15 @@ updateModel (Input str ref) = do
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: ParseWrapper Formula
+  let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
   proof %= lUpdateFormula (const p) addr
+  updateSymbols
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
 updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
-  let r = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: ParseWrapper RuleApplication
+  let r = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
   proof %= lUpdateRule (const r) addr
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
@@ -185,7 +249,7 @@ updateModel (ProcessParens eaddr start end) = do
     Right addr ->
       proof %= lUpdateRule (\r -> fromRight r $ update m (getText r)) addr
  where
-  update :: Model -> Text -> Either (ParseWrapper Formula) (ParseWrapper RuleApplication)
+  update :: Model -> Text -> Either (Wrapper Formula) (Wrapper RuleApplication)
   update m txt =
     let (first, rest) = T.splitAt start txt
         (second, third) = T.splitAt (end - start) rest
@@ -279,9 +343,9 @@ instance FromText RuleApplication where
 {- | Wrapper for `fromText` that also takes a list of aliases and
 tries to replace these aliases in the `Text`
 -}
-tryParse :: forall a. (FromText a) => Model -> [(Text, Text)] -> Int -> Text -> ParseWrapper a
+tryParse :: forall a. (FromText a) => Model -> [(Text, Text)] -> Int -> Text -> Wrapper a
 tryParse m replacements n txt = case fromText m n replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
-  Right result -> Parsed replacedTxt result
+  Right result -> ParsedValid replacedTxt result
  where
   replacedTxt = foldr (\(alias, name) t -> T.replace alias name t) txt replacements

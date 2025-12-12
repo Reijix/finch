@@ -1,6 +1,8 @@
 module App.Model where
 
 import Data.List qualified as L
+import Data.Map (Map)
+import Data.Map qualified as M
 import Data.Text (Text)
 import Fitch.Proof
 import Miso (
@@ -47,6 +49,7 @@ data SpawnType where
 data Action where
   Blur :: Action
   Input :: MisoString -> DOMRef -> Action
+  Change :: Action
   ProcessInput :: MisoString -> Int -> Int -> Either NodeAddr NodeAddr -> Action
   DoubleClick :: Either NodeAddr NodeAddr -> Action
   Drop :: DropLocation -> Action
@@ -76,19 +79,51 @@ initialModel p unaryOperators binaryOperators quantifiers =
     , _unaryOperators = unaryOperators
     , _binaryOperators = binaryOperators
     , _quantifiers = quantifiers
+    , _functionSymbols = M.empty
+    , _predicateSymbols = M.empty
     }
+
+newtype Pos = Pos (Int, Int) deriving (Show, Eq)
 
 data Model = Model
   { _focusedLine :: Maybe (Either NodeAddr NodeAddr)
+  -- ^ the line that is currently focused
   , _proof :: Proof
+  -- ^ the current proof
   , _dragTarget :: Maybe NodeAddr
+  -- ^ the element that is currently being dragged
   , _spawnType :: Maybe SpawnType
+  -- ^ the type of element that is currently being spawned
   , _currentLineBefore :: Maybe NodeAddr
+  -- ^ the line before which the user currently hovers
   , _currentLineAfter :: Maybe NodeAddr
+  -- ^ the line after which the user currently hovers
   , _dragging :: Bool
+  -- ^ denotes whether the user is currently dragging an element
   , _unaryOperators :: [(Text, Text)]
+  {- ^ list of unary operators, consisting of (alias, symbol)
+  where alias is an alternative notation for the symbol
+  -}
   , _binaryOperators :: [(Text, Text)]
+  {- ^ list of binary operators, consisting of (alias, symbol)
+  where alias is an alternative notation for the symbol
+  -}
   , _quantifiers :: [(Text, Text)]
+  {- ^ list of quantifiers, consisting of (alias, symbol)
+  where alias is an alternative notation for the symbol
+  -}
+  , _functionSymbols :: Map Text (Int, Pos)
+  {- ^ Collected function symbols consisting of
+  * name :: Text
+  * arity :: Int
+  * first occurence :: Pos
+  -}
+  , _predicateSymbols :: Map Text (Int, Pos)
+  {- ^ Collected predicate symbols consisting of
+  * name :: Text
+  * arity :: Int
+  * first occurence :: Pos
+  -}
   }
   deriving (Show, Eq)
 
@@ -121,3 +156,9 @@ binaryOperators = lens (._binaryOperators) $ \model bo -> model{_binaryOperators
 
 quantifiers :: Lens Model [(Text, Text)]
 quantifiers = lens (._quantifiers) $ \model q -> model{_quantifiers = q}
+
+functionSymbols :: Lens Model (Map Text (Int, Pos))
+functionSymbols = lens (._functionSymbols) $ \model fs -> model{_functionSymbols = fs}
+
+predicateSymbols :: Lens Model (Map Text (Int, Pos))
+predicateSymbols = lens (._predicateSymbols) $ \model ps -> model{_predicateSymbols = ps}

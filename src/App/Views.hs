@@ -104,7 +104,7 @@ viewLine model addr isLastAssumption e =
         [ onDoubleClick $ DoubleClick (Left addr)
         , HP.class_ "formula-container"
         , HP.hidden_ False
-        , HP.classList_ [("has-error", not parseSuccess)]
+        , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess)]
         ]
         [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
         , H.input_
@@ -113,12 +113,13 @@ viewLine model addr isLastAssumption e =
             , HP.classList_
                 [ ("formula-input", True)
                 , ("last-assumption", isLastAssumption)
-                , ("parse-success", parseSuccess)
-                , ("parse-fail", not parseSuccess)
+                , ("parse-success", parseSuccess && semanticSuccess)
+                , ("parse-fail", not parseSuccess || not semanticSuccess)
                 , ("draggable", Just (Left addr) /= model ^. focusedLine)
                 ]
             , HP.draggable_ False
             , onBlur Blur
+            , onChange (const Change)
             , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
             , onCreatedWith (KeyDownStart (Left addr))
             , onBeforeDestroyed (KeyDownStop (Left addr))
@@ -128,13 +129,15 @@ viewLine model addr isLastAssumption e =
         ]
     ]
  where
-  (parseSuccess, txt, err) = case e of
+  (semanticSuccess, parseSuccess, txt, err) = case e of
     Left a -> case a of
-      Parsed str a' -> (True, ms str, "")
-      Unparsed str err -> (False, ms str, ms err)
+      ParsedValid str a' -> (True, True, ms str, "")
+      ParsedInvalid str err a' -> (False, True, ms str, ms err)
+      Unparsed str err -> (False, False, ms str, ms err)
     Right (Derivation f r) -> case f of
-      (Parsed str f') -> (True, ms str, "")
-      (Unparsed str err) -> (False, ms str, ms err)
+      (ParsedValid str f') -> (True, True, ms str, "")
+      (ParsedInvalid str err f') -> (False, True, ms str, ms err)
+      (Unparsed str err) -> (False, False, ms str, ms err)
 
 viewProof :: Model -> View Model Action
 viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rules]
@@ -159,6 +162,7 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
           , HP.inert_ (Just (Right addr) /= model ^. focusedLine)
           , onBlur Blur
           , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+          , onChange (const Change)
           , onCreatedWith (KeyDownStart (Right addr))
           , onBeforeDestroyed (KeyDownStop (Right addr))
           , onDragStartWithOptions preventDefault Nop
@@ -166,10 +170,11 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
           ]
       ]
    where
-    (parseSuccess, ruleTxt, err) = case p of
-      (Parsed str _) -> (True, ms str, "")
-      (Unparsed str err) -> (False, ms str, ms err)
-  rules = H.div_ [HP.class_ "rules-container"] $ mapPWithAddr mapRules (model ^. proof)
+    (semanticSuccess, parseSuccess, ruleTxt, err) = case p of
+      (ParsedValid str _) -> (True, True, ms str, "")
+      (ParsedInvalid str _ _) -> (False, True, ms str, "")
+      (Unparsed str err) -> (False, False, ms str, ms err)
+  rules = H.div_ [HP.class_ "rules-container"] $ mapPListWithAddr mapRules (model ^. proof)
   lineNos =
     H.div_ [HP.class_ "line-no-container"] $
       map

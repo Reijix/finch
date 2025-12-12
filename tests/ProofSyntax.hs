@@ -15,11 +15,11 @@ import Test.Tasty.QuickCheck as QC
 
 -- Definitions for unit testing:
 
-formula :: Int -> ParseWrapper Formula
-formula n = Parsed "" $ Predicate (pack $ show n) []
+formula :: Int -> Wrapper Formula
+formula n = ParsedValid "" $ Predicate (pack $ show n) []
 
-rule :: Int -> [Reference] -> ParseWrapper RuleApplication
-rule str ref = Parsed "" (RuleApplication "Rule" ref)
+rule :: Int -> [Reference] -> Wrapper RuleApplication
+rule str ref = ParsedValid "" (RuleApplication "Rule" ref)
 
 derivation :: Int -> Derivation
 derivation n = Derivation (formula n) (rule n [])
@@ -78,9 +78,9 @@ instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication
   arbitrary = liftM2 RuleApplication arbitrary (pure [])
 
-instance (Arbitrary a) => Arbitrary (ParseWrapper a) where
-  arbitrary :: Gen (ParseWrapper a)
-  arbitrary = fmap (Parsed "") arbitrary
+instance (Arbitrary a) => Arbitrary (Wrapper a) where
+  arbitrary :: Gen (Wrapper a)
+  arbitrary = fmap (ParsedValid "") arbitrary
 
 instance Arbitrary Derivation where
   arbitrary :: Gen Derivation

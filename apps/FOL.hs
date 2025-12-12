@@ -16,7 +16,7 @@ main = runApp exProof unaryOperators binaryOperators quantifiers
   mkFormula :: Text -> Assumption
   mkFormula = tryParse fakeModel [] 0
 
-  mkRuleApplication :: Text -> ParseWrapper RuleApplication
+  mkRuleApplication :: Text -> Wrapper RuleApplication
   mkRuleApplication = tryParse fakeModel [] 0
 
   mkDerivation :: Text -> Text -> Derivation
