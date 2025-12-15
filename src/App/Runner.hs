@@ -12,11 +12,11 @@ module App.Runner (
 -----------------------------------------------------------------------------
 import App.Model
 import App.Views
-import Control.Monad (liftM2, liftM3, void, when)
+import Control.Monad (foldM, liftM2, liftM3, void, when)
 import Control.Monad.RWS
 import Control.Monad.State (MonadState (get), State)
 import Control.Monad.State qualified as ST
-import Data.Bifunctor (Bifunctor (first), bimap)
+import Data.Bifunctor (Bifunctor (first, second), bimap)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
 import Data.Map qualified as M
@@ -118,7 +118,38 @@ mapP ::
   Proof ->
   m Proof
 mapP af df (ProofLine d) = ProofLine <$> df d
-mapP af df (SubProof fs ps d) = liftM3 SubProof (mapM af fs) (mapM (mapP af df) ps) (df d)
+mapP af df (SubProof fs ps d) =
+  liftM3
+    SubProof
+    (mapM af fs)
+    (mapM (mapP af df) ps)
+    (df d)
+
+mapPAccumL ::
+  (MonadState Model m) =>
+  (s -> Assumption -> m (s, Assumption)) ->
+  (s -> Derivation -> m (s, Derivation)) ->
+  s ->
+  Proof ->
+  m (s, Proof)
+mapPAccumL af df s (ProofLine d) = do
+  (s', d') <- df s d
+  return (s', ProofLine d')
+mapPAccumL af df s (SubProof fs ps d) = do
+  (s', fs') <-
+    foldM
+      (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', f' : fs')))
+      (s, [])
+      fs
+  (s'', ps') <-
+    foldM
+      ( \(t, ps') p ->
+          mapPAccumL af df t p >>= (\(t', p') -> return (t', p' : ps'))
+      )
+      (s', [])
+      ps
+  (s''', d') <- df s'' d
+  return (s''', SubProof fs' ps' d')
 
 type EffectState inner = RWS (ComponentInfo ROOT) [Schedule Action] Model inner
 
@@ -126,44 +157,46 @@ updateSymbols :: Effect ROOT Model Action
 updateSymbols = do
   functionSymbols .= M.empty
   predicateSymbols .= M.empty
-  proof <~ (use proof >>= mapP goFormula goLine)
+  proof <~ (use proof >>= mapPAccumL goFormula goLine 1 <&> snd)
  where
-  goFormula :: Assumption -> EffectState Assumption
-  goFormula a@(Unparsed{}) = pure a
-  goFormula a =
+  goFormula :: Int -> Assumption -> EffectState (Int, Assumption)
+  goFormula n a@(Unparsed{}) = pure (n + 1, a)
+  goFormula n a =
     let (formula, txt) = (fromWrapper a, getText a)
      in do
           fsyms <- use functionSymbols
           psyms <- use predicateSymbols
-          go fsyms psyms txt formula
+          a' <- go n fsyms psyms txt formula
+          return (n + 1, a')
    where
-    go :: Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> EffectState Assumption
-    go fsyms psyms txt formula@(Predicate name args) = case psyms M.!? name of
+    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> EffectState Assumption
+    -- TODO in @args@ check functionsymbols!!
+    go n fsyms psyms txt formula@(Predicate name args) = case psyms M.!? name of
       Nothing -> do
-        predicateSymbols %= M.insert name (length args, Pos (0, 0))
-        return $ ParsedValid txt formula
-      Just (n, pos) ->
+        predicateSymbols %= M.insert name (length args, Pos n)
+        return (ParsedValid txt formula)
+      Just (l, pos) ->
         return $
-          if n == length args
+          if l == length args
             then ParsedValid txt formula
             -- TODO error message
-            else ParsedInvalid txt "error" formula
-    go fsyms psyms txt (UnaryOp name formula) = go fsyms psyms txt formula <&> (<$>) (UnaryOp name)
-    go fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
-      f1 <- go fsyms psyms txt formula1
-      f2 <- go fsyms psyms txt formula2
+            else ParsedInvalid txt (T.pack $ "error, predicate symbol already appeared in line " ++ show pos) formula
+    go n fsyms psyms txt (UnaryOp name formula) = go n fsyms psyms txt formula <&> (UnaryOp name <$>)
+    go n fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
+      f1 <- go n fsyms psyms txt formula1
+      f2 <- go n fsyms psyms txt formula2
       case f1 of
-        (Unparsed _ err) -> return $ Unparsed txt err
-        (ParsedInvalid _ err _) -> return $ ParsedInvalid txt err f
+        (Unparsed _ err) -> return (Unparsed txt err)
+        (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
         (ParsedValid _ _) -> case f2 of
-          (Unparsed _ err) -> return $ Unparsed txt err
-          (ParsedInvalid _ err _) -> return $ ParsedInvalid txt err f
-          (ParsedValid _ _) -> return $ ParsedValid txt f
-    go fsyms psyms txt (Quantifier name variable formula) = go fsyms psyms txt formula <&> (<$>) (Quantifier name variable)
-  goLine :: Derivation -> EffectState Derivation
-  goLine (Derivation f r) = do
-    f' <- goFormula f
-    return $ Derivation f' r
+          (Unparsed _ err) -> return (Unparsed txt err)
+          (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
+          (ParsedValid _ _) -> return (ParsedValid txt f)
+    go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
+  goLine :: Int -> Derivation -> EffectState (Int, Derivation)
+  goLine n (Derivation f r) = do
+    (n', f') <- goFormula n f
+    return (n', Derivation f' r)
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
@@ -266,12 +299,15 @@ updateModel Nop = pure ()
 viewModel :: Model -> View Model Action
 viewModel model =
   H.div_
-    []
-    [ viewProof model
-    , viewBin
-    , viewSpawnNode SpawnLine "Insert Line"
-    , viewSpawnNode SpawnAssumption "Insert Assumption"
-    , viewSpawnNode SpawnProof "Insert Proof"
+    [HP.class_ "fitch-container"]
+    [ H.div_
+        [HP.class_ "button-container"]
+        [ viewBin
+        , viewSpawnNode SpawnLine "+Line"
+        , viewSpawnNode SpawnAssumption "+Assumption"
+        , viewSpawnNode SpawnProof "+Proof"
+        ]
+    , viewProof model
     ]
 
 -----------------------------------------------------------------------------

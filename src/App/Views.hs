@@ -49,7 +49,7 @@ viewBin =
     , onDropWithOptions defaultOptions (Drop LocationBin)
     , HP.class_ "bin"
     ]
-    [H.p_ [] ["Delete Node"]]
+    [H.p_ [] ["Delete"]]
 
 viewSpawnNode :: SpawnType -> String -> View Model Action
 viewSpawnNode tp str =
