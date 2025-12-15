@@ -83,7 +83,7 @@ initialModel p unaryOperators binaryOperators quantifiers =
     , _predicateSymbols = M.empty
     }
 
-newtype Pos = Pos Int deriving (Show, Eq)
+type Pos = Int
 
 data Model = Model
   { _focusedLine :: Maybe (Either NodeAddr NodeAddr)

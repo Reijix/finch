@@ -20,7 +20,7 @@ import Data.Bifunctor (Bifunctor (first, second), bimap)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
 import Data.Map qualified as M
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fitch.Proof
@@ -109,10 +109,9 @@ runApp proof unaryOperators binaryOperators quantifiers =
  where
   m = initialModel proof unaryOperators binaryOperators quantifiers
 
--- TODO mapPAccumL such that I can take the line number with me...
-
+-- TODO comment and move to Fitch.Proof
 mapP ::
-  (MonadState Model m) =>
+  (MonadState a m) =>
   (Assumption -> m Assumption) ->
   (Derivation -> m Derivation) ->
   Proof ->
@@ -126,7 +125,7 @@ mapP af df (SubProof fs ps d) =
     (df d)
 
 mapPAccumL ::
-  (MonadState Model m) =>
+  (MonadState a m) =>
   (s -> Assumption -> m (s, Assumption)) ->
   (s -> Derivation -> m (s, Derivation)) ->
   s ->
@@ -138,13 +137,13 @@ mapPAccumL af df s (ProofLine d) = do
 mapPAccumL af df s (SubProof fs ps d) = do
   (s', fs') <-
     foldM
-      (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', f' : fs')))
+      (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', fs' ++ [f'])))
       (s, [])
       fs
   (s'', ps') <-
     foldM
       ( \(t, ps') p ->
-          mapPAccumL af df t p >>= (\(t', p') -> return (t', p' : ps'))
+          mapPAccumL af df t p >>= (\(t', p') -> return (t', ps' ++ [p']))
       )
       (s', [])
       ps
@@ -153,6 +152,7 @@ mapPAccumL af df s (SubProof fs ps d) = do
 
 type EffectState inner = RWS (ComponentInfo ROOT) [Schedule Action] Model inner
 
+-- TODO comment
 updateSymbols :: Effect ROOT Model Action
 updateSymbols = do
   functionSymbols .= M.empty
@@ -169,27 +169,54 @@ updateSymbols = do
           a' <- go n fsyms psyms txt formula
           return (n + 1, a')
    where
+    goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> EffectState (Maybe Text)
+    goArgs n fsyms = foldM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
+     where
+      goTerm :: Int -> Map Text (Int, Pos) -> Term -> EffectState (Maybe Text)
+      goTerm _ _ (Var{}) = return Nothing
+      goTerm n fsyms (Fun name args) = do
+        -- first check inner symbols
+        mTermError <- goArgs n fsyms args
+        case mTermError of
+          Just termError -> return $ Just termError
+          Nothing ->
+            -- then check the function symbol
+            case fsyms M.!? name of
+              Nothing -> do
+                functionSymbols %= M.insert name (length args, n)
+                return Nothing
+              Just (expLen, pos) ->
+                return $
+                  if expLen == length args
+                    then Nothing
+                    else Just . T.pack $ "Function symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments."
     go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> EffectState Assumption
-    -- TODO in @args@ check functionsymbols!!
-    go n fsyms psyms txt formula@(Predicate name args) = case psyms M.!? name of
-      Nothing -> do
-        predicateSymbols %= M.insert name (length args, Pos n)
-        return (ParsedValid txt formula)
-      Just (l, pos) ->
-        return $
-          if l == length args
-            then ParsedValid txt formula
-            -- TODO error message
-            else ParsedInvalid txt (T.pack $ "error, predicate symbol already appeared in line " ++ show pos) formula
+    go n fsyms psyms txt formula@(Predicate name args) = do
+      -- first check function symbols
+      mTermError <- goArgs n fsyms args
+      case mTermError of
+        Just termError -> return $ ParsedInvalid txt termError formula
+        -- then check the predicate symbol
+        Nothing ->
+          case psyms M.!? name of
+            Nothing -> do
+              predicateSymbols %= M.insert name (length args, n)
+              return (ParsedValid txt formula)
+            Just (expLen, pos) ->
+              return $
+                if expLen == length args
+                  then ParsedValid txt formula
+                  -- TODO singular/plural!
+                  else ParsedInvalid txt (T.pack $ "Predicate symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments.") formula
     go n fsyms psyms txt (UnaryOp name formula) = go n fsyms psyms txt formula <&> (UnaryOp name <$>)
     go n fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
       f1 <- go n fsyms psyms txt formula1
       f2 <- go n fsyms psyms txt formula2
       case f1 of
-        (Unparsed _ err) -> return (Unparsed txt err)
+        -- (Unparsed _ err) -> return (Unparsed txt err)
         (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
         (ParsedValid _ _) -> case f2 of
-          (Unparsed _ err) -> return (Unparsed txt err)
+          -- (Unparsed _ err) -> return (Unparsed txt err)
           (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
           (ParsedValid _ _) -> return (ParsedValid txt f)
     go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
