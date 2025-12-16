@@ -142,44 +142,46 @@ viewLine model addr isLastAssumption e =
 viewProof :: Model -> View Model Action
 viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rules]
  where
-  mapRules :: Either Assumption Derivation -> NodeAddr -> View Model Action
-  mapRules (Left a) addr = H.p_ [HP.class_ "empty-rule"] []
-  mapRules (Right (Derivation _ p)) addr =
-    H.div_
-      [ onDoubleClick $ DoubleClick (Right addr)
-      , HP.class_ "rule-container"
-      , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess)]
-      ]
-      [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
-      , H.input_
-          [ HP.class_ "rule-input"
-          , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
-          , HP.classList_
-              [ ("parse-success", parseSuccess)
-              , ("parse-fail", not parseSuccess)
-              ]
-          , HP.draggable_ False
-          , HP.inert_ (Just (Right addr) /= model ^. focusedLine)
-          , onBlur Blur
-          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-          , onChange (const Change)
-          , onCreatedWith (KeyDownStart (Right addr))
-          , onBeforeDestroyed (KeyDownStop (Right addr))
-          , onDragStartWithOptions preventDefault Nop
-          , value_ ruleTxt
-          ]
-      ]
+  rules = H.div_ [HP.class_ "rules-container"] $ pSerializeWithAddr mapAssumption mapDerivation (model ^. proof)
    where
-    (semanticSuccess, parseSuccess, ruleTxt, err) = case p of
-      (ParsedValid str _) -> (True, True, ms str, "")
-      (ParsedInvalid str _ _) -> (False, True, ms str, "")
-      (Unparsed str err) -> (False, False, ms str, ms err)
-  rules = H.div_ [HP.class_ "rules-container"] $ mapPListWithAddr mapRules (model ^. proof)
+    mapAssumption :: Assumption -> NodeAddr -> View Model Action
+    mapAssumption a addr = H.p_ [HP.class_ "empty-rule"] []
+    mapDerivation :: Derivation -> NodeAddr -> View Model Action
+    mapDerivation (Derivation _ p) addr =
+      H.div_
+        [ onDoubleClick $ DoubleClick (Right addr)
+        , HP.class_ "rule-container"
+        , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess)]
+        ]
+        [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
+        , H.input_
+            [ HP.class_ "rule-input"
+            , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
+            , HP.classList_
+                [ ("parse-success", parseSuccess)
+                , ("parse-fail", not parseSuccess)
+                ]
+            , HP.draggable_ False
+            , HP.inert_ (Just (Right addr) /= model ^. focusedLine)
+            , onBlur Blur
+            , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+            , onChange (const Change)
+            , onCreatedWith (KeyDownStart (Right addr))
+            , onBeforeDestroyed (KeyDownStop (Right addr))
+            , onDragStartWithOptions preventDefault Nop
+            , value_ ruleTxt
+            ]
+        ]
+     where
+      (semanticSuccess, parseSuccess, ruleTxt, err) = case p of
+        (ParsedValid str _) -> (True, True, ms str, "")
+        (ParsedInvalid str _ _) -> (False, True, ms str, "")
+        (Unparsed str err) -> (False, False, ms str, ms err)
   lineNos =
     H.div_ [HP.class_ "line-no-container"] $
       map
         (\n -> H.p_ [HP.class_ "line-no"] [text $ ms n])
-        (take (lLength $ model ^. proof) [1 :: Int ..])
+        (take (pLength $ model ^. proof) [1 :: Int ..])
   proofView = case model ^. proof of
     ProofLine _ -> error "Tried calling viewProof on a ProofLine"
     SubProof fs ps d -> H.div_ [HP.class_ "outer-subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
@@ -188,8 +190,7 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
       viewConclusion = viewLine model NAConclusion False (Right d)
   _viewProof :: Int -> Maybe NodeAddr -> Proof -> View Model Action
-  _viewProof n Nothing (ProofLine d) = viewLine model (NAProof n Nothing) False (Right d)
-  _viewProof n (Just a) (ProofLine d) = viewLine model (naAppendProof n a) False (Right d)
+  _viewProof n ma (ProofLine d) = viewLine model (naAppendProof n ma) False (Right d)
   _viewProof n ma (SubProof fs ps d) =
     H.div_
       [ HP.class_ "subproof"
@@ -200,12 +201,10 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       ]
       (viewAssumptions ++ viewProofs ++ [viewConclusion])
    where
-    a = case ma of
-      Nothing -> NAProof n Nothing
-      Just addr -> naAppendProof n addr
-    (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m a) (m == L.length fs - 1) (Left f))) 0 fs
+    a = naAppendProof n ma
+    (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m (Just $ naAppendProof n ma)) (m == L.length fs - 1) (Left f))) 0 fs
     (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
-    viewConclusion = viewLine model (naAppendConclusion a) False (Right d)
+    viewConclusion = viewLine model (naAppendConclusion $ Just a) False (Right d)
 
 -----------------------------------------------------------------------------
 toEm :: Int -> MisoString

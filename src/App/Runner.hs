@@ -109,122 +109,6 @@ runApp proof unaryOperators binaryOperators quantifiers =
  where
   m = initialModel proof unaryOperators binaryOperators quantifiers
 
--- TODO comment and move to Fitch.Proof
-mapP ::
-  (MonadState a m) =>
-  (Assumption -> m Assumption) ->
-  (Derivation -> m Derivation) ->
-  Proof ->
-  m Proof
-mapP af df (ProofLine d) = ProofLine <$> df d
-mapP af df (SubProof fs ps d) =
-  liftM3
-    SubProof
-    (mapM af fs)
-    (mapM (mapP af df) ps)
-    (df d)
-
-mapPAccumL ::
-  (MonadState a m) =>
-  (s -> Assumption -> m (s, Assumption)) ->
-  (s -> Derivation -> m (s, Derivation)) ->
-  s ->
-  Proof ->
-  m (s, Proof)
-mapPAccumL af df s (ProofLine d) = do
-  (s', d') <- df s d
-  return (s', ProofLine d')
-mapPAccumL af df s (SubProof fs ps d) = do
-  (s', fs') <-
-    foldM
-      (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', fs' ++ [f'])))
-      (s, [])
-      fs
-  (s'', ps') <-
-    foldM
-      ( \(t, ps') p ->
-          mapPAccumL af df t p >>= (\(t', p') -> return (t', ps' ++ [p']))
-      )
-      (s', [])
-      ps
-  (s''', d') <- df s'' d
-  return (s''', SubProof fs' ps' d')
-
-type EffectState inner = RWS (ComponentInfo ROOT) [Schedule Action] Model inner
-
--- TODO comment
-updateSymbols :: Effect ROOT Model Action
-updateSymbols = do
-  functionSymbols .= M.empty
-  predicateSymbols .= M.empty
-  proof <~ (use proof >>= mapPAccumL goFormula goLine 1 <&> snd)
- where
-  goFormula :: Int -> Assumption -> EffectState (Int, Assumption)
-  goFormula n a@(Unparsed{}) = pure (n + 1, a)
-  goFormula n a =
-    let (formula, txt) = (fromWrapper a, getText a)
-     in do
-          fsyms <- use functionSymbols
-          psyms <- use predicateSymbols
-          a' <- go n fsyms psyms txt formula
-          return (n + 1, a')
-   where
-    goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> EffectState (Maybe Text)
-    goArgs n fsyms = foldM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
-     where
-      goTerm :: Int -> Map Text (Int, Pos) -> Term -> EffectState (Maybe Text)
-      goTerm _ _ (Var{}) = return Nothing
-      goTerm n fsyms (Fun name args) = do
-        -- first check inner symbols
-        mTermError <- goArgs n fsyms args
-        case mTermError of
-          Just termError -> return $ Just termError
-          Nothing ->
-            -- then check the function symbol
-            case fsyms M.!? name of
-              Nothing -> do
-                functionSymbols %= M.insert name (length args, n)
-                return Nothing
-              Just (expLen, pos) ->
-                return $
-                  if expLen == length args
-                    then Nothing
-                    else Just . T.pack $ "Function symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments."
-    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> EffectState Assumption
-    go n fsyms psyms txt formula@(Predicate name args) = do
-      -- first check function symbols
-      mTermError <- goArgs n fsyms args
-      case mTermError of
-        Just termError -> return $ ParsedInvalid txt termError formula
-        -- then check the predicate symbol
-        Nothing ->
-          case psyms M.!? name of
-            Nothing -> do
-              predicateSymbols %= M.insert name (length args, n)
-              return (ParsedValid txt formula)
-            Just (expLen, pos) ->
-              return $
-                if expLen == length args
-                  then ParsedValid txt formula
-                  -- TODO singular/plural!
-                  else ParsedInvalid txt (T.pack $ "Predicate symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments.") formula
-    go n fsyms psyms txt (UnaryOp name formula) = go n fsyms psyms txt formula <&> (UnaryOp name <$>)
-    go n fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
-      f1 <- go n fsyms psyms txt formula1
-      f2 <- go n fsyms psyms txt formula2
-      case f1 of
-        -- (Unparsed _ err) -> return (Unparsed txt err)
-        (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
-        (ParsedValid _ _) -> case f2 of
-          -- (Unparsed _ err) -> return (Unparsed txt err)
-          (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
-          (ParsedValid _ _) -> return (ParsedValid txt f)
-    go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
-  goLine :: Int -> Derivation -> EffectState (Int, Derivation)
-  goLine n (Derivation f r) = do
-    (n', f') <- goFormula n f
-    return (n', Derivation f' r)
-
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 -- Drag n Drop events
@@ -232,18 +116,18 @@ updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
     Nothing -> pure ()
-    Just addr -> proof %= lRemove addr
+    Just addr -> proof %= pRemove addr
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pure ()
-    Just sourceAddr -> proof %= lMove targetAddr pos sourceAddr
+    Just sourceAddr -> proof %= pMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pure ()
     -- TODO adjust linenos
-    Just SpawnLine -> proof %=? lInsert (Right . ProofLine $ Derivation (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")) targetAddr pos
-    Just SpawnProof -> proof %=? lInsert (Right $ SubProof [tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"] [] (Derivation (tryParse m [] 0 "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))) targetAddr pos
-    Just SpawnAssumption -> proof %=? lInsert (Left (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
+    Just SpawnLine -> proof %=? pInsert (Right . ProofLine $ Derivation (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")) targetAddr pos
+    Just SpawnProof -> proof %=? pInsert (Right $ SubProof [tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"] [] (Derivation (tryParse m [] 0 "Formula") (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))) targetAddr pos
+    Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -274,7 +158,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = updateSymbols
+updateModel Change = regenerateSymbols
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -288,15 +172,15 @@ updateModel (Input str ref) = do
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   let p = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
-  proof %= lUpdateFormula (const p) addr
-  updateSymbols
+  proof %= pUpdateFormula (const p) addr
+  regenerateSymbols
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
 updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
   let r = tryParse m (m ^. unaryOperators ++ m ^. binaryOperators ++ m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
-  proof %= lUpdateRule (const r) addr
+  proof %= pUpdateRule (const r) addr
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
@@ -305,9 +189,9 @@ updateModel (ProcessParens eaddr start end) = do
   p <- use proof
   case eaddr of
     Left addr ->
-      proof %= lUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
+      proof %= pUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
-      proof %= lUpdateRule (\r -> fromRight r $ update m (getText r)) addr
+      proof %= pUpdateRule (\r -> fromRight r $ update m (getText r)) addr
  where
   update :: Model -> Text -> Either (Wrapper Formula) (Wrapper RuleApplication)
   update m txt =

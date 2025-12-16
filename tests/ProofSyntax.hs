@@ -126,59 +126,59 @@ prop_lRemoveMinus1 :: Proof -> Property
 prop_lRemoveMinus1 (ProofLine{}) = discard
 prop_lRemoveMinus1 p@(SubProof{}) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    lLength (lRemove a p) === lLength p - 1
+    pLength (pRemove a p) === pLength p - 1
 
 prop_lRemoveShift :: Proof -> Property
 prop_lRemoveShift p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    lIsLine (incrementNodeAddr a) p
-      ==> lLookup a (lRemove a p)
-      === lLookup (incrementNodeAddr a) p
+    pIsLine (incrementNodeAddr a) p
+      ==> pLookup a (pRemove a p)
+      === pLookup (incrementNodeAddr a) p
 
 lRemoveQCTests :: TestTree
 lRemoveQCTests =
   testGroup
-    "Testing lRemove"
+    "Testing pRemove"
     [ QC.testProperty "prop_lRemoveMinus1" prop_lRemoveMinus1
     , QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
--- TESTING lInsert
+-- TESTING pInsert
 prop_lInsertBeforeFormulaPlus1 :: Proof -> Property
 prop_lInsertBeforeFormulaPlus1 (ProofLine{}) = discard
 prop_lInsertBeforeFormulaPlus1 p@(SubProof{}) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    lLength (fromJust (lInsert (Left $ formula 0) a Before p)) === lLength p + 1
+    pLength (fromJust (pInsert (Left $ formula 0) a Before p)) === pLength p + 1
 
 prop_lInsertAfterFormulaPlus1 :: Proof -> Property
 prop_lInsertAfterFormulaPlus1 p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    lLength (fromJust (lInsert (Left $ formula 0) a After p)) === lLength p + 1
+    pLength (fromJust (pInsert (Left $ formula 0) a After p)) === pLength p + 1
 
 prop_lInsertlLookupFormulaBefore :: Proof -> Property
 prop_lInsertlLookupFormulaBefore p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    lLookup a (fromJust (lInsert (Left $ formula 0) a Before p)) === Just (Left $ formula 0)
+    pLookup a (fromJust (pInsert (Left $ formula 0) a Before p)) === Just (Left $ formula 0)
 
 prop_lInsertlLookupFormulaAfter :: Proof -> Property
 prop_lInsertlLookupFormulaAfter p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    lLookup (incrementNodeAddr a) (fromJust (lInsert (Left $ formula 0) a After p)) === Just (Left $ formula 0)
+    pLookup (incrementNodeAddr a) (fromJust (pInsert (Left $ formula 0) a After p)) === Just (Left $ formula 0)
 
 prop_lInsertBeforeLinePlus1 :: Proof -> Property
 prop_lInsertBeforeLinePlus1 p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    lLength (fromJust (lInsert (Right . ProofLine $ derivation 0) a Before p)) === lLength p + 1
+    pLength (fromJust (pInsert (Right . ProofLine $ derivation 0) a Before p)) === pLength p + 1
 
 prop_lInsertAfterLinePlus1 :: Proof -> Property
 prop_lInsertAfterLinePlus1 p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    lLength (fromJust (lInsert (Right . ProofLine $ derivation 0) a After p)) === lLength p + 1
+    pLength (fromJust (pInsert (Right . ProofLine $ derivation 0) a After p)) === pLength p + 1
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
   testGroup
-    "Testing lInsert"
+    "Testing pInsert"
     [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1
     , QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1
     , QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore
@@ -188,7 +188,7 @@ lInsertQCTests =
     ]
 
 prop_fromLineNoInverse :: Proof -> Property
-prop_fromLineNoInverse p = forAll (chooseInt (1, lLength p - 1)) $ \n ->
+prop_fromLineNoInverse p = forAll (chooseInt (1, pLength p - 1)) $ \n ->
   isJust (fromLineNo n p)
     ==> fromNodeAddr (fromJust $ fromLineNo n p) p
     === Just n

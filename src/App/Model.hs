@@ -1,9 +1,12 @@
 module App.Model where
 
+import Control.Monad (foldM)
+import Control.Monad.RWS (MonadState)
 import Data.List qualified as L
 import Data.Map (Map)
 import Data.Map qualified as M
-import Data.Text (Text)
+import Data.Maybe (isJust)
+import Data.Text (Text, pack)
 import Fitch.Proof
 import Miso (
   App,
@@ -30,11 +33,14 @@ import Miso (
   text,
  )
 import Miso.CSS qualified as CSS
-import Miso.Lens (Lens, lens, use, (.=), (^.))
+import Miso.Lens
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 
 -----------------------------------------------------------------------------
+
+-- * Types
+
 data DropLocation where
   LocationAddr :: NodeAddr -> InsertPosition -> DropLocation
   LocationBin :: DropLocation
@@ -66,22 +72,6 @@ data Action where
   KeyDownStop :: Either NodeAddr NodeAddr -> Action
 
 -----------------------------------------------------------------------------
-initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
-initialModel p unaryOperators binaryOperators quantifiers =
-  Model
-    { _focusedLine = Nothing
-    , _proof = p
-    , _dragTarget = Nothing
-    , _spawnType = Nothing
-    , _currentLineBefore = Nothing
-    , _currentLineAfter = Nothing
-    , _dragging = False
-    , _unaryOperators = unaryOperators
-    , _binaryOperators = binaryOperators
-    , _quantifiers = quantifiers
-    , _functionSymbols = M.empty
-    , _predicateSymbols = M.empty
-    }
 
 type Pos = Int
 
@@ -127,6 +117,25 @@ data Model = Model
   }
   deriving (Show, Eq)
 
+-- * Initial constructors
+initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
+initialModel p unaryOperators binaryOperators quantifiers =
+  Model
+    { _focusedLine = Nothing
+    , _proof = p
+    , _dragTarget = Nothing
+    , _spawnType = Nothing
+    , _currentLineBefore = Nothing
+    , _currentLineAfter = Nothing
+    , _dragging = False
+    , _unaryOperators = unaryOperators
+    , _binaryOperators = binaryOperators
+    , _quantifiers = quantifiers
+    , _functionSymbols = M.empty
+    , _predicateSymbols = M.empty
+    }
+
+-- * Lenses
 focusedLine :: Lens Model (Maybe (Either NodeAddr NodeAddr))
 focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
 
@@ -162,3 +171,87 @@ functionSymbols = lens (._functionSymbols) $ \model fs -> model{_functionSymbols
 
 predicateSymbols :: Lens Model (Map Text (Int, Pos))
 predicateSymbols = lens (._predicateSymbols) $ \model ps -> model{_predicateSymbols = ps}
+
+-- * Semantic checking
+
+{- | Recalculates the list of functionsymbols and predicatesymbols in the model.
+
+This is done by iterating over the proof and collecting all symbols.
+The first occurence of a symbol fixes its arity, and all following symbols with the same name are compared to this arity.
+-}
+regenerateSymbols :: forall m. (MonadState Model m) => m ()
+regenerateSymbols = do
+  functionSymbols .= M.empty
+  predicateSymbols .= M.empty
+  proof <~ (use proof >>= pMapMAccumL goFormula goLine 1 <&> snd)
+ where
+  -- collect symbols inside a formula
+  goFormula :: Int -> Assumption -> m (Int, Assumption)
+  -- skip unparsed formulae
+  goFormula n a@(Unparsed{}) = pure (n + 1, a)
+  goFormula n a =
+    let (formula, txt) = (fromWrapper a, getText a)
+     in do
+          -- fetch current lists of symbols
+          fsyms <- use functionSymbols
+          psyms <- use predicateSymbols
+          a' <- go n fsyms psyms txt formula
+          return (n + 1, a')
+   where
+    goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> m (Maybe Text)
+    goArgs n fsyms = foldM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
+     where
+      goTerm :: Int -> Map Text (Int, Pos) -> Term -> m (Maybe Text)
+      goTerm _ _ (Var{}) = return Nothing
+      goTerm n fsyms (Fun name args) = do
+        -- first check inner symbols
+        mTermError <- goArgs n fsyms args
+        case mTermError of
+          Just termError -> return $ Just termError
+          Nothing ->
+            -- then check the function symbol
+            case fsyms M.!? name of
+              Nothing -> do
+                functionSymbols %= M.insert name (length args, n)
+                return Nothing
+              Just (expLen, pos) ->
+                return $
+                  if expLen == length args
+                    then Nothing
+                    else Just . pack $ "Function symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments."
+    -- proccesses a single formula.
+    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> m Assumption
+    go n fsyms psyms txt formula@(Predicate name args) = do
+      -- first check function symbols
+      mTermError <- goArgs n fsyms args
+      case mTermError of
+        Just termError -> return $ ParsedInvalid txt termError formula
+        -- then check the predicate symbol
+        Nothing ->
+          case psyms M.!? name of
+            Nothing -> do
+              predicateSymbols %= M.insert name (length args, n)
+              return (ParsedValid txt formula)
+            Just (expLen, pos) ->
+              return $
+                if expLen == length args
+                  then ParsedValid txt formula
+                  -- TODO singular/plural!
+                  else ParsedInvalid txt (pack $ "Predicate symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments.") formula
+    go n fsyms psyms txt (UnaryOp name formula) = go n fsyms psyms txt formula <&> (UnaryOp name <$>)
+    go n fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
+      f1 <- go n fsyms psyms txt formula1
+      f2 <- go n fsyms psyms txt formula2
+      case f1 of
+        -- (Unparsed _ err) -> return (Unparsed txt err)
+        (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
+        (ParsedValid _ _) -> case f2 of
+          -- (Unparsed _ err) -> return (Unparsed txt err)
+          (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
+          (ParsedValid _ _) -> return (ParsedValid txt f)
+    go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
+  -- proccesses a single line, by proccessing its formula.
+  goLine :: Int -> Derivation -> m (Int, Derivation)
+  goLine n (Derivation f r) = do
+    (n', f') <- goFormula n f
+    return (n', Derivation f' r)
