@@ -90,12 +90,8 @@ data Model = Model
   -- ^ the line after which the user currently hovers
   , _dragging :: Bool
   -- ^ denotes whether the user is currently dragging an element
-  , _unaryOperators :: [(Text, Text)]
-  {- ^ list of unary operators, consisting of (alias, symbol)
-  where alias is an alternative notation for the symbol
-  -}
-  , _binaryOperators :: [(Text, Text)]
-  {- ^ list of binary operators, consisting of (alias, symbol)
+  , _operators :: [(Text, Text, Int)]
+  {- ^ list of operators, consisting of (alias, symbol, arity)
   where alias is an alternative notation for the symbol
   -}
   , _quantifiers :: [(Text, Text)]
@@ -114,12 +110,23 @@ data Model = Model
   * arity :: Int
   * first occurence :: Pos
   -}
+  , _rules :: Map Name RuleSpec
+  -- ^ A map that contains all rules, mapping their names to their specification
   }
   deriving (Show, Eq)
 
 -- * Initial constructors
-initialModel :: Proof -> [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Model
-initialModel p unaryOperators binaryOperators quantifiers =
+initialModel ::
+  -- | The starting proof
+  Proof ->
+  -- | A list of operators (alias, operator, arity)
+  [(Text, Text, Int)] ->
+  -- | A list of quantifiers (alias, quantifier)
+  [(Text, Text)] ->
+  -- | The map of rules
+  Map Name RuleSpec ->
+  Model
+initialModel p operators quantifiers rules =
   Model
     { _focusedLine = Nothing
     , _proof = p
@@ -128,11 +135,11 @@ initialModel p unaryOperators binaryOperators quantifiers =
     , _currentLineBefore = Nothing
     , _currentLineAfter = Nothing
     , _dragging = False
-    , _unaryOperators = unaryOperators
-    , _binaryOperators = binaryOperators
+    , _operators = operators
     , _quantifiers = quantifiers
     , _functionSymbols = M.empty
     , _predicateSymbols = M.empty
+    , _rules = rules
     }
 
 -- * Lenses
@@ -157,11 +164,8 @@ currentLineAfter = lens (._currentLineAfter) $ \model dt -> model{_currentLineAf
 dragging :: Lens Model Bool
 dragging = lens (._dragging) $ \model d -> model{_dragging = d}
 
-unaryOperators :: Lens Model [(Text, Text)]
-unaryOperators = lens (._unaryOperators) $ \model uo -> model{_unaryOperators = uo}
-
-binaryOperators :: Lens Model [(Text, Text)]
-binaryOperators = lens (._binaryOperators) $ \model bo -> model{_binaryOperators = bo}
+operators :: Lens Model [(Text, Text, Int)]
+operators = lens (._operators) $ \model op -> model{_operators = op}
 
 quantifiers :: Lens Model [(Text, Text)]
 quantifiers = lens (._quantifiers) $ \model q -> model{_quantifiers = q}
@@ -171,6 +175,9 @@ functionSymbols = lens (._functionSymbols) $ \model fs -> model{_functionSymbols
 
 predicateSymbols :: Lens Model (Map Text (Int, Pos))
 predicateSymbols = lens (._predicateSymbols) $ \model ps -> model{_predicateSymbols = ps}
+
+rules :: Lens Model (Map Name RuleSpec)
+rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 -- * Semantic checking
 
@@ -238,17 +245,16 @@ regenerateSymbols = do
                   then ParsedValid txt formula
                   -- TODO singular/plural!
                   else ParsedInvalid txt (pack $ "Predicate symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments.") formula
-    go n fsyms psyms txt (UnaryOp name formula) = go n fsyms psyms txt formula <&> (UnaryOp name <$>)
-    go n fsyms psyms txt f@(BinaryOp name formula1 formula2) = do
-      f1 <- go n fsyms psyms txt formula1
-      f2 <- go n fsyms psyms txt formula2
-      case f1 of
-        -- (Unparsed _ err) -> return (Unparsed txt err)
-        (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
-        (ParsedValid _ _) -> case f2 of
-          -- (Unparsed _ err) -> return (Unparsed txt err)
-          (ParsedInvalid _ err _) -> return (ParsedInvalid txt err f)
-          (ParsedValid _ _) -> return (ParsedValid txt f)
+    go n fsyms psyms txt form@(Op name fs) = foldM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
+     where
+      combineWrappers :: Wrapper Formula -> Wrapper Formula -> Wrapper Formula
+      combineWrappers (Unparsed _ err) _ = Unparsed txt err
+      combineWrappers (ParsedInvalid{}) (Unparsed _ err) = Unparsed txt err
+      combineWrappers (ParsedInvalid _ err _) (ParsedInvalid{}) = ParsedInvalid txt err form
+      combineWrappers (ParsedInvalid _ err _) (ParsedValid{}) = ParsedInvalid txt err form
+      combineWrappers (ParsedValid{}) (Unparsed _ err) = Unparsed txt err
+      combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
+      combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
     go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
   -- proccesses a single line, by proccessing its formula.
   goLine :: Int -> Derivation -> m (Int, Derivation)

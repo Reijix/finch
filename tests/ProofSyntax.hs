@@ -70,9 +70,13 @@ instance Arbitrary Formula where
   arbitrary :: Gen Formula
   arbitrary = return $ Predicate "Formula" []
 
-instance Arbitrary Rule where
-  arbitrary :: Gen Rule
-  arbitrary = fmap (Rule "Rule" []) arbitrary
+instance Arbitrary FormulaWP where
+  arbitrary :: Gen FormulaWP
+  arbitrary = return $ FPredicate "Formula" []
+
+instance Arbitrary RuleSpec where
+  arbitrary :: Gen RuleSpec
+  arbitrary = fmap (RuleSpec []) arbitrary
 
 instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication

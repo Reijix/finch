@@ -1,23 +1,23 @@
 module Main where
 
-import App.Model (binaryOperators)
+import App.Model (operators)
 import App.Runner
+import Data.Map qualified as M
 import Data.Text
 import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof unaryOperators binaryOperators quantifiers
+main = runApp exProof operators quantifiers M.empty
  where
-  unaryOperators = [("~", "¬")]
-  binaryOperators = [("/\\", "∧"), ("\\/", "∨"), ("->", "→")]
+  operators = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
   quantifiers = [("forall", "∀")]
-  fakeModel = initialModel undefined unaryOperators binaryOperators quantifiers
+  fakeModel = initialModel undefined operators quantifiers M.empty
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] 0
+  mkFormula = tryParse fakeModel [] [] 0
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
-  mkRuleApplication = tryParse fakeModel [] 0
+  mkRuleApplication = tryParse fakeModel [] [] 0
 
   mkDerivation :: Text -> Text -> Derivation
   mkDerivation f r = Derivation (mkFormula f) (mkRuleApplication r)
@@ -36,18 +36,5 @@ main = runApp exProof unaryOperators binaryOperators quantifiers
           (mkDerivation "A ∨ B" "(∨I) 4")
       ]
       (mkDerivation "A ∧ B" "(∧I)")
-
------------------------------------------------------------------------------
-
--- exProof :: Proof
--- exProof = SubProof [Parsed "A" $ Predicate "A" []] [] (Derivation (Parsed "A" $ Predicate "A" []) (Parsed "Re" $ RuleApplication (Rule "Re" [] (Predicate "A" [])) []))
-
--- SubProof
---   [formula "Formula", formula "Formula"]
---   [ ProofLine (Derivation (formula "Formula") (rule "rule" [])),
---     SubProof [formula "Formula"] [ProofLine (Derivation (formula "Formula") (rule "rule" []))] (Derivation (formula "Formula") (rule "rule" [])),
---     SubProof [formula "Formula"] [ProofLine (Derivation (formula "Formula") (rule "rule" []))] (Derivation (formula "Formula") (rule "rule" []))
---   ]
---   (Derivation (formula "Formula") (rule "rule" []))
 
 -----------------------------------------------------------------------------

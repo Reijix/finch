@@ -69,6 +69,7 @@ executable fitch-editor-FOL
 
   build-depends:
     base >=4.21.0 && <5,
+    containers >=0.7 && <0.9,
     fitch-editor-lib,
     text >=2.1.2 && <2.2,
 
@@ -90,6 +91,7 @@ executable fitch-editor-Prop
 
   build-depends:
     base >=4.21.0 && <5,
+    containers >=0.7 && <0.9,
     fitch-editor-lib,
     text >=2.1.2 && <2.2,
 

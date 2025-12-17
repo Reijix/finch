@@ -1,19 +1,19 @@
 module Main where
 
-import App.Model (binaryOperators)
+import App.Model (operators)
 import App.Runner
+import Data.Map qualified as M
 import Data.Text
 import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof unaryOperators binaryOperators []
+main = runApp exProof operators [] M.empty
  where
-  unaryOperators = [("~", "¬")]
-  binaryOperators = [("/\\", "∧"), ("\\/", "∨"), ("->", "→")]
-  fakeModel = initialModel undefined unaryOperators binaryOperators []
+  operators = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
+  fakeModel = initialModel undefined operators [] M.empty
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] 0
+  mkFormula = tryParse fakeModel [] [] 0
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
   mkRuleApplication txt = Unparsed txt ""

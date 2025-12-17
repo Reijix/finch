@@ -45,11 +45,11 @@ getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
 -- | The type of a fitch rule.
-data Rule
-  = {- | A `Rule` @name@ @assumptions@ @conclusion@ consists of a name,
-    a list of assumptions that are proofs or formulae, and the conclusion.
+data RuleSpec
+  = {- | A `RuleSpec` @assumptions@ @conclusion@ consists of
+    a list of assumptions that are subproofs or formulae, and the conclusion.
     -}
-    Rule Name [Either Formula Proof] Formula
+    RuleSpec [Either FormulaWP (FormulaWP, FormulaWP, Maybe Name)] FormulaWP
   deriving (Show, Eq)
 
 type Name = Text
@@ -67,16 +67,31 @@ instance Show Term where
   show :: Term -> String
   show (Var v) = T.unpack v
   show (Fun f []) = T.unpack f
-  show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts)
+  show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+
+data Subst = Subst Name Term
+  deriving (Show, Eq)
+
+infixl 9 ~>
+(~>) :: Name -> Term -> Subst
+(~>) = Subst
+
+type Substitution = [Subst]
+
+data FormulaWP
+  = FSubst FormulaWP Subst
+  | FVar Name
+  | FPredicate Name [Term]
+  | FOp Text [FormulaWP]
+  | FQuantifier Name Name FormulaWP
+  deriving (Show, Eq)
 
 -- | A formula for first-order logic (can be instantiated to 0th order, by using `Predicate` without the list of `Term`.
 data Formula
   = -- | A single `Predicate` applied to terms
     Predicate Name [Term]
-  | -- | A unary operator, like @~@ for negation.
-    UnaryOp Text Formula
-  | -- | A binary operator, like @->@ for implication.
-    BinaryOp Text Formula Formula
+  | -- | A n-ary operator, like @->@ for implication, or @~@ for negation.
+    Op Text [Formula]
   | -- | A quantifier, like @∀@ for universal quantification.
     Quantifier Name Name Formula
   deriving (Eq, Ord)
@@ -85,8 +100,10 @@ instance Show Formula where
   show :: Formula -> String
   show (Predicate p []) = T.unpack p
   show (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-  show (UnaryOp op f) = T.unpack op ++ "(" ++ show f ++ ")"
-  show (BinaryOp op f1 f2) = "(" ++ show f1 ++ ") " ++ T.unpack op ++ " (" ++ show f2 ++ ")"
+  show (Op op fs)
+    | null fs = T.unpack op
+    | L.length fs == 2 = "(" ++ show (head fs) ++ ") " ++ T.unpack op ++ " (" ++ show (fs !! 1) ++ ")"
+    | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
   show (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
 
 -- | A reference to a line (either `Assumption` or `ProofLine`) or a `SubProof`
@@ -241,6 +258,7 @@ pMapMAccumL af df s (SubProof fs ps d) = do
 ==== Usage
 
 A `NodeAddr` may either be a reference to
+
 * a single assumption `NAAssumption` @n@,
 * the conclusion `NAConclusion` of the proof
 * a single proof or line inside the proof `NAProof` @n@ `Nothing`

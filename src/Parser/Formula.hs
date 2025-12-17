@@ -19,8 +19,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Unicode qualified as Unicode
 
 data FormulaParserState = FormulaParserState
-  { unaryOperators :: [(Text, Text)]
-  , binaryOperators :: [(Text, Text)]
+  { operators :: [(Text, Text, Int)]
   , quantifiers :: [(Text, Text)]
   }
 
@@ -64,11 +63,17 @@ pQuantifierName = do
   symbols <- ST.gets quantifiers
   foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
 
+pConstant :: FormulaParser Formula
+pConstant = do
+  ops <- ST.gets operators
+  op <- foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
+  lexeme . return $ Op op []
+
 pQuantifier :: FormulaParser Formula
 pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (string ".") >> lexeme pFormula)
 
 pFormulaAtomic :: FormulaParser Formula
-pFormulaAtomic = (pQuantifier <|> parens pFormula <|> pPredicate) <?> "formula"
+pFormulaAtomic = (pQuantifier <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
 
 binary :: Text -> (a -> a -> a) -> Operator FormulaParser a
 binary name f = InfixL (f <$ hidden (symbol name))
@@ -78,16 +83,15 @@ prefix name f = Prefix $ foldr1 (.) <$> some (f <$ hidden (symbol name))
 
 pFormula :: FormulaParser Formula
 pFormula = do
-  unaries <- ST.gets unaryOperators
-  binaries <- ST.gets binaryOperators
+  ops <- ST.gets operators
   let operatorTable =
-        [ concatMap (\(alias, u) -> [prefix alias (UnaryOp u), prefix u (UnaryOp u)]) unaries
-        , concatMap (\(alias, b) -> [binary alias (BinaryOp b), binary b (BinaryOp b)]) binaries
+        [ concatMap (\(alias, u, arity) -> if arity == 1 then [prefix alias (\f -> Op u [f]), prefix u (\f -> Op u [f])] else []) ops
+        , concatMap (\(alias, b, arity) -> if arity == 2 then [binary alias (\f1 f2 -> Op b [f1, f2]), binary b (\f1 f2 -> Op b [f1, f2])] else []) ops
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
-parseFormula :: [(Text, Text)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
-parseFormula unaryOperators binaryOperators quantifiers lineNo input = case ST.evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
+parseFormula :: [(Text, Text, Int)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
+parseFormula operators quantifiers lineNo input = case ST.evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right f) -> Right f
  where
@@ -107,7 +111,6 @@ parseFormula unaryOperators binaryOperators quantifiers lineNo input = case ST.e
       }
   initialState =
     FormulaParserState
-      { unaryOperators
-      , binaryOperators
+      { operators
       , quantifiers
       }
