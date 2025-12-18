@@ -4,18 +4,13 @@ import Data.Bifunctor
 import Data.Text (append)
 import Fitch.Proof
 
--- free variables of a term
-termFreeVars :: Term -> [Name]
-termFreeVars (Var x) = [x]
-termFreeVars (Fun _ ts) = concatMap termFreeVars ts
-
 class FreeVars a where
   freeVars :: a -> [Name]
 
 instance FreeVars Term where
   freeVars :: Term -> [Name]
   freeVars (Var x) = [x]
-  freeVars (Fun _ ts) = concatMap freeVars ts
+  freeVars (Fun _ ts) = foldr (\t ns -> foldr (!:) ns (freeVars t)) [] ts
 
 -- | Unique insertion into lists
 (!:) :: (Eq a) => a -> [a] -> [a]
@@ -59,8 +54,13 @@ instance Substitute FormulaWP where
   subst _ f@(FVar v) = f
   subst sub (FPredicate name args) = FPredicate name (map (subst sub) args)
   subst sub (FOp op fs) = FOp op (map (subst sub) fs)
-  -- TODO capture avoiding
-  subst sub (FQuantifier q v f) = undefined
+  subst s@(Subst x t) (FQuantifier q v f)
+    | x == v = FQuantifier q v f
+    | v `elem` freeVars t = subst (Subst x t) (FQuantifier q v' f')
+    | otherwise = FQuantifier q v (subst s f)
+   where
+    v' = makeFresh (makeFresh v t) f
+    f' = subst (Subst v (Var v')) f
 
 type Unifier a = [Subst]
 
@@ -79,11 +79,11 @@ instance Unify Term where
   -- (orient)
   unify ((Fun f ts, Var x) : rest) = unify $ (Var x, Fun f ts) : rest
   -- (occurs)
-  unify ((Var x, t) : _) | x `elem` termFreeVars t && Var x /= t = Nothing
+  unify ((Var x, t) : _) | x `elem` freeVars t && Var x /= t = Nothing
   -- (elim)
   unify ((Var x, t) : rest)
-    | notElem x (termFreeVars t)
-        && x `elem` concatMap (\(t1, t2) -> termFreeVars t1 ++ termFreeVars t2) rest =
+    | notElem x (freeVars t)
+        && x `elem` concatMap (\(t1, t2) -> freeVars t1 ++ freeVars t2) rest =
         unify $ (Var x, t) : map (bimap (subst (x ~> t)) (subst (x ~> t))) rest
   -- descent
   unify ((Var x, s) : rest) = do
