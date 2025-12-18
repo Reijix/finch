@@ -26,6 +26,14 @@ data Wrapper a where
   Unparsed :: Text -> Text -> Wrapper a
   deriving (Show, Eq)
 
+isUnparsed :: Wrapper a -> Bool
+isUnparsed (Unparsed{}) = True
+isUnparsed _ = False
+
+isParseValid :: Wrapper a -> Bool
+isParseValid (ParsedValid{}) = True
+isParseValid _ = False
+
 instance Functor Wrapper where
   fmap :: (a -> b) -> Wrapper a -> Wrapper b
   fmap f (ParsedValid txt x) = ParsedValid txt (f x)
@@ -63,7 +71,6 @@ data Term
   deriving (Eq, Ord)
 
 instance Show Term where
-  -- TODO verify
   show :: Term -> String
   show (Var v) = T.unpack v
   show (Fun f []) = T.unpack f
@@ -156,13 +163,13 @@ instance Show Proof where
 
 -- | Returns `True` if the proof is a `SubProof`
 isSubProof :: Proof -> Bool
-isSubProof (ProofLine{}) = False
 isSubProof (SubProof{}) = True
+isSubProof _ = False
 
 -- | Returns `True` if the proof is a `ProofLine`
 isProofLine :: Proof -> Bool
 isProofLine (ProofLine{}) = True
-isProofLine (SubProof{}) = False
+isProofLine _ = False
 
 -- | The `pLength` of a proof is its number of lines.
 pLength :: Proof -> Int
