@@ -277,7 +277,7 @@ class FromText a where
 
 instance FromText RuleSpec where
   fromText :: Model -> Int -> Text -> Either Text RuleSpec
-  fromText m n _ = Right $ RuleSpec [] (FPredicate "" [])
+  fromText m n _ = Right $ RuleSpec [] [] (FPredicate "" [])
 
 instance FromText Formula where
   fromText :: Model -> Int -> Text -> Either Text Formula

@@ -107,6 +107,7 @@ library fitch-editor-lib
     App.Runner
     App.Views
     Fitch.Proof
+    Fitch.Unification
     Parser.Formula
     Parser.Rule
 

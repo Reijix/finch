@@ -8,10 +8,11 @@ import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof operators quantifiers M.empty
+main = runApp exProof operators quantifiers rules
  where
   operators = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
   quantifiers = [("forall", "∀")]
+  rules = M.fromList []
   fakeModel = initialModel undefined operators quantifiers M.empty
   mkFormula :: Text -> Assumption
   mkFormula = tryParse fakeModel [] [] 0

@@ -76,7 +76,7 @@ instance Arbitrary FormulaWP where
 
 instance Arbitrary RuleSpec where
   arbitrary :: Gen RuleSpec
-  arbitrary = fmap (RuleSpec []) arbitrary
+  arbitrary = fmap (RuleSpec [] []) arbitrary
 
 instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication

@@ -49,7 +49,7 @@ data RuleSpec
   = {- | A `RuleSpec` @assumptions@ @conclusion@ consists of
     a list of assumptions that are subproofs or formulae, and the conclusion.
     -}
-    RuleSpec [Either FormulaWP (FormulaWP, FormulaWP, Maybe Name)] FormulaWP
+    RuleSpec [FormulaWP] [(FormulaWP, FormulaWP, Maybe Name)] FormulaWP
   deriving (Show, Eq)
 
 type Name = Text
@@ -75,8 +75,6 @@ data Subst = Subst Name Term
 infixl 9 ~>
 (~>) :: Name -> Term -> Subst
 (~>) = Subst
-
-type Substitution = [Subst]
 
 data FormulaWP
   = FSubst FormulaWP Subst
