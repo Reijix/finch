@@ -116,8 +116,13 @@ verifyProof rules = pMap id verifyRule
   verifyRule (Derivation f r) =
     let
       formula = fromWrapper f
-      (RuleApplication n rs) = fromWrapper r
+      ra@(RuleApplication ruleName refs) = fromWrapper r
+      text = getText r
      in
-      undefined
+      Derivation f $ case rules M.!? ruleName of
+        Nothing -> ParsedInvalid text ("Rule (" `append` ruleName `append` ") does not exist.") ra
+        Just spec -> case verifyReferences spec refs formula of
+          Nothing -> ParsedValid text ra
+          Just err -> ParsedInvalid text err ra
   verifyReferences :: RuleSpec -> [Reference] -> Formula -> Maybe Text
   verifyReferences = undefined

@@ -151,15 +151,15 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       H.div_
         [ onDoubleClick $ DoubleClick (Right addr)
         , HP.class_ "rule-container"
-        , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess)]
+        , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess || not semanticSuccess)]
         ]
         [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
         , H.input_
             [ HP.class_ "rule-input"
             , HP.id_ . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (model ^. proof)))
             , HP.classList_
-                [ ("parse-success", parseSuccess)
-                , ("parse-fail", not parseSuccess)
+                [ ("parse-success", parseSuccess && semanticSuccess)
+                , ("parse-fail", not parseSuccess || not semanticSuccess)
                 ]
             , HP.draggable_ False
             , HP.inert_ (Just (Right addr) /= model ^. focusedLine)
@@ -175,7 +175,7 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
      where
       (semanticSuccess, parseSuccess, ruleTxt, err) = case p of
         (ParsedValid str _) -> (True, True, ms str, "")
-        (ParsedInvalid str _ _) -> (False, True, ms str, "")
+        (ParsedInvalid str err _) -> (False, True, ms str, ms err)
         (Unparsed str err) -> (False, False, ms str, ms err)
   lineNos =
     H.div_ [HP.class_ "line-no-container"] $

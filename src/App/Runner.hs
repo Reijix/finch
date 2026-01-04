@@ -24,6 +24,7 @@ import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Fitch.Proof
+import Fitch.Verification (verifyProof)
 import Language.Javascript.JSaddle
 import Miso (
   App,
@@ -157,8 +158,14 @@ updateModel (DoubleClick ea) = do
     Right a -> do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
-updateModel Blur = focusedLine .= Nothing
-updateModel Change = regenerateSymbols
+updateModel Blur = do
+  focusedLine .= Nothing
+  ruleMap <- use rules
+  proof %= verifyProof ruleMap
+  p <- use proof
+  io_ $ consoleLog $ ms $ show p
+updateModel Change = do
+  regenerateSymbols
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
