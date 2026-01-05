@@ -125,4 +125,4 @@ verifyProof rules = pMap id verifyRule
           Nothing -> ParsedValid text ra
           Just err -> ParsedInvalid text err ra
   verifyReferences :: RuleSpec -> [Reference] -> Formula -> Maybe Text
-  verifyReferences = undefined
+  verifyReferences _ _ _ = Nothing

@@ -53,6 +53,7 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
+  Setup :: Action
   Blur :: Action
   Input :: MisoString -> DOMRef -> Action
   Change :: Action

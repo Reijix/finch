@@ -25,11 +25,12 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Fitch.Proof
 import Fitch.Verification (verifyProof)
-import Language.Javascript.JSaddle
+
+-- import Language.Javascript.JSaddle
 import Miso (
   App,
   CSS (Href),
-  Component (events, styles, subs),
+  Component (events, initialAction, styles, subs),
   ComponentInfo,
   DOMRef,
   Effect,
@@ -72,6 +73,7 @@ import Miso (
   stopSub,
   text,
  )
+import Miso.DSL
 import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
@@ -106,12 +108,17 @@ runApp proof operators quantifiers rules =
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
       , events = dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents
+      , initialAction = Just Setup
       }
  where
   m = initialModel proof operators quantifiers rules
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
+updateModel Setup = do
+  regenerateSymbols
+  ruleMap <- use rules
+  proof %= verifyProof ruleMap
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
@@ -158,14 +165,11 @@ updateModel (DoubleClick ea) = do
     Right a -> do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
-updateModel Blur = do
-  focusedLine .= Nothing
-  ruleMap <- use rules
-  proof %= verifyProof ruleMap
-  p <- use proof
-  io_ $ consoleLog $ ms $ show p
+updateModel Blur = focusedLine .= Nothing
 updateModel Change = do
   regenerateSymbols
+  ruleMap <- use rules
+  proof %= verifyProof ruleMap
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
