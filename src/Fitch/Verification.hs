@@ -7,7 +7,7 @@ import Data.Bifunctor
 import Data.Functor
 import Data.Map (Map)
 import Data.Map qualified as M
-import Data.Text (Text, append)
+import Data.Text (Text, append, pack)
 import Fitch.Proof
 
 class FreeVars a where
@@ -96,17 +96,18 @@ unifyFormulae f (FSubst fwp sub) = unifyFormulae f fwp
 unifyFormulae _ _ = Nothing
 
 {- Phases of proof verification:
-  1. Check that the formula matches the rules' conclusion.
-  2. Check that the reference types (i.e. line or proof) match the expected assumptions.
-  3. Check that the references match the expected assumptions, i.e. the form of the formula is correct.
-  4. Collect name->term mappings.
-  5. Verify name->term mappings, the datastructure should be `Map Name [Term]`
-  5. Collect name->formula mappings, using the name->term mappings to resolve substitutions.
+  1. Check that the rule exists
+  2. Check that the formula matches the rules' conclusion.
+  3. Check that the reference types (i.e. line or proof) match the expected assumptions.
+  4. Check that the references match the expected assumptions, i.e. the form of the formula is correct.
+  5. Collect name->term mappings.
+  6. Verify name->term mappings, the datastructure should be `Map Name [Term]`
+  7. Collect name->formula mappings, using the name->term mappings to resolve substitutions.
      The datastructure for name->formula mappings should be `Map Name [Either Formula [Formula]]`, where
      Name` is e.g. φ, `Formula` is a formula that has been identified as φ,
      and `[Formula]` is a list of possible formulae that
      can be identified as φ (yielded by backwards-substitution).
-  6. Now check that for every φ all its mappings can be made equal by choosing from the lists.
+  8. Now check that for every φ all its mappings can be made equal by choosing from the lists.
  -}
 verifyProof :: Map Name RuleSpec -> Proof -> Proof
 verifyProof rules = pMap id verifyRule
@@ -114,15 +115,28 @@ verifyProof rules = pMap id verifyRule
   verifyRule :: Derivation -> Derivation
   verifyRule d@(Derivation _ (Unparsed{})) = d
   verifyRule (Derivation f r) =
-    let
-      formula = fromWrapper f
-      ra@(RuleApplication ruleName refs) = fromWrapper r
-      text = getText r
-     in
-      Derivation f $ case rules M.!? ruleName of
-        Nothing -> ParsedInvalid text ("Rule (" `append` ruleName `append` ") does not exist.") ra
-        Just spec -> case verifyReferences spec refs formula of
-          Nothing -> ParsedValid text ra
-          Just err -> ParsedInvalid text err ra
-  verifyReferences :: RuleSpec -> [Reference] -> Formula -> Maybe Text
-  verifyReferences _ _ _ = Nothing
+    -- 1. Check that the rule exists
+    Derivation f $ case rules M.!? ruleName of
+      Nothing -> ParsedInvalid ruleText ("Rule (" <> ruleName <> ") does not exist.") ra
+      -- 2. Check that  the formula matches the rules' conclusion
+      Just spec -> case checkConclusion spec formula of
+        Just err -> ParsedInvalid ruleText err ra
+        Nothing -> case verifyReferences spec refs formula of
+          Nothing -> ParsedValid ruleText ra
+          Just err -> ParsedInvalid ruleText err ra
+   where
+    formula = fromWrapper f
+    formulaText = getText f
+    ra@(RuleApplication ruleName refs) = fromWrapper r
+    ruleText = getText r
+    checkConclusion :: RuleSpec -> Formula -> Maybe Text
+    checkConclusion (RuleSpec _ _ expected) actual = case unifyFormulae actual expected of
+      Nothing ->
+        Just $
+          "Rule cannot be applied to "
+            <> formulaText
+            <> "\nExpecting a formula of the form "
+            <> pack (show expected)
+      Just _ -> Nothing
+    verifyReferences :: RuleSpec -> [Reference] -> Formula -> Maybe Text
+    verifyReferences _ _ _ = Nothing

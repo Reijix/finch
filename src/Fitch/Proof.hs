@@ -3,6 +3,8 @@ module Fitch.Proof where
 import Control.Monad (foldM, liftM3)
 import Data.List qualified as L
 import Data.Maybe (fromMaybe)
+import Data.Set (Set)
+import Data.Set qualified as S
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Traversable (mapAccumL)
@@ -89,7 +91,22 @@ data FormulaWP
   | FPredicate Name [Term]
   | FOp Text [FormulaWP]
   | FQuantifier Name Name FormulaWP
-  deriving (Show, Eq)
+  deriving (Eq)
+
+instance Show FormulaWP where
+  show :: FormulaWP -> String
+  show f = go False f
+   where
+    go :: Bool -> FormulaWP -> String
+    go _ (FPredicate p []) = T.unpack p
+    go _ (FPredicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+    go _ (FVar n) = T.unpack n
+    go True f = "(" ++ go False f ++ ")"
+    go _ (FOp op fs)
+      | null fs = T.unpack op
+      | L.length fs == 2 = L.intercalate (" " ++ T.unpack op ++ " ") (map (go True) fs)
+      | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
+    go _ (FQuantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
 
 -- | A formula for first-order logic (can be instantiated to 0th order, by using `Predicate` without the list of `Term`.
 data Formula
@@ -103,13 +120,17 @@ data Formula
 
 instance Show Formula where
   show :: Formula -> String
-  show (Predicate p []) = T.unpack p
-  show (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-  show (Op op fs)
-    | null fs = T.unpack op
-    | L.length fs == 2 = "(" ++ show (head fs) ++ ") " ++ T.unpack op ++ " (" ++ show (fs !! 1) ++ ")"
-    | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
-  show (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
+  show f = go False f
+   where
+    go :: Bool -> Formula -> String
+    go _ (Predicate p []) = T.unpack p
+    go _ (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+    go True f = "(" ++ go False f ++ ")"
+    go _ (Op op fs)
+      | null fs = T.unpack op
+      | L.length fs == 2 = L.intercalate (T.unpack op) (map (go True) fs)
+      | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
+    go _ (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
 
 -- | A reference to a line (either `Assumption` or `ProofLine`) or a `SubProof`
 data Reference where
