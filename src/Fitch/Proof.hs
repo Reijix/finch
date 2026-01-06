@@ -445,6 +445,21 @@ pLookup (NAProof n Nothing) (SubProof _ ps _)
   | n < L.length ps = Just . Right $ ps !! n
 pLookup _ _ = Nothing
 
+pIndex :: Int -> Proof -> Maybe (Either Assumption Proof)
+pIndex n p = case fromLineNo n p of
+  Nothing -> Nothing
+  Just addr -> pLookup addr p
+
+extractFormula :: Either Assumption Proof -> Formula
+extractFormula (Left a) = fromWrapper a
+extractFormula (Right (ProofLine (Derivation f _))) = fromWrapper f
+extractFormula _ = error "could not extract formula."
+
+extractText :: Either Assumption Proof -> Text
+extractText (Left a) = getText a
+extractText (Right (ProofLine (Derivation f _))) = getText f
+extractText _ = error "could not extract text."
+
 -- * Updating proof contents
 
 {- | `pUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ using @f@.

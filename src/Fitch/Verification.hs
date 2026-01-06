@@ -4,9 +4,11 @@ import App.Model (Model)
 import Control.Monad (foldM, liftM2)
 import Control.Monad.RWS (MonadState)
 import Data.Bifunctor
+import Data.Either (fromLeft)
 import Data.Functor
 import Data.Map (Map)
 import Data.Map qualified as M
+import Data.Maybe (fromJust)
 import Data.Text (Text, append, pack)
 import Fitch.Proof
 
@@ -98,37 +100,50 @@ unifyFormulae _ _ = Nothing
 {- Phases of proof verification:
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
-  3. Check that the reference types (i.e. line or proof) match the expected assumptions.
-  4. Check that the references match the expected assumptions, i.e. the form of the formula is correct.
+  3. Check that the reference types (i.e. line or proof)
+     match the expected assumptions.
+  4. Check that the references match the expected assumptions,
+     i.e. the form of the formula is correct.
   5. Collect name->term mappings.
   6. Verify name->term mappings, the datastructure should be `Map Name [Term]`
-  7. Collect name->formula mappings, using the name->term mappings to resolve substitutions.
-     The datastructure for name->formula mappings should be `Map Name [Either Formula [Formula]]`, where
+  7. Collect name->formula mappings, using the name->term mappings
+     to resolve substitutions.
+     The datastructure for name->formula mappings should be `
+     Map Name [Either Formula [Formula]]`, where
      Name` is e.g. φ, `Formula` is a formula that has been identified as φ,
      and `[Formula]` is a list of possible formulae that
      can be identified as φ (yielded by backwards-substitution).
-  8. Now check that for every φ all its mappings can be made equal by choosing from the lists.
+  8. Now check that for every φ all its mappings can be made equal by
+     choosing from the lists.
  -}
 verifyProof :: Map Name RuleSpec -> Proof -> Proof
-verifyProof rules = pMap id verifyRule
+verifyProof rules p = pMap id verifyRule p
  where
   verifyRule :: Derivation -> Derivation
   verifyRule d@(Derivation _ (Unparsed{})) = d
   verifyRule (Derivation f r) =
-    -- 1. Check that the rule exists
-    Derivation f $ case rules M.!? ruleName of
-      Nothing -> ParsedInvalid ruleText ("Rule (" <> ruleName <> ") does not exist.") ra
-      -- 2. Check that  the formula matches the rules' conclusion
-      Just spec -> case checkConclusion spec formula of
+    -- 1. Check that the rule exists.
+    Derivation f $ case checkExistence rules of
+      Left err -> ParsedInvalid ruleText err ra
+      -- 2. Check that the formula matches the rules' conclusion.
+      Right spec -> case checkConclusion spec formula of
         Just err -> ParsedInvalid ruleText err ra
-        Nothing -> case verifyReferences spec refs formula of
-          Nothing -> ParsedValid ruleText ra
+        -- 3. Check that the reference types match expected assumptions.
+        Nothing -> case verifyReferences 0 spec refs of
           Just err -> ParsedInvalid ruleText err ra
+          -- 4. Check that formulae match given lines.
+          Nothing -> case matchReferences spec refs of
+            Just err -> ParsedInvalid ruleText err ra
+            Nothing -> ParsedValid ruleText ra
    where
     formula = fromWrapper f
     formulaText = getText f
     ra@(RuleApplication ruleName refs) = fromWrapper r
     ruleText = getText r
+    checkExistence :: Map Name RuleSpec -> Either Text RuleSpec
+    checkExistence rules = case rules M.!? ruleName of
+      Nothing -> Left ("Rule (" <> ruleName <> ") does not exist.")
+      Just spec -> Right spec
     checkConclusion :: RuleSpec -> Formula -> Maybe Text
     checkConclusion (RuleSpec _ _ expected) actual = case unifyFormulae actual expected of
       Nothing ->
@@ -138,5 +153,92 @@ verifyProof rules = pMap id verifyRule
             <> "\nExpecting a formula of the form "
             <> pack (show expected)
       Just _ -> Nothing
-    verifyReferences :: RuleSpec -> [Reference] -> Formula -> Maybe Text
+    matchReferences :: RuleSpec -> [Reference] -> Maybe Text
+    matchReferences (RuleSpec (f : fs) ps c) (LineReference line : refs) =
+      case unifyFormulae (extractFormula . fromJust $ pIndex line p) f of
+        Nothing ->
+          Just $
+            "Found "
+              <> (extractText . fromJust $ pIndex line p)
+              <> " at line "
+              <> pack (show line)
+              <> ".\nBut expected a formula of the form "
+              <> pack (show f)
+              <> "."
+        Just _ -> matchReferences (RuleSpec fs ps c) refs
+    matchReferences (RuleSpec [] ((startF, endF, _) : ps) c) (ProofReference start end : refs) =
+      case unifyFormulae (extractFormula . fromJust $ pIndex start p) startF of
+        Nothing ->
+          Just $
+            "Found "
+              <> (extractText . fromJust $ pIndex start p)
+              <> " at line "
+              <> pack (show start)
+              <> ".\nBut expected a formula of the form "
+              <> pack (show startF)
+              <> "."
+        Just _ -> case unifyFormulae (extractFormula . fromJust $ pIndex end p) endF of
+          Nothing ->
+            Just $
+              "Found "
+                <> (extractText . fromJust $ pIndex end p)
+                <> " at line "
+                <> pack (show end)
+                <> ".\nBut expected a formula of the form "
+                <> pack (show endF)
+                <> "."
+          Just _ -> matchReferences (RuleSpec [] ps c) refs
+    matchReferences _ _ = Nothing
+    verifyReferences :: Int -> RuleSpec -> [Reference] -> Maybe Text
+    verifyReferences n (RuleSpec (_ : fs) ps f) (LineReference{} : refs) =
+      verifyReferences (n + 1) (RuleSpec fs ps f) refs
+    verifyReferences n (RuleSpec [] (p : ps) f) (ProofReference{} : refs) =
+      verifyReferences (n + 1) (RuleSpec [] ps f) refs
+    verifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
+      Just $
+        "Rule ("
+          <> ruleName
+          <> ") expects a single line at position "
+          <> pack (show n)
+          <> " but got the range "
+          <> pack (show start)
+          <> "-"
+          <> pack (show end)
+          <> "."
+    verifyReferences n (RuleSpec [] (_ : _) _) (LineReference line : refs) =
+      Just $
+        "Rule ("
+          <> ruleName
+          <> ") expects a line range at position "
+          <> pack (show n)
+          <> " but got the single line "
+          <> pack (show line)
+          <> "."
+    verifyReferences n (RuleSpec (_ : fs) ps _) [] =
+      Just $
+        "Rule ("
+          <> ruleName
+          <> ") expects "
+          <> pack (show $ n + length fs + length ps + 1)
+          <> " references,\nbut got "
+          <> pack (show n)
+          <> " references."
+    verifyReferences n (RuleSpec [] (_ : ps) _) [] =
+      Just $
+        "Rule ("
+          <> ruleName
+          <> ") expects "
+          <> pack (show $ n + length ps + 1)
+          <> " references,\nbut got "
+          <> pack (show n)
+          <> " references."
+    verifyReferences n (RuleSpec [] [] _) (_ : refs) =
+      Just $
+        "Rule ("
+          <> ruleName
+          <> ") expects "
+          <> pack (show n)
+          <> " references,\nbut got "
+          <> pack (show $ n + length refs + 1)
+          <> " references."
     verifyReferences _ _ _ = Nothing

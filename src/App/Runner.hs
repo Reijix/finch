@@ -185,6 +185,8 @@ updateModel (ProcessInput str start end (Left addr)) = do
   let p = tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
   proof %= pUpdateFormula (const p) addr
   regenerateSymbols
+  ruleMap <- use rules
+  proof %= verifyProof ruleMap
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
@@ -192,6 +194,8 @@ updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
   let r = tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
   proof %= pUpdateRule (const r) addr
+  ruleMap <- use rules
+  proof %= verifyProof ruleMap
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)

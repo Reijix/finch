@@ -18,7 +18,7 @@ main = runApp exProof operators quantifiers rules
       , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
       , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
       , ("→I", RuleSpec [] [(phi, psi, Nothing)] (phi → psi))
-      , ("→E", RuleSpec [phi → psi, phi] [] psi)
+      , ("→E", RuleSpec [phi, phi → psi] [] psi)
       , ("¬I", RuleSpec [] [(phi, bot, Nothing)] psi)
       , ("¬E", RuleSpec [phi, neg phi] [] bot)
       , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
