@@ -80,9 +80,10 @@ formulaeValid =
     (\b (Derivation f _) -> b && isParseValid f)
     True
 
-unifyFormulae :: Formula -> FormulaWP -> Maybe (Map Name Formula)
+unifyFormulae :: Formula -> FormulaSpec -> Maybe (Map Name Formula)
 unifyFormulae (Predicate p ts) (FPredicate p' ts')
   -- TODO do something here to handle `E = E`
+  -- TODO check unifiability of terms!
   | p == p' && length ts == length ts' = Just M.empty
 unifyFormulae (Op op fs) (FOp op' fs')
   | op == op' =
@@ -91,11 +92,25 @@ unifyFormulae (Op op fs) (FOp op' fs')
         M.empty
         (zip fs fs')
 unifyFormulae (Quantifier q v f) (FQuantifier q' v' f')
+  -- TODO maybe rename this function so that it just adjusts alpha eq?
   | q == q' = undefined -- TODO alpha equivalence
 unifyFormulae f (FVar n) = Just $ M.singleton n f
 -- ignore the substitution, since it only replaces terms.
 unifyFormulae f (FSubst fwp sub) = unifyFormulae f fwp
 unifyFormulae _ _ = Nothing
+
+unifyTermsDirected :: [(Term, Term)] -> Map Name [Term]
+unifyTermsDirected [] = M.empty
+unifyTermsDirected ((Var x, t) : rest) =
+  M.alter (\case Nothing -> Just [t]; Just ts -> Just $ t : ts) x $ unifyTermsDirected rest
+unifyTermsDirected ((Fun f es, Fun g ds) : rest) = unifyTermsDirected (zip es ds)
+
+unifyFormulaeTerm :: Formula -> FormulaSpec -> Map Name [Term]
+unifyFormulaeTerm (Predicate _ ts) (FPredicate _ ts') =
+  unifyTermsDirected (zip ts' ts)
+unifyFormulaeTerm (Op _ fs) (FOp _ fs') = foldr (M.union . uncurry unifyFormulaeTerm) M.empty (zip fs fs')
+unifyFormulaeTerm (Quantifier _ _ f) (FQuantifier _ _ f') = unifyFormulaeTerm f f'
+unifyFormulaeTerm _ _ = M.empty
 
 {- Phases of proof verification:
   1. Check that the rule exists
@@ -127,14 +142,16 @@ verifyProof rules p = pMap id verifyRule p
       Left err -> ParsedInvalid ruleText err ra
       -- 2. Check that the formula matches the rules' conclusion.
       Right spec -> case checkConclusion spec formula of
-        Just err -> ParsedInvalid ruleText err ra
+        Left err -> ParsedInvalid ruleText err ra
         -- 3. Check that the reference types match expected assumptions.
-        Nothing -> case verifyReferences 0 spec refs of
+        Right (conclusion, conclusionSpec) -> case verifyReferences 0 spec refs of
           Just err -> ParsedInvalid ruleText err ra
           -- 4. Check that formulae match given lines.
           Nothing -> case matchReferences spec refs of
-            Just err -> ParsedInvalid ruleText err ra
-            Nothing -> ParsedValid ruleText ra
+            Left err -> ParsedInvalid ruleText err ra
+            -- 5. Collect Name->Term mappings
+            Right (formulaSpecs, proofSpecs) ->
+              ParsedValid ruleText ra
    where
     formula = fromWrapper f
     formulaText = getText f
@@ -144,20 +161,22 @@ verifyProof rules p = pMap id verifyRule p
     checkExistence rules = case rules M.!? ruleName of
       Nothing -> Left ("Rule (" <> ruleName <> ") does not exist.")
       Just spec -> Right spec
-    checkConclusion :: RuleSpec -> Formula -> Maybe Text
+    checkConclusion :: RuleSpec -> Formula -> Either Text (Formula, FormulaSpec)
     checkConclusion (RuleSpec _ _ expected) actual = case unifyFormulae actual expected of
       Nothing ->
-        Just $
+        Left $
           "Rule cannot be applied to "
             <> formulaText
             <> "\nExpecting a formula of the form "
             <> pack (show expected)
-      Just _ -> Nothing
-    matchReferences :: RuleSpec -> [Reference] -> Maybe Text
+      Just _ -> Right (actual, expected)
+    -- TODO:
+    matchReferences :: RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
+    -- formula
     matchReferences (RuleSpec (f : fs) ps c) (LineReference line : refs) =
       case unifyFormulae (extractFormula . fromJust $ pIndex line p) f of
         Nothing ->
-          Just $
+          Left $
             "Found "
               <> (extractText . fromJust $ pIndex line p)
               <> " at line "
@@ -165,34 +184,61 @@ verifyProof rules p = pMap id verifyRule p
               <> ".\nBut expected a formula of the form "
               <> pack (show f)
               <> "."
-        Just _ -> matchReferences (RuleSpec fs ps c) refs
-    matchReferences (RuleSpec [] ((startF, endF, _) : ps) c) (ProofReference start end : refs) =
-      case unifyFormulae (extractFormula . fromJust $ pIndex start p) startF of
+        Just _ -> case matchReferences (RuleSpec fs ps c) refs of
+          Left err -> Left err
+          Right (fs, ps) -> Right ((extractFormula . fromJust $ pIndex line p, f) : fs, ps)
+    -- proof
+    matchReferences (RuleSpec [] (pSpec@(startFs, endF, mn) : ps) c) (ProofReference start end : refs) =
+      case pIndexProof start end p of
         Nothing ->
-          Just $
-            "Found "
-              <> (extractText . fromJust $ pIndex start p)
-              <> " at line "
+          Left $
+            "Line range "
               <> pack (show start)
-              <> ".\nBut expected a formula of the form "
-              <> pack (show startF)
-              <> "."
-        Just _ -> case unifyFormulae (extractFormula . fromJust $ pIndex end p) endF of
-          Nothing ->
-            Just $
-              "Found "
-                <> (extractText . fromJust $ pIndex end p)
-                <> " at line "
-                <> pack (show end)
-                <> ".\nBut expected a formula of the form "
-                <> pack (show endF)
-                <> "."
-          Just _ -> matchReferences (RuleSpec [] ps c) refs
-    matchReferences _ _ = Nothing
+              <> "-"
+              <> pack (show end)
+              <> " does not correspond to a proof.\nLine "
+              <> pack (show start)
+              <> " should mark the start of a subproof and line "
+              <> pack (show end)
+              <> " should be its conclusion."
+        Just p -> handleProof p pSpec
+     where
+      -- TODO check that startF,endF specifies a proof!!
+      -- case unifyFormulae (extractFormula . fromJust $ pIndex start p) startF of
+      --   Nothing ->
+      --     Left $
+      --       "Found "
+      --         <> (extractText . fromJust $ pIndex start p)
+      --         <> " at line "
+      --         <> pack (show start)
+      --         <> ".\nBut expected a formula of the form "
+      --         <> pack (show startF)
+      --         <> "."
+      --   Just _ -> case unifyFormulae (extractFormula . fromJust $ pIndex end p) endF of
+      --     Nothing ->
+      --       Left $
+      --         "Found "
+      --           <> (extractText . fromJust $ pIndex end p)
+      --           <> " at line "
+      --           <> pack (show end)
+      --           <> ".\nBut expected a formula of the form "
+      --           <> pack (show endF)
+      --           <> "."
+      --     Just _ -> case matchReferences (RuleSpec [] ps c) refs of
+      --       Left err -> Left err
+      --       Right (fs, ps) -> _
+
+      handleProof :: Proof -> ProofSpec -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
+      handleProof p pSpec = Left "not implemented yet!"
+    matchReferences _ _ = Right ([], [])
     verifyReferences :: Int -> RuleSpec -> [Reference] -> Maybe Text
-    verifyReferences n (RuleSpec (_ : fs) ps f) (LineReference{} : refs) =
-      verifyReferences (n + 1) (RuleSpec fs ps f) refs
-    verifyReferences n (RuleSpec [] (p : ps) f) (ProofReference{} : refs) =
+    verifyReferences n (RuleSpec (_ : fs) ps f) (LineReference line : refs) =
+      case pIndex line p of
+        Just (Left w) -> if isParseValid w then verifyReferences (n + 1) (RuleSpec fs ps f) refs else Just $ "Error in line: " <> pack (show line)
+        Just (Right (ProofLine (Derivation w _))) -> if isParseValid w then verifyReferences (n + 1) (RuleSpec fs ps f) refs else Just $ "Error in line: " <> pack (show line)
+        _ -> Just $ "Invalid line: " <> pack (show line)
+    verifyReferences n (RuleSpec [] (p : ps) f) (ProofReference start end : refs) =
+      -- TODO verify that all assumptions and conclusion are parsed
       verifyReferences (n + 1) (RuleSpec [] ps f) refs
     verifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Just $

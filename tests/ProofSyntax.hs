@@ -70,8 +70,8 @@ instance Arbitrary Formula where
   arbitrary :: Gen Formula
   arbitrary = return $ Predicate "Formula" []
 
-instance Arbitrary FormulaWP where
-  arbitrary :: Gen FormulaWP
+instance Arbitrary FormulaSpec where
+  arbitrary :: Gen FormulaSpec
   arbitrary = return $ FPredicate "Formula" []
 
 instance Arbitrary RuleSpec where

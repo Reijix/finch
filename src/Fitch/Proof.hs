@@ -2,7 +2,7 @@ module Fitch.Proof where
 
 import Control.Monad (foldM, liftM3)
 import Data.List qualified as L
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Text (Text)
@@ -54,12 +54,14 @@ getText (ParsedValid txt _) = txt
 getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
+type ProofSpec = ([FormulaSpec], FormulaSpec, Maybe Name)
+
 -- | The type of a fitch rule.
 data RuleSpec
   = {- | A `RuleSpec` @assumptions@ @conclusion@ consists of
     a list of assumptions that are subproofs or formulae, and the conclusion.
     -}
-    RuleSpec [FormulaWP] [(FormulaWP, FormulaWP, Maybe Name)] FormulaWP
+    RuleSpec [FormulaSpec] [ProofSpec] FormulaSpec
   deriving (Show, Eq)
 
 type Name = Text
@@ -85,19 +87,19 @@ infixl 9 ~>
 (~>) :: Name -> Term -> Subst
 (~>) = Subst
 
-data FormulaWP
-  = FSubst FormulaWP Subst
+data FormulaSpec
+  = FSubst FormulaSpec Subst
   | FVar Name
   | FPredicate Name [Term]
-  | FOp Text [FormulaWP]
-  | FQuantifier Name Name FormulaWP
+  | FOp Text [FormulaSpec]
+  | FQuantifier Name Name FormulaSpec
   deriving (Eq)
 
-instance Show FormulaWP where
-  show :: FormulaWP -> String
+instance Show FormulaSpec where
+  show :: FormulaSpec -> String
   show f = go False f
    where
-    go :: Bool -> FormulaWP -> String
+    go :: Bool -> FormulaSpec -> String
     go _ (FPredicate p []) = T.unpack p
     go _ (FPredicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
     go _ (FVar n) = T.unpack n
@@ -387,6 +389,12 @@ incrementNodeAddr (NAAssumption n) = NAAssumption (n + 1)
 incrementNodeAddr (NAProof n Nothing) = NAProof (n + 1) Nothing
 incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 
+naLevelUp :: NodeAddr -> Maybe NodeAddr
+naLevelUp (NAProof n (Just (NAAssumption{}))) = Just $ NAProof n Nothing
+naLevelUp (NAProof n (Just NAConclusion)) = Just $ NAProof n Nothing
+naLevelUp (NAProof _ (Just (NAProof n p))) = naLevelUp $ NAProof n p
+naLevelUp _ = Nothing
+
 -- * Querying proofs
 
 -- | Returns `True` if the line at `NodeAddr` is the first formula of the proof.
@@ -449,6 +457,20 @@ pIndex :: Int -> Proof -> Maybe (Either Assumption Proof)
 pIndex n p = case fromLineNo n p of
   Nothing -> Nothing
   Just addr -> pLookup addr p
+
+pIndexProof :: Int -> Int -> Proof -> Maybe Proof
+pIndexProof start end p =
+  let
+    startA = fromJust $ fromLineNo start p
+    endA = fromJust $ fromLineNo end p
+    a1 = naLevelUp startA
+    a2 = naLevelUp endA
+   in
+    if pIsFirstFormula startA p && pIsConclusion endA p && a1 == a2 && isJust a1
+      then case fromJust $ pLookup (fromJust a1) p of
+        Left _ -> Nothing
+        Right p -> Just p
+      else Nothing
 
 extractFormula :: Either Assumption Proof -> Formula
 extractFormula (Left a) = fromWrapper a
