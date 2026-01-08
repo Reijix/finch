@@ -81,6 +81,8 @@ formulaeValid =
     True
 
 unifyFormulae :: Formula -> FormulaSpec -> Maybe (Map Name Formula)
+unifyFormulae (FreshVar v) (FFreshVar v') = Just $ M.singleton v' (FreshVar v)
+unifyFormulae (FreshVar{}) _ = Nothing
 unifyFormulae (Predicate p ts) (FPredicate p' ts')
   -- TODO do something here to handle `E = E`
   -- TODO check unifiability of terms!
@@ -117,6 +119,7 @@ unifyFormulaeTerm _ _ = M.empty
   2. Check that the formula matches the rules' conclusion.
   3. Check that the reference types (i.e. line or proof)
      match the expected assumptions.
+  -- TODO references should only be in lines after the current one.
   4. Check that the references match the expected assumptions,
      i.e. the form of the formula is correct.
   5. Collect name->term mappings.
@@ -196,14 +199,17 @@ verifyProof rules p = pMap id verifyRule p
               <> pack (show start)
               <> "-"
               <> pack (show end)
-              <> " does not correspond to a proof.\nLine "
+              <> " does not correspond to a subproof.\nLine "
               <> pack (show start)
               <> " should mark the start of a subproof and line "
               <> pack (show end)
               <> " should be its conclusion."
-        Just p -> handleProof p pSpec
+        Just p -> case handleProof start p pSpec of
+          Just err -> Left err
+          Nothing -> case matchReferences (RuleSpec [] ps c) refs of
+            Left err -> Left err
+            Right (fs, ps) -> Right (fs, (p, pSpec) : ps)
      where
-      -- TODO check that startF,endF specifies a proof!!
       -- case unifyFormulae (extractFormula . fromJust $ pIndex start p) startF of
       --   Nothing ->
       --     Left $
@@ -228,8 +234,22 @@ verifyProof rules p = pMap id verifyRule p
       --       Left err -> Left err
       --       Right (fs, ps) -> _
 
-      handleProof :: Proof -> ProofSpec -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
-      handleProof p pSpec = Left "not implemented yet!"
+      handleProof :: Int -> Proof -> ProofSpec -> Maybe Text
+      handleProof n (SubProof [] ps (Derivation c _)) ([], cSpec, mn) = case unifyFormulae (fromWrapper c) cSpec of
+        Nothing ->
+          Just $
+            "Found "
+              <> getText c
+              <> " at line "
+              <> pack (show n)
+              <> ".\nBut expected a formula of the form "
+              <> pack (show cSpec)
+              <> "."
+        Just _ -> Nothing
+      handleProof n (SubProof (f:fs) ps c) _
+      -- TODO better error message
+      handleProof _ (SubProof fs ps c) ([], cSpec, mn) = Just "Rule expects a subproof with less assumptions!"
+      handleProof _ (ProofLine{}) _ = error "handleProof got ProofLine (should not happen!)"
     matchReferences _ _ = Right ([], [])
     verifyReferences :: Int -> RuleSpec -> [Reference] -> Maybe Text
     verifyReferences n (RuleSpec (_ : fs) ps f) (LineReference line : refs) =

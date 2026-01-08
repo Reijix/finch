@@ -52,6 +52,12 @@ pTerm = lexeme (liftM2 Fun pName (parens (pTerm `sepBy` comma) <|> return []) <?
 parens :: FormulaParser a -> FormulaParser a
 parens = between (symbol "(") (symbol ")")
 
+brackets :: FormulaParser a -> FormulaParser a
+brackets = between (symbol "[") (symbol "]")
+
+pFreshVariable :: FormulaParser Formula
+pFreshVariable = lexeme $ FreshVar <$> brackets pName
+
 pPredicate :: FormulaParser Formula
 pPredicate = lexeme $ liftM2 Predicate pName $ parens (pTerm `sepBy` comma) <|> return []
 
@@ -73,7 +79,7 @@ pQuantifier :: FormulaParser Formula
 pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (string ".") >> lexeme pFormula)
 
 pFormulaAtomic :: FormulaParser Formula
-pFormulaAtomic = (pQuantifier <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
+pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
 
 binary :: Text -> (a -> a -> a) -> Operator FormulaParser a
 binary name f = InfixL (f <$ hidden (symbol name))

@@ -257,6 +257,7 @@ regenerateSymbols = do
       combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
       combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
     go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
+    go _ _ _ txt (FreshVar var) = return $ ParsedValid txt $ FreshVar var
   -- proccesses a single line, by proccessing its formula.
   goLine :: Int -> Derivation -> m (Int, Derivation)
   goLine n (Derivation f r) = do

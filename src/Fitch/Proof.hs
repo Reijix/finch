@@ -1,6 +1,6 @@
 module Fitch.Proof where
 
-import Control.Monad (foldM, liftM3)
+import Control.Monad (foldM, liftM3, liftM4)
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Set (Set)
@@ -93,6 +93,7 @@ data FormulaSpec
   | FPredicate Name [Term]
   | FOp Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
+  | FFreshVar Name
   deriving (Eq)
 
 instance Show FormulaSpec where
@@ -118,6 +119,8 @@ data Formula
     Op Text [Formula]
   | -- | A quantifier, like @∀@ for universal quantification.
     Quantifier Name Name Formula
+  | -- | A fresh variable of a subproof, written like @[c]@
+    FreshVar Name
   deriving (Eq, Ord)
 
 instance Show Formula where
@@ -133,6 +136,7 @@ instance Show Formula where
       | L.length fs == 2 = L.intercalate (T.unpack op) (map (go True) fs)
       | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
     go _ (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
+    go _ (FreshVar v) = "[" ++ T.unpack v ++ "]"
 
 -- | A reference to a line (either `Assumption` or `ProofLine`) or a `SubProof`
 data Reference where

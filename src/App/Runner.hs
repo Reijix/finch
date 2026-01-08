@@ -133,8 +133,27 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
   use spawnType >>= \case
     Nothing -> pure ()
     -- TODO adjust linenos
-    Just SpawnLine -> proof %=? pInsert (Right . ProofLine $ Derivation (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")) targetAddr pos
-    Just SpawnProof -> proof %=? pInsert (Right $ SubProof [tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"] [] (Derivation (tryParse m [] [] 0 "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))) targetAddr pos
+    Just SpawnLine ->
+      proof
+        %=? pInsert
+          ( Right . ProofLine $
+              Derivation
+                (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")
+                (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")
+          )
+          targetAddr
+          pos
+    Just SpawnProof ->
+      proof
+        %=? pInsert
+          ( Right $
+              SubProof
+                [tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"]
+                []
+                (Derivation (tryParse m [] [] 0 "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
+          )
+          targetAddr
+          pos
     Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
