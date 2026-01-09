@@ -54,7 +54,7 @@ getText (ParsedValid txt _) = txt
 getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
-type ProofSpec = ([FormulaSpec], FormulaSpec, Maybe Name)
+type ProofSpec = ([FormulaSpec], FormulaSpec)
 
 -- | The type of a fitch rule.
 data RuleSpec
@@ -239,6 +239,37 @@ pMap ::
   Proof
 pMap af df (ProofLine d) = ProofLine $ df d
 pMap af df (SubProof fs ps d) = SubProof (map af fs) (map (pMap af df) ps) (df d)
+
+pMapAccumL ::
+  (s -> Assumption -> (s, Assumption)) ->
+  (s -> Derivation -> (s, Derivation)) ->
+  s ->
+  Proof ->
+  (s, Proof)
+pMapAccumL af df s (ProofLine d) =
+  let
+    (s', d') = df s d
+   in
+    (s', ProofLine d')
+pMapAccumL af df s (SubProof fs ps d) =
+  let
+    (s', fs') = mapAccumL af s fs
+    (s'', ps') = mapAccumL (pMapAccumL af df) s' ps
+    (s''', d') = df s'' d
+   in
+    (s''', SubProof fs' ps' d')
+
+pMapWithLineNo ::
+  (Int -> Assumption -> Assumption) ->
+  (Int -> Derivation -> Derivation) ->
+  Proof ->
+  Proof
+pMapWithLineNo af df = snd . pMapAccumL af' df' 1
+ where
+  af' :: Int -> Assumption -> (Int, Assumption)
+  af' n a = (n + 1, af n a)
+  df' :: Int -> Derivation -> (Int, Derivation)
+  df' n d = (n + 1, df n d)
 
 -- | Like `pMap` but lifted to monadic results.
 pMapM ::
