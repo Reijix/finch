@@ -114,27 +114,6 @@ unifyFormulaeTerm (Op _ fs) (FOp _ fs') = foldr (M.union . uncurry unifyFormulae
 unifyFormulaeTerm (Quantifier _ _ f) (FQuantifier _ _ f') = unifyFormulaeTerm f f'
 unifyFormulaeTerm _ _ = M.empty
 
-canBeReferenced :: Int -> NodeAddr -> NodeAddr -> Maybe Text
-canBeReferenced lineNo ruleLine refLine
-  | ruleLine < refLine =
-      Just $
-        "Line "
-          <> pack (show lineNo)
-          <> " can not be referenced because it appears after this line.\n"
-          <> pack (show ruleLine)
-          <> " and "
-          <> pack (show refLine)
-  | ruleLine == refLine =
-      Just "Can not reference the same line."
-canBeReferenced lineNo (NAProof n (Just na1)) (NAProof m (Just na2))
-  | n == m = canBeReferenced lineNo na1 na2
-canBeReferenced lineNo _ (NAProof _ (Just _)) =
-  Just $
-    "Line "
-      <> pack (show lineNo)
-      <> " can not be referenced because it is located inside of a subproof."
-canBeReferenced _ _ _ = Nothing
-
 {- Phases of proof verification:
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
@@ -194,6 +173,23 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             <> "\nExpecting a formula of the form "
             <> pack (show expected)
       Just _ -> Right (actual, expected)
+    canBeReferenced :: Int -> NodeAddr -> NodeAddr -> Maybe Text
+    canBeReferenced refLine ruleAddr refAddr
+      | ruleAddr < refAddr =
+          Just $
+            "Line "
+              <> pack (show refLine)
+              <> " can not be referenced because it appears after this line."
+      | ruleAddr == refAddr =
+          Just "Can not reference the same line."
+    canBeReferenced refLine (NAProof n (Just na1)) (NAProof m (Just na2))
+      | n == m = canBeReferenced refLine na1 na2
+    canBeReferenced refLine _ (NAProof _ (Just _)) =
+      Just $
+        "Line "
+          <> pack (show refLine)
+          <> " can not be referenced because it is located inside of a subproof."
+    canBeReferenced _ _ _ = Nothing
     matchReferences :: RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
     -- formula
     matchReferences (RuleSpec (f : fs) ps c) (LineReference line : refs) =

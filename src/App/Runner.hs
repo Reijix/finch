@@ -113,12 +113,15 @@ runApp proof operators quantifiers rules =
  where
   m = initialModel proof operators quantifiers rules
 
--- | Main execution loop of the application.
-updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = do
+checkProof :: Effect ROOT Model Action
+checkProof = do
   regenerateSymbols
   ruleMap <- use rules
   proof %= verifyProof ruleMap
+
+-- | Main execution loop of the application.
+updateModel :: Action -> Effect ROOT Model Action
+updateModel Setup = checkProof
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
@@ -155,6 +158,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           targetAddr
           pos
     Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
+  checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -185,10 +189,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
       io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = do
-  regenerateSymbols
-  ruleMap <- use rules
-  proof %= verifyProof ruleMap
+updateModel Change = checkProof
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -203,9 +204,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   let p = tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
   proof %= pUpdateFormula (const p) addr
-  regenerateSymbols
-  ruleMap <- use rules
-  proof %= verifyProof ruleMap
+  checkProof
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
