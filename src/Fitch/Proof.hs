@@ -1,6 +1,6 @@
 module Fitch.Proof where
 
-import Control.Monad (foldM, liftM3, liftM4)
+import Control.Monad (foldM, liftM3, liftM4, when)
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Set (Set)
@@ -488,34 +488,38 @@ pLookup (NAProof n Nothing) (SubProof _ ps _)
   | n < L.length ps = Just . Right $ ps !! n
 pLookup _ _ = Nothing
 
-pIndex :: Int -> Proof -> Maybe (Either Assumption Proof)
+pIndex :: Int -> Proof -> Maybe (Either Assumption Derivation)
 pIndex n p = case fromLineNo n p of
   Nothing -> Nothing
-  Just addr -> pLookup addr p
+  Just addr -> case pLookup addr p of
+    Nothing -> Nothing
+    Just (Left a) -> Just (Left a)
+    Just (Right (ProofLine d)) -> Just (Right d)
+    Just (Right _) -> Nothing
 
 pIndexProof :: Int -> Int -> Proof -> Maybe Proof
-pIndexProof start end p =
-  let
-    startA = fromJust $ fromLineNo start p
-    endA = fromJust $ fromLineNo end p
-    a1 = naLevelUp startA
-    a2 = naLevelUp endA
-   in
-    if pIsFirstFormula startA p && pIsConclusion endA p && a1 == a2 && isJust a1
-      then case fromJust $ pLookup (fromJust a1) p of
-        Left _ -> Nothing
-        Right p -> Just p
-      else Nothing
+pIndexProof start end p = do
+  startA <- fromLineNo start p
+  endA <- fromLineNo end p
+  a1 <- naLevelUp startA
+  a2 <- naLevelUp endA
+  if pIsFirstFormula startA p
+    && pIsConclusion endA p
+    && a1 == a2
+    then case pLookup a1 p of
+      Nothing -> Nothing
+      Just (Left{}) -> Nothing
+      Just (Right p) -> Just p
+    else Nothing
 
-extractFormula :: Either Assumption Proof -> Formula
+-- TODO use Maybe?
+extractFormula :: Either Assumption Derivation -> Formula
 extractFormula (Left a) = fromWrapper a
-extractFormula (Right (ProofLine (Derivation f _))) = fromWrapper f
-extractFormula _ = error "could not extract formula."
+extractFormula (Right (Derivation f _)) = fromWrapper f
 
-extractText :: Either Assumption Proof -> Text
+extractText :: Either Assumption Derivation -> Text
 extractText (Left a) = getText a
-extractText (Right (ProofLine (Derivation f _))) = getText f
-extractText _ = error "could not extract text."
+extractText (Right (Derivation f _)) = getText f
 
 -- * Updating proof contents
 

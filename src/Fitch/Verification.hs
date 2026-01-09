@@ -189,6 +189,9 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         "Line "
           <> pack (show refLine)
           <> " can not be referenced because it is located inside of a subproof."
+    -- TODO maybe merge matchReferences and verifyReferences
+    -- to avoid usage of fromJust and fromWrapper!
+    -- one step in the direction of using relude!
     canBeReferenced _ _ _ = Nothing
     matchReferences :: RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
     -- formula
@@ -264,7 +267,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                 if isParseValid w
                   then verifyReferences (n + 1) (RuleSpec fSpecs ps f) refs
                   else Just $ "Parse error in line: " <> pack (show line)
-              Right (ProofLine (Derivation w _)) ->
+              Right (Derivation w _) ->
                 if isParseValid w
                   then verifyReferences (n + 1) (RuleSpec fSpecs ps f) refs
                   else Just $ "Parse error in line: " <> pack (show line)
