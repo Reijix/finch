@@ -117,20 +117,24 @@ unifyFormulaeTerm _ _ = M.empty
 {- Phases of proof verification:
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
-  3. Check that the reference types (i.e. line or proof)
-     match the expected assumptions and that references are visible for the current line.
-  4. Check that the references match the expected assumptions,
-     i.e. the form of the formula is correct.
-  5. Collect name->term mappings.
-  6. Verify name->term mappings, the datastructure should be `Map Name [Term]`
-  7. Collect name->formula mappings, using the name->term mappings
+  3. Match references to lines/proof, concretely:
+    - check that references are parsed and valid line numbers
+    - line references should only refer to lines
+    - proof references should refer to proofs,
+      i.e. first number is the first line and second number the conclusion
+    - references line needs to be visible for the referer,
+      i.e. not in a subproof or later in the proof.
+  4. Collect name->term mappings.
+  5. Verify name->term mappings, the datastructure should be `Map Name [(Int, Term)]`
+     to give better error messages. The `Int` is the corresponding line number.
+  6. Collect name->formula mappings, using the name->term mappings
      to resolve substitutions.
      The datastructure for name->formula mappings should be `
      Map Name [Either Formula [Formula]]`, where
      Name` is e.g. φ, `Formula` is a formula that has been identified as φ,
      and `[Formula]` is a list of possible formulae that
      can be identified as φ (yielded by backwards-substitution).
-  8. Now check that for every φ all its mappings can be made equal by
+  7. Now check that for every φ all its mappings can be made equal by
      choosing from the lists.
  -}
 verifyProof :: Map Name RuleSpec -> Proof -> Proof
@@ -146,24 +150,30 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       -- 2. Check that the formula matches the rules' conclusion.
       Right spec -> case checkConclusion spec formula of
         Left err -> ParsedInvalid ruleText err ra
-        -- 3. Check that the reference types match expected assumptions.
-        Right (conclusion, conclusionSpec) -> case verifyReferences 0 spec refs of
-          Just err -> ParsedInvalid ruleText err ra
-          -- 4. Check that formulae match given lines.
-          Nothing -> case matchReferences spec refs of
-            Left err -> ParsedInvalid ruleText err ra
-            -- 5. Collect Name->Term mappings
-            Right (formulaSpecs, proofSpecs) ->
-              ParsedValid ruleText ra
+        -- 3. Match each reference to the corresponding line/proof
+        Right (conclusion, conclusionSpec) -> case unifyReferences 0 spec refs of
+          Left err -> ParsedInvalid ruleText err ra
+          -- 4. Collect name->term mappings
+          Right (formulaSpecs, proofSpecs) -> ParsedValid ruleText ra
    where
+    ---------------------------------------------------
+    -- Unwrap variables
     formula = fromWrapper f
     formulaText = getText f
     ra@(RuleApplication ruleName refs) = fromWrapper r
     ruleText = getText r
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 1. Check that the rule exists.
     checkExistence :: Map Name RuleSpec -> Either Text RuleSpec
     checkExistence rules = case rules M.!? ruleName of
       Nothing -> Left ("Rule (" <> ruleName <> ") does not exist.")
       Just spec -> Right spec
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 2. Unify conclusion.
     checkConclusion :: RuleSpec -> Formula -> Either Text (Formula, FormulaSpec)
     checkConclusion (RuleSpec _ _ expected) actual = case unifyFormulae actual expected of
       Nothing ->
@@ -173,61 +183,46 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             <> "\nExpecting a formula of the form "
             <> pack (show expected)
       Just _ -> Right (actual, expected)
-    canBeReferenced :: Int -> NodeAddr -> NodeAddr -> Maybe Text
-    canBeReferenced refLine ruleAddr refAddr
-      | ruleAddr < refAddr =
-          Just $
-            "Line "
-              <> pack (show refLine)
-              <> " can not be referenced because it appears after this line."
-      | ruleAddr == refAddr =
-          Just "Can not reference the same line."
-    canBeReferenced refLine (NAProof n (Just na1)) (NAProof m (Just na2))
-      | n == m = canBeReferenced refLine na1 na2
-    canBeReferenced refLine _ (NAProof _ (Just _)) =
-      Just $
-        "Line "
-          <> pack (show refLine)
-          <> " can not be referenced because it is located inside of a subproof."
-    -- TODO maybe merge matchReferences and verifyReferences
-    -- to avoid usage of fromJust and fromWrapper!
-    -- one step in the direction of using relude!
-    canBeReferenced _ _ _ = Nothing
-    matchReferences :: RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
-    -- formula
-    matchReferences (RuleSpec (f : fs) ps c) (LineReference line : refs) =
-      case unifyFormulae (extractFormula . fromJust $ pIndex line p) f of
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 3. Unify references
+    unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
+    unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
+      f <- lookupReference refLine p
+      f' <- handleFormula refLine f fSpec
+      (fs, ps) <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
+      return (f' : fs, ps)
+     where
+      handleFormula :: Int -> Formula -> FormulaSpec -> Either Text (Formula, FormulaSpec)
+      handleFormula line f fSpec = case unifyFormulae f fSpec of
         Nothing ->
           Left $
             "Found "
-              <> (extractText . fromJust $ pIndex line p)
+              <> pack (show f)
               <> " at line "
               <> pack (show line)
               <> ".\nBut expected a formula of the form "
-              <> pack (show f)
+              <> pack (show fSpec)
               <> "."
-        Just _ -> case matchReferences (RuleSpec fs ps c) refs of
-          Left err -> Left err
-          Right (fs, ps) -> Right ((extractFormula . fromJust $ pIndex line p, f) : fs, ps)
-    -- proof
-    matchReferences (RuleSpec [] (pSpec@(startFs, endF) : ps) c) (ProofReference start end : refs) =
-      case pIndexProof start end p of
-        Nothing ->
-          Left $
-            "Line range "
-              <> pack (show start)
-              <> "-"
-              <> pack (show end)
-              <> " does not correspond to a subproof.\nLine "
-              <> pack (show start)
-              <> " should mark the start of a subproof and line "
-              <> pack (show end)
-              <> " should be its conclusion."
-        Just p -> case handleProof (start, end) p pSpec of
-          Just err -> Left err
-          Nothing -> case matchReferences (RuleSpec [] ps c) refs of
-            Left err -> Left err
-            Right (fs, ps) -> Right (fs, (p, pSpec) : ps)
+        Just _ -> Right (f, fSpec)
+    unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = case pIndexProof start end p of
+      Nothing ->
+        Left $
+          "Line range "
+            <> pack (show start)
+            <> "-"
+            <> pack (show end)
+            <> " does not correspond to a subproof.\nLine "
+            <> pack (show start)
+            <> " should mark the start of a subproof and line "
+            <> pack (show end)
+            <> " should be its conclusion."
+      Just p -> do
+        lookupReference start p
+        maybe (pure ()) Left (handleProof (start, end) p pSpec)
+        (fs, ps) <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
+        return (fs, (p, pSpec) : ps)
      where
       handleProof :: (Int, Int) -> Proof -> ProofSpec -> Maybe Text
       handleProof (_, end) (SubProof [] ps (Derivation c _)) ([], cSpec) = case unifyFormulae (fromWrapper c) cSpec of
@@ -254,30 +249,9 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         Just _ -> handleProof (start + 1, end) (SubProof fs ps c) (fSpecs, cSpec)
       -- TODO better error message
       handleProof _ (SubProof fs ps c) ([], cSpec) = Just "Rule expects a subproof with less assumptions!"
-      handleProof _ (ProofLine{}) _ = error "handleProof got ProofLine (should not happen!)"
-    matchReferences _ _ = Right ([], [])
-    verifyReferences :: Int -> RuleSpec -> [Reference] -> Maybe Text
-    verifyReferences n (RuleSpec (fSpec : fSpecs) ps f) (LineReference line : refs) =
-      case pIndex line p of
-        Just e ->
-          case canBeReferenced line (fromJust $ fromLineNo ruleLine p) (fromJust $ fromLineNo line p) of
-            Just err -> Just err
-            Nothing -> case e of
-              Left w ->
-                if isParseValid w
-                  then verifyReferences (n + 1) (RuleSpec fSpecs ps f) refs
-                  else Just $ "Parse error in line: " <> pack (show line)
-              Right (Derivation w _) ->
-                if isParseValid w
-                  then verifyReferences (n + 1) (RuleSpec fSpecs ps f) refs
-                  else Just $ "Parse error in line: " <> pack (show line)
-        _ -> Just $ "Invalid line: " <> pack (show line)
-    verifyReferences n (RuleSpec [] (pSpec : pSpecs) f) (ProofReference start end : refs) =
-      case canBeReferenced start (fromJust $ fromLineNo ruleLine p) (fromJust $ fromLineNo start p) of
-        Nothing -> verifyReferences (n + 1) (RuleSpec [] pSpecs f) refs
-        Just err -> Just err
-    verifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
-      Just $
+      handleProof _ (ProofLine{}) _ = Just "handleProof got ProofLine (should not happen!)"
+    unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
+      Left $
         "Rule ("
           <> ruleName
           <> ") expects a single line at position "
@@ -287,8 +261,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> "-"
           <> pack (show end)
           <> "."
-    verifyReferences n (RuleSpec [] (_ : _) _) (LineReference line : refs) =
-      Just $
+    unifyReferences n (RuleSpec _ (_ : _) _) (LineReference line : refs) =
+      Left $
         "Rule ("
           <> ruleName
           <> ") expects a line range at position "
@@ -296,8 +270,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> " but got the single line "
           <> pack (show line)
           <> "."
-    verifyReferences n (RuleSpec (_ : fs) ps _) [] =
-      Just $
+    unifyReferences n (RuleSpec (_ : fs) ps _) [] =
+      Left $
         "Rule ("
           <> ruleName
           <> ") expects "
@@ -305,8 +279,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> " references,\nbut got "
           <> pack (show n)
           <> " references."
-    verifyReferences n (RuleSpec [] (_ : ps) _) [] =
-      Just $
+    unifyReferences n (RuleSpec [] (_ : ps) _) [] =
+      Left $
         "Rule ("
           <> ruleName
           <> ") expects "
@@ -314,8 +288,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> " references,\nbut got "
           <> pack (show n)
           <> " references."
-    verifyReferences n (RuleSpec [] [] _) (_ : refs) =
-      Just $
+    unifyReferences n (RuleSpec [] [] _) (_ : refs) =
+      Left $
         "Rule ("
           <> ruleName
           <> ") expects "
@@ -323,4 +297,49 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> " references,\nbut got "
           <> pack (show $ n + length refs + 1)
           <> " references."
-    verifyReferences _ _ _ = Nothing
+    unifyReferences _ (RuleSpec [] [] _) [] = Right ([], [])
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 4. Collect terms
+    collectTerms :: [(Formula, FormulaSpec)] -> [(Proof, ProofSpec)] -> Map Name [(Int, Term)]
+    collectTerms fs ps = undefined
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 5. Verify term mappings
+    verifyTerms :: Map Name [(Int, Term)] -> Either Text (Map Name Term)
+    verifyTerms = undefined
+    ---------------------------------------------------
+
+    -- helpers
+    lookupReference :: Int -> Proof -> Either Text Formula
+    lookupReference refLine p
+      | ruleLine < refLine =
+          Left $
+            "Line "
+              <> pack (show refLine)
+              <> " can not be referenced because it appears after this line."
+      | ruleLine == refLine =
+          Left "Can not reference the same line."
+    lookupReference refLine p = case (fromLineNo ruleLine p, fromLineNo refLine p) of
+      (Nothing, _) -> Left $ "Line " <> pack (show ruleLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+      (_, Nothing) -> Left $ "Line " <> pack (show refLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+      (Just ruleAddr, Just refAddr) ->
+        let
+          -- Make sure that nesting structure of both `NodeAddr` is compatible
+          go (NAProof n (Just na1)) (NAProof m (Just na2))
+            | n == m = go na1 na2
+          go _ (NAProof _ (Just _)) =
+            Left $
+              "Line "
+                <> pack (show refLine)
+                <> " can not be referenced because it is located inside of a subproof."
+          -- Make sure that refLine is valid
+          go _ _ = case pIndex refLine p of
+            Nothing -> Left $ "Line " <> pack (show refLine) <> " is not a valid line."
+            Just (Left (ParsedValid _ f)) -> Right f
+            Just (Right (Derivation (ParsedValid _ f) _)) -> Right f
+            Just _ -> Left $ "Parse error in line: " <> pack (show refLine)
+         in
+          go ruleAddr refAddr
