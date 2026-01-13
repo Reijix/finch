@@ -1,15 +1,15 @@
 module Fitch.Verification where
 
 import App.Model (Model)
-import Control.Monad (foldM, liftM2)
+import Control.Monad (foldM, forM, liftM2, zipWithM)
 import Control.Monad.RWS (MonadState)
 import Data.Bifunctor
 import Data.Either (fromLeft)
-import Data.Functor
 import Data.Map (Map)
 import Data.Map qualified as M
 import Data.Maybe (fromJust)
 import Data.Text (Text, append, pack)
+import Data.Traversable (mapAccumM)
 import Fitch.Proof
 
 class FreeVars a where
@@ -42,6 +42,7 @@ instance FreeVars Formula where
 class MakeFresh a where
   makeFresh :: Name -> a -> Name
 
+-- TODO makeFresh is erronous when chained...
 instance MakeFresh Term where
   makeFresh :: Name -> Term -> Name
   makeFresh n t = if n `elem` freeVars t then makeFresh (append n "'") t else n
@@ -80,26 +81,31 @@ formulaeValid =
     (\b (Derivation f _) -> b && isParseValid f)
     True
 
-unifyFormulae :: Formula -> FormulaSpec -> Maybe (Map Name Formula)
-unifyFormulae (FreshVar v) (FFreshVar v') = Just $ M.singleton v' (FreshVar v)
-unifyFormulae (FreshVar{}) _ = Nothing
-unifyFormulae (Predicate p ts) (FPredicate p' ts')
-  -- TODO do something here to handle `E = E`
-  -- TODO check unifiability of terms!
-  | p == p' && length ts == length ts' = Just M.empty
-unifyFormulae (Op op fs) (FOp op' fs')
-  | op == op' =
-      foldM
-        (\m (f, f') -> unifyFormulae f f' <&> M.union m)
-        M.empty
-        (zip fs fs')
-unifyFormulae (Quantifier q v f) (FQuantifier q' v' f')
-  -- TODO maybe rename this function so that it just adjusts alpha eq?
-  | q == q' = undefined -- TODO alpha equivalence
-unifyFormulae f (FVar n) = Just $ M.singleton n f
+unifyAlphaEq :: Formula -> FormulaSpec -> Maybe (Formula, FormulaSpec)
+unifyAlphaEq f@(FreshVar v) fs@(FFreshVar v') = Just (f, fs)
+unifyAlphaEq (FreshVar{}) _ = Nothing
+unifyAlphaEq f@(Predicate p ts) fs@(FPredicate p' ts')
+  | p == p' && length ts == length ts' = do
+      unifyTermsOnlyFun (zip ts ts')
+      return (f, fs)
+ where
+  unifyTermsOnlyFun :: [(Term, Term)] -> Maybe ()
+  unifyTermsOnlyFun ((Fun t ts, Fun s ss) : rest) | t == s && length ts == length ss = unifyTermsOnlyFun (zip ts ss ++ rest)
+  unifyTermsOnlyFun ((Var _, Var _) : rest) = unifyTermsOnlyFun rest
+  unifyTermsOnlyFun _ = Nothing
+unifyAlphaEq (Op op fs) (FOp op' fs')
+  | op == op' = do
+      fss <- zipWithM unifyAlphaEq fs fs'
+      return $ bimap (Op op) (FOp op') $ unzip fss
+unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
+  | q == q' = return (f, fs)
+  | otherwise = undefined
+unifyAlphaEq f fs@(FVar n) = Just (f, fs)
 -- ignore the substitution, since it only replaces terms.
-unifyFormulae f (FSubst fwp sub) = unifyFormulae f fwp
-unifyFormulae _ _ = Nothing
+unifyAlphaEq f fs@(FSubst fwp sub) = do
+  (f', fwp') <- unifyAlphaEq f fwp
+  return (f', FSubst fwp' sub)
+unifyAlphaEq _ _ = Nothing
 
 unifyTermsDirected :: [(Term, Term)] -> Map Name [Term]
 unifyTermsDirected [] = M.empty
@@ -122,8 +128,9 @@ unifyFormulaeTerm _ _ = M.empty
     - line references should only refer to lines
     - proof references should refer to proofs,
       i.e. first number is the first line and second number the conclusion
-    - references line needs to be visible for the referer,
+    - referenced line needs to be visible for the referer,
       i.e. not in a subproof or later in the proof.
+    - unify referenced lines with expected formula/proof.
   4. Collect name->term mappings.
   5. Verify name->term mappings, the datastructure should be `Map Name [(Int, Term)]`
      to give better error messages. The `Int` is the corresponding line number.
@@ -175,37 +182,45 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
     -- 2. Unify conclusion.
     checkConclusion :: RuleSpec -> Formula -> Either Text (Formula, FormulaSpec)
-    checkConclusion (RuleSpec _ _ expected) actual = case unifyFormulae actual expected of
+    checkConclusion (RuleSpec _ _ expected) actual = case unifyAlphaEq actual expected of
       Nothing ->
         Left $
           "Rule cannot be applied to "
             <> formulaText
             <> "\nExpecting a formula of the form "
             <> pack (show expected)
-      Just _ -> Right (actual, expected)
+      Just (actual', expected') -> Right (actual', expected')
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 3. Unify references
+    handleFormula :: Int -> Formula -> FormulaSpec -> Either Text (Formula, FormulaSpec)
+    handleFormula line f fSpec = case unifyAlphaEq f fSpec of
+      Nothing ->
+        Left $
+          "Found "
+            <> pack (show f)
+            <> " at line "
+            <> pack (show line)
+            <> ".\nBut expected a formula of the form "
+            <> pack (show fSpec)
+            <> "."
+      Just (f', fSpec') -> Right (f', fSpec')
+    handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Assumption, FormulaSpec)
+    handleAssumption line fw fSpec = case fw of
+      Unparsed{} -> Left "Unparsed assumption --- INTERNAL ERROR SHOULD NOT HAPPEN"
+      (ParsedInvalid txt err f) -> do
+        (f', fSpec') <- handleFormula line f fSpec
+        return (ParsedInvalid txt err f', fSpec')
+      (ParsedValid txt f) -> do
+        (f', fSpec') <- handleFormula line f fSpec
+        return (ParsedValid txt f', fSpec')
     unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
     unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
       f <- lookupReference refLine p
       f' <- handleFormula refLine f fSpec
       (fs, ps) <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
       return (f' : fs, ps)
-     where
-      handleFormula :: Int -> Formula -> FormulaSpec -> Either Text (Formula, FormulaSpec)
-      handleFormula line f fSpec = case unifyFormulae f fSpec of
-        Nothing ->
-          Left $
-            "Found "
-              <> pack (show f)
-              <> " at line "
-              <> pack (show line)
-              <> ".\nBut expected a formula of the form "
-              <> pack (show fSpec)
-              <> "."
-        Just _ -> Right (f, fSpec)
     unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = case pIndexProof start end p of
       Nothing ->
         Left $
@@ -218,38 +233,33 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             <> " should mark the start of a subproof and line "
             <> pack (show end)
             <> " should be its conclusion."
-      Just p -> do
-        lookupReference start p
-        maybe (pure ()) Left (handleProof (start, end) p pSpec)
+      Just prf -> do
+        case (fromLineNo ruleLine p, fromLineRange start end p) of
+          (Nothing, _) -> Left $ "Line " <> pack (show ruleLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+          (_, Nothing) -> Left $ "Line range " <> pack (show start) <> "-" <> pack (show end) <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
+          (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
+            Nothing -> Right ()
+            Just err -> Left err
+        (p', pSpec') <- handleProof (start, end) prf pSpec
         (fs, ps) <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-        return (fs, (p, pSpec) : ps)
+        return (fs, (p', pSpec') : ps)
      where
-      handleProof :: (Int, Int) -> Proof -> ProofSpec -> Maybe Text
-      handleProof (_, end) (SubProof [] ps (Derivation c _)) ([], cSpec) = case unifyFormulae (fromWrapper c) cSpec of
-        Nothing ->
-          Just $
-            "Found "
-              <> getText c
-              <> " at line "
-              <> pack (show end)
-              <> ".\nBut expected a formula of the form "
-              <> pack (show cSpec)
-              <> "."
-        Just _ -> Nothing
-      handleProof (start, end) (SubProof (f : fs) ps c) (fSpec : fSpecs, cSpec) = case unifyFormulae (fromWrapper f) fSpec of
-        Nothing ->
-          Just $
-            "Found "
-              <> getText f
-              <> " at line "
-              <> pack (show start)
-              <> ".\nBut expected a formula of the form "
-              <> pack (show cSpec)
-              <> "."
-        Just _ -> handleProof (start + 1, end) (SubProof fs ps c) (fSpecs, cSpec)
-      -- TODO better error message
-      handleProof _ (SubProof fs ps c) ([], cSpec) = Just "Rule expects a subproof with less assumptions!"
-      handleProof _ (ProofLine{}) _ = Just "handleProof got ProofLine (should not happen!)"
+      handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text (Proof, ProofSpec)
+      handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
+        | length fs /= length fSpecs = Left "Number of assumptions of the subproof does not match the expected number."
+        | otherwise = do
+            (fs', fSpecs') <-
+              unzip . snd
+                <$> mapAccumM
+                  ( \s (a, fSpec) -> do
+                      (a', fSpec') <- handleAssumption s a fSpec
+                      return (s + 1, (a', fSpec'))
+                  )
+                  start
+                  (zip fs fSpecs)
+            (c', cSpec') <- handleAssumption end c cSpec
+            return (SubProof fs' ps (Derivation c' r), (fSpecs', cSpec'))
+      handleProof _ (ProofLine{}) _ = Left "handleProof found ProofLine -- SHOULD NOT HAPPEN - INTERNAL ERROR."
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
         "Rule ("
@@ -313,6 +323,15 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
 
     -- helpers
+    refIsVisible :: Int -> NodeAddr -> NodeAddr -> Maybe Text
+    refIsVisible line ruleAddr refAddr
+      | ruleAddr <= refAddr = Just "Can only reference lines that appear before this line!"
+    refIsVisible line (NAProof n (Just na1)) (NAProof m (Just na2))
+      | n == m = refIsVisible line na1 na2
+    refIsVisible _ (NAProof n _) (NAProof m _) | m < n = Nothing
+    refIsVisible line rua ra@(NAProof _ (Just _)) = Just "Line cannot be referenced because it is located inside of a subproof."
+    refIsVisible _ _ _ = Nothing
+
     lookupReference :: Int -> Proof -> Either Text Formula
     lookupReference refLine p
       | ruleLine < refLine =
@@ -326,20 +345,12 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       (Nothing, _) -> Left $ "Line " <> pack (show ruleLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
       (_, Nothing) -> Left $ "Line " <> pack (show refLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
       (Just ruleAddr, Just refAddr) ->
-        let
-          -- Make sure that nesting structure of both `NodeAddr` is compatible
-          go (NAProof n (Just na1)) (NAProof m (Just na2))
-            | n == m = go na1 na2
-          go _ (NAProof _ (Just _)) =
-            Left $
-              "Line "
-                <> pack (show refLine)
-                <> " can not be referenced because it is located inside of a subproof."
-          -- Make sure that refLine is valid
-          go _ _ = case pIndex refLine p of
-            Nothing -> Left $ "Line " <> pack (show refLine) <> " is not a valid line."
-            Just (Left (ParsedValid _ f)) -> Right f
-            Just (Right (Derivation (ParsedValid _ f) _)) -> Right f
-            Just _ -> Left $ "Parse error in line: " <> pack (show refLine)
-         in
-          go ruleAddr refAddr
+        maybe
+          ( case pIndex refLine p of
+              Nothing -> Left $ "Line " <> pack (show refLine) <> " is not a valid line."
+              Just (Left (ParsedValid _ f)) -> Right f
+              Just (Right (Derivation (ParsedValid _ f) _)) -> Right f
+              Just _ -> Left $ "Parse error in line: " <> pack (show refLine)
+          )
+          Left
+          (refIsVisible refLine ruleAddr refAddr)

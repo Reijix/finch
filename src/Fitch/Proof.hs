@@ -1,6 +1,6 @@
 module Fitch.Proof where
 
-import Control.Monad (foldM, liftM3, liftM4, when)
+import Control.Monad (foldM, join, liftM3, liftM4, when)
 import Data.List qualified as L
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Set (Set)
@@ -372,6 +372,27 @@ fromLineNo n (SubProof fs _ _) | (n - 1) < L.length fs = Just $ NAAssumption (n 
 fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
 fromLineNo n p = Nothing
 
+fromLineRange :: Int -> Int -> Proof -> Maybe NodeAddr
+fromLineRange start end p = go start end 0 p
+ where
+  go :: Int -> Int -> Int -> Proof -> Maybe NodeAddr
+  go _ _ _ (ProofLine{}) = Nothing
+  go start end _ _ | start < 1 || end <= start = Nothing
+  go 1 end n p = do
+    first <- fromLineNo 1 p
+    last <- fromLineNo end p
+    na1 <- naLevelUp first
+    na2 <- naLevelUp last
+    if pIsFirstFormula first p
+      && pIsConclusion last p
+      && na1 == na2
+      then Just na1
+      else Nothing
+  go start end n (SubProof [] (p : ps) c)
+    | pLength p < start = go (start - pLength p) (end - pLength p) (n + 1) (SubProof [] ps c)
+    | otherwise = NAProof n . Just <$> go start end 0 p
+  go start end n (SubProof fs ps c) = go (start - length fs) (end - length fs) n (SubProof [] ps c)
+
 {- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
 
 NOTE: indices of NodeAddr start at 0, but line numbers start at 1!
@@ -427,7 +448,8 @@ incrementNodeAddr (NAProof n (Just a)) = NAProof n (Just (incrementNodeAddr a))
 naLevelUp :: NodeAddr -> Maybe NodeAddr
 naLevelUp (NAProof n (Just (NAAssumption{}))) = Just $ NAProof n Nothing
 naLevelUp (NAProof n (Just NAConclusion)) = Just $ NAProof n Nothing
-naLevelUp (NAProof _ (Just (NAProof n p))) = naLevelUp $ NAProof n p
+naLevelUp (NAProof n (Just (NAProof _ Nothing))) = Just $ NAProof n Nothing
+naLevelUp (NAProof n (Just na)) = Just . NAProof n $ naLevelUp na
 naLevelUp _ = Nothing
 
 -- * Querying proofs
