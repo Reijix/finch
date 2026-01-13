@@ -87,10 +87,22 @@ infixl 9 ~>
 (~>) :: Name -> Term -> Subst
 (~>) = Subst
 
+data TermSpec
+  = TVar Name
+  | TFun Name [TermSpec]
+  | TPlaceholder Name
+  deriving (Eq)
+
+instance Show TermSpec where
+  show :: TermSpec -> String
+  show (TVar n) = T.unpack n
+  show (TFun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+  show (TPlaceholder n) = T.unpack n
+
 data FormulaSpec
   = FSubst FormulaSpec Subst
-  | FVar Name
-  | FPredicate Name [Term]
+  | FPlaceholder Name
+  | FPredicate Name [TermSpec]
   | FOp Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
   | FFreshVar Name
@@ -103,7 +115,9 @@ instance Show FormulaSpec where
     go :: Bool -> FormulaSpec -> String
     go _ (FPredicate p []) = T.unpack p
     go _ (FPredicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-    go _ (FVar n) = T.unpack n
+    go _ (FPlaceholder n) = T.unpack n
+    go _ (FFreshVar n) = "[" ++ T.unpack n ++ "]"
+    go _ (FSubst f (Subst n t)) = go True f ++ "[" ++ T.unpack n ++ " -> " ++ show t ++ "]"
     go True f = "(" ++ go False f ++ ")"
     go _ (FOp op fs)
       | null fs = T.unpack op

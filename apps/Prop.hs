@@ -26,9 +26,9 @@ main = runApp exProof operators [] rules
       , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
       , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
       ]
-  phi = FVar "φ"
-  psi = FVar "ψ"
-  chi = FVar "χ"
+  phi = FPlaceholder "φ"
+  psi = FPlaceholder "ψ"
+  chi = FPlaceholder "χ"
   top = FOp "⊤" []
   bot = FOp "⊥" []
   neg f = FOp "¬" [f]

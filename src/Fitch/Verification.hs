@@ -1,10 +1,11 @@
 module Fitch.Verification where
 
 import App.Model (Model)
-import Control.Monad (foldM, forM, liftM2, zipWithM)
+import Control.Monad (foldM, foldM_, forM, liftM2, zipWithM)
 import Control.Monad.RWS (MonadState)
 import Data.Bifunctor
 import Data.Either (fromLeft)
+import Data.Functor ((<&>))
 import Data.Map (Map)
 import Data.Map qualified as M
 import Data.Maybe (fromJust)
@@ -14,6 +15,8 @@ import Fitch.Proof
 
 class FreeVars a where
   freeVars :: a -> [Name]
+  makeFresh :: Name -> a -> Name
+  makeFresh n t = if n `elem` freeVars t then makeFresh (append n "'") t else n
 
 instance FreeVars Term where
   freeVars :: Term -> [Name]
@@ -39,19 +42,9 @@ instance FreeVars Formula where
   freeVars (Op _ fs) = concatMapU freeVars fs
   freeVars (Quantifier _ v f) = filter (/= v) $ freeVars f
 
-class MakeFresh a where
-  makeFresh :: Name -> a -> Name
-
--- TODO makeFresh is erronous when chained...
-instance MakeFresh Term where
-  makeFresh :: Name -> Term -> Name
-  makeFresh n t = if n `elem` freeVars t then makeFresh (append n "'") t else n
-
-instance MakeFresh Formula where
-  makeFresh :: Name -> Formula -> Name
-  makeFresh n (Predicate name ts) = foldr (flip makeFresh) n ts
-  makeFresh n (Op _ fs) = foldr (flip makeFresh) n fs
-  makeFresh n fq@(Quantifier q v f) = if n `elem` (v : freeVars f) then makeFresh (append n "'") fq else n
+instance FreeVars FormulaSpec where
+  freeVars :: FormulaSpec -> [Name]
+  freeVars = undefined
 
 class Substitute a where
   subst :: Subst -> a -> a
@@ -73,52 +66,45 @@ instance Substitute Formula where
     v' = makeFresh (makeFresh v t) f
     f' = subst (Subst v (Var v')) f
 
--- | Returns `True` if all formulae of the proof have been successfully parsed and are semantically valid.
-formulaeValid :: Proof -> Bool
-formulaeValid =
-  pFold
-    (\b a -> b && isParseValid a)
-    (\b (Derivation f _) -> b && isParseValid f)
-    True
+instance Substitute FormulaSpec where
+  subst :: Subst -> FormulaSpec -> FormulaSpec
+  subst = undefined
+
+unifyTerms :: [(Term, TermSpec)] -> Maybe (Map Name Term)
+unifyTerms ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTerms (zip ts ss ++ rest)
+unifyTerms ((Var x, TVar y) : rest) | x == y = unifyTerms rest
+unifyTerms ((t, TPlaceholder n) : rest) = (M.singleton n t <>) <$> unifyTerms rest
+unifyTerms [] = Just M.empty
+unifyTerms _ = Nothing
 
 unifyAlphaEq :: Formula -> FormulaSpec -> Maybe (Formula, FormulaSpec)
 unifyAlphaEq f@(FreshVar v) fs@(FFreshVar v') = Just (f, fs)
 unifyAlphaEq (FreshVar{}) _ = Nothing
 unifyAlphaEq f@(Predicate p ts) fs@(FPredicate p' ts')
   | p == p' && length ts == length ts' = do
-      unifyTermsOnlyFun (zip ts ts')
+      unifyTerms (zip ts ts')
       return (f, fs)
- where
-  unifyTermsOnlyFun :: [(Term, Term)] -> Maybe ()
-  unifyTermsOnlyFun ((Fun t ts, Fun s ss) : rest) | t == s && length ts == length ss = unifyTermsOnlyFun (zip ts ss ++ rest)
-  unifyTermsOnlyFun ((Var _, Var _) : rest) = unifyTermsOnlyFun rest
-  unifyTermsOnlyFun _ = Nothing
 unifyAlphaEq (Op op fs) (FOp op' fs')
   | op == op' = do
       fss <- zipWithM unifyAlphaEq fs fs'
       return $ bimap (Op op) (FOp op') $ unzip fss
 unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
-  | q == q' = return (f, fs)
-  | otherwise = undefined
-unifyAlphaEq f fs@(FVar n) = Just (f, fs)
+  | q == q' && v == v' = return (f, fs)
+  | q == q' && notElem v (freeVars form') = Just (f, FQuantifier q' v $ subst (Subst v (Var v')) form')
+  | q == q' =
+      let
+        v'' = makeFresh (makeFresh v form) form'
+       in
+        Just
+          ( Quantifier q v'' $ subst (Subst v (Var v'')) form
+          , FQuantifier q' v'' $ subst (Subst v (Var v'')) form'
+          )
+unifyAlphaEq f fs@(FPlaceholder n) = Just (f, fs)
 -- ignore the substitution, since it only replaces terms.
 unifyAlphaEq f fs@(FSubst fwp sub) = do
   (f', fwp') <- unifyAlphaEq f fwp
   return (f', FSubst fwp' sub)
 unifyAlphaEq _ _ = Nothing
-
-unifyTermsDirected :: [(Term, Term)] -> Map Name [Term]
-unifyTermsDirected [] = M.empty
-unifyTermsDirected ((Var x, t) : rest) =
-  M.alter (\case Nothing -> Just [t]; Just ts -> Just $ t : ts) x $ unifyTermsDirected rest
-unifyTermsDirected ((Fun f es, Fun g ds) : rest) = unifyTermsDirected (zip es ds)
-
-unifyFormulaeTerm :: Formula -> FormulaSpec -> Map Name [Term]
-unifyFormulaeTerm (Predicate _ ts) (FPredicate _ ts') =
-  unifyTermsDirected (zip ts' ts)
-unifyFormulaeTerm (Op _ fs) (FOp _ fs') = foldr (M.union . uncurry unifyFormulaeTerm) M.empty (zip fs fs')
-unifyFormulaeTerm (Quantifier _ _ f) (FQuantifier _ _ f') = unifyFormulaeTerm f f'
-unifyFormulaeTerm _ _ = M.empty
 
 {- Phases of proof verification:
   1. Check that the rule exists
@@ -160,8 +146,10 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         -- 3. Match each reference to the corresponding line/proof
         Right (conclusion, conclusionSpec) -> case unifyReferences 0 spec refs of
           Left err -> ParsedInvalid ruleText err ra
-          -- 4. Collect name->term mappings
-          Right (formulaSpecs, proofSpecs) -> ParsedValid ruleText ra
+          -- 4. Collect name->term mappings and 5. verify term mappings
+          Right formulaSpecs -> case verifyTerms (collectTerms ((conclusion, conclusionSpec) : formulaSpecs)) of
+            Left err -> ParsedInvalid ruleText err ra
+            Right termMap -> ParsedValid ruleText ra
    where
     ---------------------------------------------------
     -- Unwrap variables
@@ -206,21 +194,21 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             <> pack (show fSpec)
             <> "."
       Just (f', fSpec') -> Right (f', fSpec')
-    handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Assumption, FormulaSpec)
+    handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Formula, FormulaSpec)
     handleAssumption line fw fSpec = case fw of
       Unparsed{} -> Left "Unparsed assumption --- INTERNAL ERROR SHOULD NOT HAPPEN"
       (ParsedInvalid txt err f) -> do
         (f', fSpec') <- handleFormula line f fSpec
-        return (ParsedInvalid txt err f', fSpec')
+        return (f', fSpec')
       (ParsedValid txt f) -> do
         (f', fSpec') <- handleFormula line f fSpec
-        return (ParsedValid txt f', fSpec')
-    unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text ([(Formula, FormulaSpec)], [(Proof, ProofSpec)])
+        return (f', fSpec')
+    unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text [(Formula, FormulaSpec)]
     unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
       f <- lookupReference refLine p
       f' <- handleFormula refLine f fSpec
-      (fs, ps) <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
-      return (f' : fs, ps)
+      fs <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
+      return (f' : fs)
     unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = case pIndexProof start end p of
       Nothing ->
         Left $
@@ -240,11 +228,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
             Nothing -> Right ()
             Just err -> Left err
-        (p', pSpec') <- handleProof (start, end) prf pSpec
-        (fs, ps) <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-        return (fs, (p', pSpec') : ps)
+        fs <- handleProof (start, end) prf pSpec
+        fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
+        return (fs ++ fs')
      where
-      handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text (Proof, ProofSpec)
+      handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [(Formula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
         | length fs /= length fSpecs = Left "Number of assumptions of the subproof does not match the expected number."
         | otherwise = do
@@ -258,7 +246,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                   start
                   (zip fs fSpecs)
             (c', cSpec') <- handleAssumption end c cSpec
-            return (SubProof fs' ps (Derivation c' r), (fSpecs', cSpec'))
+            return (zip (fs' ++ [c']) (fSpecs' ++ [cSpec']))
       handleProof _ (ProofLine{}) _ = Left "handleProof found ProofLine -- SHOULD NOT HAPPEN - INTERNAL ERROR."
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
@@ -307,19 +295,67 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           <> " references,\nbut got "
           <> pack (show $ n + length refs + 1)
           <> " references."
-    unifyReferences _ (RuleSpec [] [] _) [] = Right ([], [])
+    unifyReferences _ (RuleSpec [] [] _) [] = Right []
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 4. Collect terms
-    collectTerms :: [(Formula, FormulaSpec)] -> [(Proof, ProofSpec)] -> Map Name [(Int, Term)]
-    collectTerms fs ps = undefined
+    collectTerms :: [(Formula, FormulaSpec)] -> Map Name [Term]
+    collectTerms ((Predicate _ ps, FPredicate _ qs) : rest) =
+      M.unionWith
+        (++)
+        (collectTerms' (zip ps qs))
+        (collectTerms rest)
+     where
+      collectTerms' :: [(Term, TermSpec)] -> Map Name [Term]
+      collectTerms' [] = M.empty
+      collectTerms' ((Fun _ ts, TFun _ ss) : rest) = collectTerms' (zip ts ss ++ rest)
+      collectTerms' ((t, TPlaceholder n) : rest) =
+        M.insertWith
+          (++)
+          n
+          [t]
+          (collectTerms' rest)
+      collectTerms' (_ : rest) = collectTerms' rest
+    collectTerms ((Op _ fs, FOp _ fs') : rest) =
+      collectTerms (zip fs fs' ++ rest)
+    collectTerms ((Quantifier _ _ f, FQuantifier _ _ f') : rest) =
+      collectTerms ((f, f') : rest)
+    collectTerms (_ : rest) = collectTerms rest
+    collectTerms [] = M.empty
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 5. Verify term mappings
-    verifyTerms :: Map Name [(Int, Term)] -> Either Text (Map Name Term)
-    verifyTerms = undefined
+    verifyTerms :: Map Name [Term] -> Either Text (Map Name Term)
+    verifyTerms m = do
+      mappings <- mapM makeUnique (M.toList m)
+      return (M.fromList mappings)
+     where
+      makeUnique :: (Name, [Term]) -> Either Text (Name, Term)
+      makeUnique (_, []) = Left "INTERNAL ERROR, makeUnique got empty list of Terms!"
+      makeUnique (v, t : ts) = do
+        foldM_
+          ( \lastTerm currTerm ->
+              if lastTerm == currTerm
+                then Right currTerm
+                else
+                  Left $
+                    "Error when trying to verify that\nall assignments of placeholder "
+                      <> v
+                      <> " are the same, found\n"
+                      <> v
+                      <> "↦"
+                      <> pack (show lastTerm)
+                      <> " and\n"
+                      <> v
+                      <> "↦"
+                      <> pack (show currTerm)
+                      <> "."
+          )
+          t
+          ts
+        return (v, t)
     ---------------------------------------------------
 
     -- helpers

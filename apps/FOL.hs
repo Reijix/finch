@@ -26,10 +26,11 @@ main = runApp exProof operators quantifiers rules
       , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
       , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
       , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
+      , ("=I", RuleSpec [] [] (FPredicate "Eq" [TPlaceholder "E", TPlaceholder "E"]))
       ]
-  phi = FVar "φ"
-  psi = FVar "ψ"
-  chi = FVar "χ"
+  phi = FPlaceholder "φ"
+  psi = FPlaceholder "ψ"
+  chi = FPlaceholder "χ"
   top = FOp "⊤" []
   bot = FOp "⊥" []
   neg f = FOp "¬" [f]
@@ -60,6 +61,6 @@ main = runApp exProof operators quantifiers rules
           []
           (mkDerivation "A ∨ B" "(∨I1) 4")
       ]
-      (mkDerivation "A → B" "(→I) 4-5")
+      (mkDerivation "Eq(x,y)" "(=I)")
 
 -----------------------------------------------------------------------------
