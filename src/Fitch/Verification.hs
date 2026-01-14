@@ -122,9 +122,9 @@ unifyAlphaEq _ _ = Nothing
      to give better error messages. The `Int` is the corresponding line number.
   6. Collect name->formula mappings, using the name->term mappings
      to resolve substitutions.
-     The datastructure for name->formula mappings should be `
-     Map Name [Either Formula [Formula]]`, where
-     Name` is e.g. φ, `Formula` is a formula that has been identified as φ,
+     The datastructure for name->formula mappings should be
+     `Map Name [Either Formula [Formula]]`, where
+     `Name` is e.g. φ, `Formula` is a formula that has been identified as φ,
      and `[Formula]` is a list of possible formulae that
      can be identified as φ (yielded by backwards-substitution).
   7. Now check that for every φ all its mappings can be made equal by
@@ -364,7 +364,6 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       | ruleAddr <= refAddr = Just "Can only reference lines that appear before this line!"
     refIsVisible line (NAProof n (Just na1)) (NAProof m (Just na2))
       | n == m = refIsVisible line na1 na2
-    refIsVisible _ (NAProof n _) (NAProof m _) | m < n = Nothing
     refIsVisible line rua ra@(NAProof _ (Just _)) = Just "Line cannot be referenced because it is located inside of a subproof."
     refIsVisible _ _ _ = Nothing
 

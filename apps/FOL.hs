@@ -61,6 +61,6 @@ main = runApp exProof operators quantifiers rules
           []
           (mkDerivation "A ∨ B" "(∨I1) 4")
       ]
-      (mkDerivation "Eq(x,y)" "(=I)")
+      (mkDerivation "A → B" "(→I) 5-6")
 
 -----------------------------------------------------------------------------
