@@ -41,21 +41,42 @@ instance FreeVars Formula where
   freeVars (Predicate _ args) = concatMapU freeVars args
   freeVars (Op _ fs) = concatMapU freeVars fs
   freeVars (Quantifier _ v f) = filter (/= v) $ freeVars f
+  freeVars (FreshVar _) = []
+
+instance FreeVars TermSpec where
+  freeVars :: TermSpec -> [Name]
+  freeVars (TVar n) = [n]
+  freeVars (TFun _ ts) = concatMapU freeVars ts
+  freeVars (TPlaceholder _) = []
 
 instance FreeVars FormulaSpec where
   freeVars :: FormulaSpec -> [Name]
-  freeVars = undefined
+  freeVars (FPredicate _ args) = concatMapU freeVars args
+  freeVars (FOp _ fs) = concatMapU freeVars fs
+  freeVars (FQuantifier _ v f) = filter (/= v) $ freeVars f
+  freeVars (FSubst f (Subst v t)) = freeVars t
+  freeVars (FFreshVar _) = []
+  freeVars (FPlaceholder _) = []
 
-class Substitute a where
-  subst :: Subst -> a -> a
+fromTerm :: Term -> TermSpec
+fromTerm (Var n) = TVar n
+fromTerm (Fun f ts) = TFun f (map fromTerm ts)
 
-instance Substitute Term where
-  subst :: Subst -> Term -> Term
+class Substitute a b where
+  subst :: Subst b -> a -> a
+
+instance Substitute Term Term where
+  subst :: Subst Term -> Term -> Term
   subst (Subst y s) t@(Var x) = if x == y then s else t
   subst sub (Fun f ts) = Fun f $ map (subst sub) ts
 
-instance Substitute Formula where
-  subst :: Subst -> Formula -> Formula
+instance Substitute TermSpec TermSpec where
+  subst :: Subst TermSpec -> TermSpec -> TermSpec
+  subst (Subst y s) t@(TVar x) = if x == y then s else t
+  subst sub (TFun f ts) = TFun f $ map (subst sub) ts
+
+instance Substitute Formula Term where
+  subst :: Subst Term -> Formula -> Formula
   subst sub (Predicate name args) = Predicate name (map (subst sub) args)
   subst sub (Op op fs) = Op op (map (subst sub) fs)
   subst s@(Subst x t) (Quantifier q v f)
@@ -65,10 +86,22 @@ instance Substitute Formula where
    where
     v' = makeFresh (makeFresh v t) f
     f' = subst (Subst v (Var v')) f
+  subst _ f = f
 
-instance Substitute FormulaSpec where
-  subst :: Subst -> FormulaSpec -> FormulaSpec
-  subst = undefined
+instance Substitute FormulaSpec TermSpec where
+  subst :: Subst TermSpec -> FormulaSpec -> FormulaSpec
+  subst sub (FPredicate name args) = FPredicate name (map (subst sub) args)
+  subst sub (FOp op fs) = FOp op (map (subst sub) fs)
+  subst s@(Subst x t) (FQuantifier q v f)
+    | x == v = FQuantifier q v f
+    | v `elem` freeVars t = subst (Subst x t) (FQuantifier q v' f')
+    | otherwise = FQuantifier q v (subst s f)
+   where
+    v' = makeFresh (makeFresh v t) f
+    f' = subst (Subst v (TVar v')) f
+  subst s (FSubst n (Subst v' t')) =
+    FSubst n (Subst v' (subst s t'))
+  subst _ f = f
 
 unifyTerms :: [(Term, TermSpec)] -> Maybe (Map Name Term)
 unifyTerms ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTerms (zip ts ss ++ rest)
@@ -88,22 +121,20 @@ unifyAlphaEq (Op op fs) (FOp op' fs')
   | op == op' = do
       fss <- zipWithM unifyAlphaEq fs fs'
       return $ bimap (Op op) (FOp op') $ unzip fss
+-- TODO the renaming for freshness needs to happen GLOBALLY!!
 unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
   | q == q' && v == v' = return (f, fs)
-  | q == q' && notElem v (freeVars form') = Just (f, FQuantifier q' v $ subst (Subst v (Var v')) form')
+  | q == q' && notElem v (freeVars form') = Just (f, FQuantifier q' v $ subst (Subst v (TVar v')) form')
   | q == q' =
       let
         v'' = makeFresh (makeFresh v form) form'
        in
         Just
           ( Quantifier q v'' $ subst (Subst v (Var v'')) form
-          , FQuantifier q' v'' $ subst (Subst v (Var v'')) form'
+          , FQuantifier q' v'' $ subst (Subst v (TVar v'')) form'
           )
 unifyAlphaEq f fs@(FPlaceholder n) = Just (f, fs)
--- ignore the substitution, since it only replaces terms.
-unifyAlphaEq f fs@(FSubst fwp sub) = do
-  (f', fwp') <- unifyAlphaEq f fwp
-  return (f', FSubst fwp' sub)
+unifyAlphaEq f fs@(FSubst n sub) = return (f, fs)
 unifyAlphaEq _ _ = Nothing
 
 {- Phases of proof verification:
@@ -149,8 +180,15 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           -- 4. Collect name->term mappings and 5. verify term mappings
           Right formulaSpecs -> case verifyTerms (collectTerms ((conclusion, conclusionSpec) : formulaSpecs)) of
             Left err -> ParsedInvalid ruleText err ra
-            Right termMap -> ParsedValid ruleText ra
+            Right termMap ->
+              let
+                termMap' = collectFreshVar termMap formulaSpecs
+                forms = collectFormulae termMap' ((conclusion, conclusionSpec) : formulaSpecs)
+               in
+                ParsedInvalid ruleText (pack $ show forms) ra
    where
+    -- ParsedValid ruleText ra
+
     ---------------------------------------------------
     -- Unwrap variables
     formula = fromWrapper f
@@ -328,9 +366,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
     -- 5. Verify term mappings
     verifyTerms :: Map Name [Term] -> Either Text (Map Name Term)
-    verifyTerms m = do
-      mappings <- mapM makeUnique (M.toList m)
-      return (M.fromList mappings)
+    verifyTerms m = M.fromList <$> mapM makeUnique (M.toList m)
      where
       makeUnique :: (Name, [Term]) -> Either Text (Name, Term)
       makeUnique (_, []) = Left "INTERNAL ERROR, makeUnique got empty list of Terms!"
@@ -356,6 +392,73 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           t
           ts
         return (v, t)
+    ---------------------------------------------------
+
+    ---------------------------------------------------
+    -- 6. Collect formula mappings using backward substitution
+    -- TODO this should work because of freshness??
+    collectFreshVar :: Map Name Term -> [(Formula, FormulaSpec)] -> Map Name Term
+    collectFreshVar terms ((FreshVar n, FFreshVar m) : rest) =
+      M.insert m (Var n) $
+        collectFreshVar terms rest
+    collectFreshVar terms (_ : rest) = collectFreshVar terms rest
+    collectFreshVar terms [] = terms
+    collectFormulae ::
+      Map Name Term ->
+      [(Formula, FormulaSpec)] ->
+      Map Name [Either Formula (Either [Formula] (Formula, Subst TermSpec))]
+    collectFormulae _ [] = M.empty
+    collectFormulae terms ((Op p fs, FOp q hs) : rest) =
+      collectFormulae terms (zip fs hs ++ rest)
+    collectFormulae terms ((Quantifier q v f, FQuantifier q' v' f') : rest) =
+      collectFormulae terms ((f, f') : rest)
+    collectFormulae terms ((f, FPlaceholder n) : rest) =
+      M.insertWith (++) n [Left f] (collectFormulae terms rest)
+    collectFormulae terms ((FreshVar n, FFreshVar m) : rest) =
+      M.insertWith
+        (++)
+        m
+        [Left (FreshVar n)]
+        (collectFormulae terms rest)
+    collectFormulae terms ((f, FSubst n s) : rest) =
+      M.insertWith
+        (++)
+        n
+        [handleSubst n s f]
+        (collectFormulae terms rest)
+     where
+      handleSubst :: Name -> Subst TermSpec -> Formula -> Either Formula (Either [Formula] (Formula, Subst TermSpec))
+      handleSubst fName (Subst v (TPlaceholder n)) f = case terms M.!? n of
+        Nothing -> Right . Right $ (f, Subst v (TPlaceholder n))
+        Just t -> Right . Left $ backwardsSubstitute n t f
+      handleSubst fName (Subst v (TVar n)) f = case terms M.!? n of
+        -- TODO in this case no List is needed, since the backwardssubst is unique!
+        -- Maybe adjust data structure to accomodate this??
+        -- Maybe introduce TFreshVar in TermSpec?
+        Just (Var x) -> Right . Left $ backwardsSubstitute n (Var x) f
+        Nothing -> error "found no instance of [c]! SHOULD NOT HAPPEN"
+      bwsTerm :: Name -> Term -> Term -> [Term]
+      bwsTerm v t t'@(Fun f ts) =
+        if t == t'
+          then [Var v, t']
+          else map (Fun f) . transpose $ map (bwsTerm v t) ts
+      bwsTerm v t t'@(Var x) =
+        if t == t'
+          then [Var v, t']
+          else [t']
+      backwardsSubstitute :: Name -> Term -> Formula -> [Formula]
+      backwardsSubstitute n t (Predicate p ts) =
+        map (Predicate p) . transpose $ map (bwsTerm n t) ts
+      backwardsSubstitute n t (Op op fs) =
+        map (Op op) . transpose $ map (backwardsSubstitute n t) fs
+      backwardsSubstitute n t (Quantifier q v f)
+        | n /= v =
+            map (Quantifier q v) (backwardsSubstitute n t f)
+      backwardsSubstitute _ _ f = [f]
+      transpose :: [[a]] -> [[a]]
+      transpose [] = []
+      transpose (ts : rest) = let rest' = transpose rest in concatMap (\t -> map (t :) rest') ts
+    collectFormulae terms (_ : rest) = collectFormulae terms rest
     ---------------------------------------------------
 
     -- helpers
