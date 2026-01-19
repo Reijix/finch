@@ -180,15 +180,10 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           -- 4. Collect name->term mappings and 5. verify term mappings
           Right formulaSpecs -> case verifyTerms (collectTerms ((conclusion, conclusionSpec) : formulaSpecs)) of
             Left err -> ParsedInvalid ruleText err ra
-            Right termMap ->
-              let
-                termMap' = collectFreshVar termMap formulaSpecs
-                forms = collectFormulae termMap' ((conclusion, conclusionSpec) : formulaSpecs)
-               in
-                ParsedInvalid ruleText (pack $ show forms) ra
+            Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
+              Left err -> ParsedInvalid ruleText err ra
+              Right formMap -> ParsedValid ruleText ra
    where
-    -- ParsedValid ruleText ra
-
     ---------------------------------------------------
     -- Unwrap variables
     formula = fromWrapper f
@@ -359,6 +354,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       collectTerms (zip fs fs' ++ rest)
     collectTerms ((Quantifier _ _ f, FQuantifier _ _ f') : rest) =
       collectTerms ((f, f') : rest)
+    collectTerms ((FreshVar m, FFreshVar n) : rest) = M.insertWith (++) n [Var m] $ collectTerms rest
     collectTerms (_ : rest) = collectTerms rest
     collectTerms [] = M.empty
     ---------------------------------------------------
@@ -396,69 +392,28 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
 
     ---------------------------------------------------
     -- 6. Collect formula mappings using backward substitution
-    -- TODO this should work because of freshness??
-    collectFreshVar :: Map Name Term -> [(Formula, FormulaSpec)] -> Map Name Term
-    collectFreshVar terms ((FreshVar n, FFreshVar m) : rest) =
-      M.insert m (Var n) $
-        collectFreshVar terms rest
-    collectFreshVar terms (_ : rest) = collectFreshVar terms rest
-    collectFreshVar terms [] = terms
-    collectFormulae ::
-      Map Name Term ->
-      [(Formula, FormulaSpec)] ->
-      Map Name [Either Formula (Either [Formula] (Formula, Subst TermSpec))]
-    collectFormulae _ [] = M.empty
-    collectFormulae terms ((Op p fs, FOp q hs) : rest) =
-      collectFormulae terms (zip fs hs ++ rest)
-    collectFormulae terms ((Quantifier q v f, FQuantifier q' v' f') : rest) =
-      collectFormulae terms ((f, f') : rest)
-    collectFormulae terms ((f, FPlaceholder n) : rest) =
-      M.insertWith (++) n [Left f] (collectFormulae terms rest)
-    collectFormulae terms ((FreshVar n, FFreshVar m) : rest) =
-      M.insertWith
-        (++)
-        m
-        [Left (FreshVar n)]
-        (collectFormulae terms rest)
-    collectFormulae terms ((f, FSubst n s) : rest) =
-      M.insertWith
-        (++)
-        n
-        [handleSubst n s f]
-        (collectFormulae terms rest)
+    verifyFormulae :: Map Name Term -> [(Formula, FormulaSpec)] -> Either Text (Map Name Formula)
+    verifyFormulae termMap formsAndSpecs = do
+      formMap <- reduceFormulae $ M.map (map Left) $ collectSimpleFormulae formsAndSpecs
+      formMap' <- collectMoreFormulae formMap formsAndSpecs
+      reduceFormulae formMap'
      where
-      handleSubst :: Name -> Subst TermSpec -> Formula -> Either Formula (Either [Formula] (Formula, Subst TermSpec))
-      handleSubst fName (Subst v (TPlaceholder n)) f = case terms M.!? n of
-        Nothing -> Right . Right $ (f, Subst v (TPlaceholder n))
-        Just t -> Right . Left $ backwardsSubstitute n t f
-      handleSubst fName (Subst v (TVar n)) f = case terms M.!? n of
-        -- TODO in this case no List is needed, since the backwardssubst is unique!
-        -- Maybe adjust data structure to accomodate this??
-        -- Maybe introduce TFreshVar in TermSpec?
-        Just (Var x) -> Right . Left $ backwardsSubstitute n (Var x) f
-        Nothing -> error "found no instance of [c]! SHOULD NOT HAPPEN"
-      bwsTerm :: Name -> Term -> Term -> [Term]
-      bwsTerm v t t'@(Fun f ts) =
-        if t == t'
-          then [Var v, t']
-          else map (Fun f) . transpose $ map (bwsTerm v t) ts
-      bwsTerm v t t'@(Var x) =
-        if t == t'
-          then [Var v, t']
-          else [t']
-      backwardsSubstitute :: Name -> Term -> Formula -> [Formula]
-      backwardsSubstitute n t (Predicate p ts) =
-        map (Predicate p) . transpose $ map (bwsTerm n t) ts
-      backwardsSubstitute n t (Op op fs) =
-        map (Op op) . transpose $ map (backwardsSubstitute n t) fs
-      backwardsSubstitute n t (Quantifier q v f)
-        | n /= v =
-            map (Quantifier q v) (backwardsSubstitute n t f)
-      backwardsSubstitute _ _ f = [f]
-      transpose :: [[a]] -> [[a]]
-      transpose [] = []
-      transpose (ts : rest) = let rest' = transpose rest in concatMap (\t -> map (t :) rest') ts
-    collectFormulae terms (_ : rest) = collectFormulae terms rest
+      collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name [Formula]
+      collectSimpleFormulae [] = M.empty
+      collectSimpleFormulae ((Predicate{}, FPredicate{}) : rest) = collectSimpleFormulae rest
+      collectSimpleFormulae ((Op _ fs, FOp _ fSpecs) : rest) = collectSimpleFormulae $ zip fs fSpecs <> rest
+      collectSimpleFormulae ((Quantifier _ _ f, FQuantifier _ _ fSpec) : rest) = collectSimpleFormulae $ (f, fSpec) : rest
+      collectSimpleFormulae ((FreshVar n, FFreshVar m) : rest) = collectSimpleFormulae rest
+      collectSimpleFormulae ((f, FPlaceholder n) : rest) = M.insertWith (++) n [f] $ collectSimpleFormulae rest
+      collectSimpleFormulae (_ : rest) = collectSimpleFormulae rest
+      reduceFormulae :: Map Name [Either Formula [Formula]] -> Either Text (Map Name Formula)
+      reduceFormulae = M.traverseWithKey reduceHelper
+       where
+        reduceHelper :: Name -> [Either Formula [Formula]] -> Either Text Formula
+        reduceHelper n fs = undefined
+
+      collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name [Either Formula [Formula]])
+      collectMoreFormulae = undefined
     ---------------------------------------------------
 
     -- helpers

@@ -30,7 +30,7 @@ import Fitch.Verification (verifyProof)
 import Miso (
   App,
   CSS (Href),
-  Component (events, initialAction, styles, subs),
+  Component (initialAction, styles, subs),
   ComponentInfo,
   DOMRef,
   Effect,
@@ -104,10 +104,9 @@ runApp ::
   -- | Resulting program
   IO ()
 runApp proof operators quantifiers rules =
-  run . startApp $
+  run . startApp (dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
-      , events = dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents
       , initialAction = Just Setup
       }
  where

@@ -11,7 +11,6 @@ import Fitch.Proof
 import Miso (
   App,
   Attribute,
-  Component (events, subs),
   DOMRef,
   Effect,
   KeyCode,
@@ -20,7 +19,6 @@ import Miso (
   PointerEvent (client),
   ROOT,
   View,
-  component,
   consoleLog,
   io_,
   mouseSub,
