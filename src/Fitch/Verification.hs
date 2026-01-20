@@ -214,7 +214,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Left err -> ParsedInvalid ruleText err ra
             Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
               Left err -> ParsedInvalid ruleText err ra
-              Right formMap -> ParsedValid ruleText ra
+              Right formMap -> ParsedInvalid ruleText (pack $ show formMap) ra
    where
     ---------------------------------------------------
     -- Unwrap variables
@@ -461,17 +461,30 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap M.!? phi of
         -- unify fs
         Just phiF -> case unifyFormulae [(phiF, f)] of
-          Nothing -> Left "unification error"
+          Nothing -> Left $ "Error unifying " <> pack (show phiF) <> " with\n" <> pack (show f)
           -- compare assignment of E
           Just mgu -> case (mgu M.!? n, termMap M.!? n) of
-            (Nothing, _) -> undefined
+            (Nothing, _) -> M.insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
             (Just e, Just e') -> undefined
         Nothing -> case t of
           TPlaceholder e -> case termMap M.!? e of
             Nothing -> Left "Term has wrong form, RULEERROR!" -- error
             Just t -> undefined -- backward substitution
           _ -> Left "Term has wrong form, RULEERROR!" -- error
-
+      collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
+      substBackwardsForm :: Subst Term -> Formula -> [Formula]
+      substBackwardsForm s (Predicate p ts) = map (Predicate p) . transpose $ map (substBackwardsTerm s) ts
+      substBackwardsForm s (Op o fs) = map (Op o) . transpose $ map (substBackwardsForm s) fs
+      -- TODO need freshness here :(
+      substBackwardsForm s@(Subst n t) (Quantifier q v f) = if n == v then undefined else map (Quantifier q v) (substBackwardsForm s f)
+      substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
+      substBackwardsTerm :: Subst Term -> Term -> [Term]
+      substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
+      substBackwardsTerm s (Var x) = [Var x]
+      substBackwardsTerm s (Fun f ts) = map (Fun f) . transpose $ map (substBackwardsTerm s) ts
+      transpose :: [[a]] -> [[a]]
+      transpose [] = []
+      transpose (l : rest) = let rest' = transpose rest in concatMap (\t -> map (t :) rest') l
     ---------------------------------------------------
 
     -- helpers
