@@ -6,6 +6,8 @@ import Control.Monad.RWS (MonadState)
 import Data.Bifunctor
 import Data.Either (fromLeft)
 import Data.Functor ((<&>))
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NE
 import Data.Map (Map)
 import Data.Map qualified as M
 import Data.Maybe (fromJust)
@@ -103,19 +105,49 @@ instance Substitute FormulaSpec TermSpec where
     FSubst n (Subst v' (subst s t'))
   subst _ f = f
 
-unifyTerms :: [(Term, TermSpec)] -> Maybe (Map Name Term)
-unifyTerms ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTerms (zip ts ss ++ rest)
-unifyTerms ((Var x, TVar y) : rest) | x == y = unifyTerms rest
-unifyTerms ((t, TPlaceholder n) : rest) = (M.singleton n t <>) <$> unifyTerms rest
-unifyTerms [] = Just M.empty
-unifyTerms _ = Nothing
+unifyTermSpec :: [(Term, TermSpec)] -> Maybe (Map Name Term)
+unifyTermSpec ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTermSpec (zip ts ss ++ rest)
+unifyTermSpec ((Var x, TVar y) : rest) | x == y = unifyTermSpec rest
+unifyTermSpec ((t, TPlaceholder n) : rest) = (M.singleton n t <>) <$> unifyTermSpec rest
+unifyTermSpec [] = Just M.empty
+unifyTermSpec _ = Nothing
+
+unifyTerms :: [(Term, Term)] -> Maybe [(Name, Term)]
+unifyTerms [] = Just []
+unifyTerms ((Fun f ts, Fun g ss) : rest)
+  -- (decomp)
+  | f == g && length ts == length ss = unifyTerms (zip ts ss <> rest)
+  -- (conflict)
+  | otherwise = Nothing
+-- (delete)
+unifyTerms ((Var x, Var y) : rest) | x == y = unifyTerms rest
+unifyTerms ((Var x, t) : rest)
+  -- (occurs)
+  | x `elem` freeVars t = Nothing
+  -- (elim)
+  | x `elem` concatMapU (\(t1, t2) -> freeVars t1 <> freeVars t2) rest =
+      unifyTerms $ (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) rest
+  | otherwise = ((x, t) :) <$> unifyTerms rest
+-- (orient)
+unifyTerms ((t, Var x) : rest) = unifyTerms ((Var x, t) : rest)
+
+unifyFormulae :: [(Formula, Formula)] -> Maybe (Map Name Term)
+unifyFormulae = fmap M.fromList . go
+ where
+  go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
+  go ((Predicate p ts, Predicate q ss) : rest) | p == q && length ts == length ss = do
+    mapping <- go rest
+    unifyTerms $ zip ts ss <> map (first Var) mapping
+  go ((Op o1 fs1, Op o2 fs2) : rest) | o1 == o2 && length fs1 == length fs2 = go (zip fs1 fs2 <> rest)
+  go ((Quantifier q1 v1 f1, Quantifier q2 v2 f2) : rest) | q1 == q2 && v1 == v2 = go ((f1, f2) : rest)
+  go _ = Nothing
 
 unifyAlphaEq :: Formula -> FormulaSpec -> Maybe (Formula, FormulaSpec)
 unifyAlphaEq f@(FreshVar v) fs@(FFreshVar v') = Just (f, fs)
 unifyAlphaEq (FreshVar{}) _ = Nothing
 unifyAlphaEq f@(Predicate p ts) fs@(FPredicate p' ts')
   | p == p' && length ts == length ts' = do
-      unifyTerms (zip ts ts')
+      unifyTermSpec (zip ts ts')
       return (f, fs)
 unifyAlphaEq (Op op fs) (FOp op' fs')
   | op == op' = do
@@ -394,26 +426,52 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     -- 6. Collect formula mappings using backward substitution
     verifyFormulae :: Map Name Term -> [(Formula, FormulaSpec)] -> Either Text (Map Name Formula)
     verifyFormulae termMap formsAndSpecs = do
-      formMap <- reduceFormulae $ M.map (map Left) $ collectSimpleFormulae formsAndSpecs
+      formMap <- reduceFormulae $ M.map (NE.map Left) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
       reduceFormulae formMap'
      where
-      collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name [Formula]
+      collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name (NonEmpty Formula)
       collectSimpleFormulae [] = M.empty
       collectSimpleFormulae ((Predicate{}, FPredicate{}) : rest) = collectSimpleFormulae rest
       collectSimpleFormulae ((Op _ fs, FOp _ fSpecs) : rest) = collectSimpleFormulae $ zip fs fSpecs <> rest
       collectSimpleFormulae ((Quantifier _ _ f, FQuantifier _ _ fSpec) : rest) = collectSimpleFormulae $ (f, fSpec) : rest
       collectSimpleFormulae ((FreshVar n, FFreshVar m) : rest) = collectSimpleFormulae rest
-      collectSimpleFormulae ((f, FPlaceholder n) : rest) = M.insertWith (++) n [f] $ collectSimpleFormulae rest
+      collectSimpleFormulae ((f, FPlaceholder n) : rest) = M.insertWith (<>) n (f :| []) $ collectSimpleFormulae rest
       collectSimpleFormulae (_ : rest) = collectSimpleFormulae rest
-      reduceFormulae :: Map Name [Either Formula [Formula]] -> Either Text (Map Name Formula)
+      reduceFormulae :: Map Name (NonEmpty (Either Formula [Formula])) -> Either Text (Map Name Formula)
       reduceFormulae = M.traverseWithKey reduceHelper
        where
-        reduceHelper :: Name -> [Either Formula [Formula]] -> Either Text Formula
-        reduceHelper n fs = undefined
+        reduceHelper :: Name -> NonEmpty (Either Formula [Formula]) -> Either Text Formula
+        reduceHelper n (Left f :| rest) = go n f rest
+        reduceHelper n (Right [] :| rest) = Left "Error: can't find match!"
+        reduceHelper n (Right (f : fs) :| rest) = case go n f rest of
+          Left err -> reduceHelper n (Right fs :| rest)
+          Right f -> Right f
+        go :: Name -> Formula -> [Either Formula [Formula]] -> Either Text Formula
+        go n f [] = Right f
+        go n f (Left f' : rest) = if f == f' then go n f' rest else Left "Error f/=f'" -- TODO error message
+        go n f (Right fs' : rest) = mapFs fs'
+         where
+          mapFs :: [Formula] -> Either Text Formula
+          mapFs [] = Left $ "Error: can't find match for f=" <> pack (show f)
+          mapFs (f' : fs) = if f /= f' then mapFs fs else Right f'
 
-      collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name [Either Formula [Formula]])
-      collectMoreFormulae = undefined
+      collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name (NonEmpty (Either Formula [Formula])))
+      collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
+      collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap M.!? phi of
+        -- unify fs
+        Just phiF -> case unifyFormulae [(phiF, f)] of
+          Nothing -> Left "unification error"
+          -- compare assignment of E
+          Just mgu -> case (mgu M.!? n, termMap M.!? n) of
+            (Nothing, _) -> undefined
+            (Just e, Just e') -> undefined
+        Nothing -> case t of
+          TPlaceholder e -> case termMap M.!? e of
+            Nothing -> Left "Term has wrong form, RULEERROR!" -- error
+            Just t -> undefined -- backward substitution
+          _ -> Left "Term has wrong form, RULEERROR!" -- error
+
     ---------------------------------------------------
 
     -- helpers
