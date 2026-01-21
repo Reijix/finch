@@ -32,7 +32,7 @@ x !: xs = if x `elem` xs then xs else x : xs
 -- | Unique appending
 (++!) :: (Eq a) => [a] -> [a] -> [a]
 [] ++! ys = ys
-(x : xs) ++! ys = x !: xs ++! ys
+(x : xs) ++! ys = x !: (xs ++! ys)
 
 -- | Unique concatMap
 concatMapU :: (Eq b) => (a -> [b]) -> [a] -> [b]
@@ -129,12 +129,13 @@ unifyTerms ((Var x, t) : rest)
       unifyTerms $ (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) rest
   | otherwise = ((x, t) :) <$> unifyTerms rest
 -- (orient)
-unifyTerms ((t, Var x) : rest) = unifyTerms ((Var x, t) : rest)
+unifyTerms ((t@Fun{}, Var x) : rest) = unifyTerms ((Var x, t) : rest)
 
 unifyFormulae :: [(Formula, Formula)] -> Maybe (Map Name Term)
 unifyFormulae = fmap M.fromList . go
  where
   go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
+  go [] = Just []
   go ((Predicate p ts, Predicate q ss) : rest) | p == q && length ts == length ss = do
     mapping <- go rest
     unifyTerms $ zip ts ss <> map (first Var) mapping
@@ -464,7 +465,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           Nothing -> Left $ "Error unifying " <> pack (show phiF) <> " with\n" <> pack (show f)
           -- compare assignment of E
           Just mgu -> case (mgu M.!? n, termMap M.!? n) of
-            (Nothing, _) -> M.insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
+            ((Nothing, _); (_, Nothing)) -> M.insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
             (Just e, Just e') -> undefined
         Nothing -> case t of
           TPlaceholder e -> case termMap M.!? e of

@@ -114,6 +114,7 @@ library fitch-editor-lib
   default-extensions:
     OverloadedRecordDot
     OverloadedStrings
+    OrPatterns
 
   build-depends:
     base >=4.21.0 && <5,

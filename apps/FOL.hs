@@ -48,10 +48,10 @@ main = runApp exProof operators quantifiers rules
   fakeModel = initialModel undefined operators quantifiers M.empty
 
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] [] 0
+  mkFormula = tryParse fakeModel [] [] 1
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
-  mkRuleApplication = tryParse fakeModel [] [] 0
+  mkRuleApplication = tryParse fakeModel [] [] 1
 
   mkDerivation :: Text -> Text -> Derivation
   mkDerivation f r = Derivation (mkFormula f) (mkRuleApplication r)

@@ -152,7 +152,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
               SubProof
                 [tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"]
                 []
-                (Derivation (tryParse m [] [] 0 "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
+                (Derivation (tryParse m [] [] 1 "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
           )
           targetAddr
           pos

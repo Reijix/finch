@@ -38,7 +38,7 @@ main = runApp exProof operators [] rules
 
   fakeModel = initialModel undefined operators [] M.empty
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] [] 0
+  mkFormula = tryParse fakeModel [] [] 1
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
   mkRuleApplication txt = Unparsed txt ""

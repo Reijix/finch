@@ -72,13 +72,13 @@ data Term
     Var Name
   | -- | A function applied to terms in first-order logic
     Fun Name [Term]
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
-instance Show Term where
-  show :: Term -> String
-  show (Var v) = T.unpack v
-  show (Fun f []) = T.unpack f
-  show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+-- instance Show Term where
+--   show :: Term -> String
+--   show (Var v) = T.unpack v
+--   show (Fun f []) = T.unpack f
+--   show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
 
 data Subst a = Subst Name a
   deriving (Show, Eq)
@@ -135,22 +135,22 @@ data Formula
     Quantifier Name Name Formula
   | -- | A fresh variable of a subproof, written like @[c]@
     FreshVar Name
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
-instance Show Formula where
-  show :: Formula -> String
-  show f = go False f
-   where
-    go :: Bool -> Formula -> String
-    go _ (Predicate p []) = T.unpack p
-    go _ (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-    go True f = "(" ++ go False f ++ ")"
-    go _ (Op op fs)
-      | null fs = T.unpack op
-      | L.length fs == 2 = L.intercalate (T.unpack op) (map (go True) fs)
-      | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
-    go _ (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
-    go _ (FreshVar v) = "[" ++ T.unpack v ++ "]"
+-- instance Show Formula where
+--   show :: Formula -> String
+--   show f = go False f
+--    where
+--     go :: Bool -> Formula -> String
+--     go _ (Predicate p []) = T.unpack p
+--     go _ (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+--     go True f = "(" ++ go False f ++ ")"
+--     go _ (Op op fs)
+--       | null fs = T.unpack op
+--       | L.length fs == 2 = L.intercalate (T.unpack op) (map (go True) fs)
+--       | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
+--     go _ (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
+--     go _ (FreshVar v) = "[" ++ T.unpack v ++ "]"
 
 -- | A reference to a line (either `Assumption` or `ProofLine`) or a `SubProof`
 data Reference where

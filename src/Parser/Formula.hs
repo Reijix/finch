@@ -45,9 +45,15 @@ comma :: FormulaParser Text
 comma = symbol ","
 
 -- The parser cant distinguish between function constants and variables.
--- This does not matter for our application.
+-- This does not matter for our application. => constants are treated as variables!
+pFun :: FormulaParser Term
+pFun = lexeme (liftM2 Fun pName (parens (pTerm `sepBy` comma)) <?> "function")
+
+pVar :: FormulaParser Term
+pVar = lexeme (Var <$> pName <?> "variable")
+
 pTerm :: FormulaParser Term
-pTerm = lexeme (liftM2 Fun pName (parens (pTerm `sepBy` comma) <|> return []) <?> "term")
+pTerm = try pFun <|> pVar <?> "term"
 
 parens :: FormulaParser a -> FormulaParser a
 parens = between (symbol "(") (symbol ")")
