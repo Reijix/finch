@@ -15,6 +15,17 @@ import Data.Text (Text, append, pack)
 import Data.Traversable (mapAccumM)
 import Fitch.Proof
 
+{-@ allCombinations :: xss:[[a]] -> [{v:[a]| len v == len xss}] @-}
+allCombinations :: [[a]] -> [[a]]
+allCombinations xs = assert (all ((length xs ==) . length)) $ go xs
+ where
+  go [] = [[]]
+  go [[]] = []
+  go ([] : _) = []
+  go ((x : xs') : ys) = ((x :) <$> go ys) ++ go (xs' : ys)
+
+  assert b x = if b x then x else error "allCombinations: assertion violation"
+
 class FreeVars a where
   freeVars :: a -> [Name]
   makeFresh :: Name -> a -> Name
@@ -444,17 +455,18 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
        where
         reduceHelper :: Name -> NonEmpty (Either Formula [Formula]) -> Either Text Formula
         reduceHelper n (Left f :| rest) = go n f rest
-        reduceHelper n (Right [] :| rest) = Left "Error: can't find match!"
+        reduceHelper n (Right [] :| rest) = Left "reduceHelper: can't find match!"
+        -- reduceHelper n (Right fs :| rest) = Left $ "reduceHelper: can't find match!" <> pack (show fs)
         reduceHelper n (Right (f : fs) :| rest) = case go n f rest of
           Left err -> reduceHelper n (Right fs :| rest)
           Right f -> Right f
         go :: Name -> Formula -> [Either Formula [Formula]] -> Either Text Formula
         go n f [] = Right f
-        go n f (Left f' : rest) = if f == f' then go n f' rest else Left "Error f/=f'" -- TODO error message
+        go n f (Left f' : rest) = if f == f' then go n f' rest else Left "reduceFormulae: f/=f'" -- TODO error message
         go n f (Right fs' : rest) = mapFs fs'
          where
           mapFs :: [Formula] -> Either Text Formula
-          mapFs [] = Left $ "Error: can't find match for f=" <> pack (show f)
+          mapFs [] = Left $ "reduceFormulae: can't find match for f=" <> pack (show f)
           mapFs (f' : fs) = if f /= f' then mapFs fs else Right f'
 
       collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name (NonEmpty (Either Formula [Formula])))
@@ -470,22 +482,20 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         Nothing -> case t of
           TPlaceholder e -> case termMap M.!? e of
             Nothing -> Left "Term has wrong form, RULEERROR!" -- error
-            Just t -> undefined -- backward substitution
+            -- backwards
+            Just t' -> M.insertWith (<>) phi (Right (substBackwardsForm (Subst n t') f) :| []) <$> collectMoreFormulae formMap rest
           _ -> Left "Term has wrong form, RULEERROR!" -- error
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> Formula -> [Formula]
-      substBackwardsForm s (Predicate p ts) = map (Predicate p) . transpose $ map (substBackwardsTerm s) ts
-      substBackwardsForm s (Op o fs) = map (Op o) . transpose $ map (substBackwardsForm s) fs
+      substBackwardsForm s (Predicate p ts) = map (Predicate p) . allCombinations $ map (substBackwardsTerm s) ts
+      substBackwardsForm s (Op o fs) = map (Op o) . allCombinations $ map (substBackwardsForm s) fs
       -- TODO need freshness here :(
       substBackwardsForm s@(Subst n t) (Quantifier q v f) = if n == v then undefined else map (Quantifier q v) (substBackwardsForm s f)
       substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
       substBackwardsTerm :: Subst Term -> Term -> [Term]
       substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
       substBackwardsTerm s (Var x) = [Var x]
-      substBackwardsTerm s (Fun f ts) = map (Fun f) . transpose $ map (substBackwardsTerm s) ts
-      transpose :: [[a]] -> [[a]]
-      transpose [] = []
-      transpose (l : rest) = let rest' = transpose rest in concatMap (\t -> map (t :) rest') l
+      substBackwardsTerm s (Fun f ts) | not (null ts) = map (Fun f) . allCombinations $ map (substBackwardsTerm s) ts
     ---------------------------------------------------
 
     -- helpers
