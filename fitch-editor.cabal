@@ -107,14 +107,15 @@ library fitch-editor-lib
     App.Runner
     App.Views
     Fitch.Proof
+    Fitch.Unification
     Fitch.Verification
     Parser.Formula
     Parser.Rule
 
   default-extensions:
+    OrPatterns
     OverloadedRecordDot
     OverloadedStrings
-    OrPatterns
 
   build-depends:
     base >=4.21.0 && <5,
