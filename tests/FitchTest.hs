@@ -2,6 +2,8 @@ module FitchTest where
 
 import Data.Text (pack)
 import Data.Text.IO
+import Fitch.Proof (prettyProof)
+import Parser.Formula (parseFormula)
 import Parser.Proof
 import System.IO (IOMode (..), openFile)
 
@@ -12,8 +14,8 @@ quantifiers = [("forall", "∀")]
 
 main :: IO ()
 main = do
-  handle <- openFile "tests/Examples/SimpleProof.fitch" ReadMode
+  handle <- openFile "tests/Examples/Proof1.fitch" ReadMode
   contents <- hGetContents handle
   case parseProof operators quantifiers contents of
     Left err -> Data.Text.IO.putStrLn err
-    Right p -> print p
+    Right p -> Data.Text.IO.putStrLn $ prettyProof p

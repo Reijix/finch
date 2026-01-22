@@ -44,7 +44,6 @@ test-suite test
   other-modules:
     FitchTest
     ProofSyntax
-    FitchTest
 
   main-is:
     test.hs

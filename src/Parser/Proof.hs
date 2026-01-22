@@ -21,17 +21,6 @@ import Parser.Rule (pRule)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec qualified as Parsec
 
-data ProofParserState = ProofParserState
-  {formulaParserState :: FormulaParserState}
-
-type ProofParser = ParsecT Void Text (State ProofParserState)
-
-instance {-# OVERLAPPING #-} (MonadState FormulaParserState) ProofParser where
-  get :: ProofParser FormulaParserState
-  get = gets formulaParserState
-  put :: FormulaParserState -> ProofParser ()
-  put fps = modify (\state -> state{formulaParserState = fps})
-
 pAssumption :: (FormulaParser m) => m Assumption
 pAssumption = match (lexeme pFormula) <&> uncurry ParsedValid
 
@@ -42,17 +31,17 @@ pDerivation =
     pAssumption
     (match (lexeme pRule) <&> uncurry ParsedValid)
 
-pProofLine :: ProofParser Proof
+pProofLine :: (FormulaParser m) => m Proof
 pProofLine = ProofLine <$> pDerivation
 
-pFormulaSep :: Int -> ProofParser ()
+pFormulaSep :: (Parser m) => Int -> m ()
 pFormulaSep ind = void . withIndent ind $ symbol "---"
 
-withIndent :: Int -> ProofParser a -> ProofParser a
+withIndent :: (Parser m) => Int -> m a -> m a
 withIndent 0 p = p
 withIndent n p = symbol "|" *> withIndent (n - 1) p
 
-pSubProof :: Int -> ProofParser Proof
+pSubProof :: (FormulaParser m) => Int -> m Proof
 pSubProof ind = do
   fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
   proofs <- some . try $ lexeme (pProof ind)
@@ -62,7 +51,7 @@ pSubProof ind = do
     Just (ps, ProofLine d) -> return $ SubProof fs ps d
     Just _ -> failure Nothing (S.singleton (Label $ NE.fromList "conclusion"))
 
-pProof :: Int -> ProofParser Proof
+pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
   try (withIndent ind pProofLine)
     <|> pSubProof (ind + 1)
@@ -113,10 +102,7 @@ parseProof operators quantifiers input = case evalState (runParserT' (pProof 0 <
       , stateParseErrors = []
       }
   initialState =
-    ProofParserState
-      { formulaParserState =
-          FormulaParserState
-            { operators
-            , quantifiers
-            }
+    FormulaParserState
+      { operators
+      , quantifiers
       }

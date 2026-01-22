@@ -185,6 +185,35 @@ data Proof where
   SubProof :: [Assumption] -> [Proof] -> Derivation -> Proof
   deriving (Eq)
 
+prettyProof :: Proof -> Text
+prettyProof p = pretty' 1 0 p
+ where
+  lineNoLen = length . show $ pLength p
+  withIndent :: Int -> Text -> Text
+  withIndent level t = T.replicate level "|" <> t
+  withLine :: Int -> Text -> Text
+  withLine line t = lineNo <> padding <> " " <> t
+   where
+    lineNo = T.pack (show line)
+    padding = T.replicate (lineNoLen - T.length lineNo) " "
+  withoutLine :: Text -> Text
+  withoutLine = (T.replicate (lineNoLen + 1) " " <>)
+  prettyAssumption :: Int -> Int -> Assumption -> Text
+  prettyAssumption line level a = withLine line $ withIndent level (getText a)
+  prettyDerivation :: Int -> Int -> Derivation -> Text
+  prettyDerivation line level (Derivation f r) = withLine line $ withIndent level (getText f <> "|" <> getText r)
+  pretty' :: Int -> Int -> Proof -> Text
+  pretty' line level (ProofLine d) = prettyDerivation line level d
+  pretty' line level (SubProof fs ps c) =
+    T.concat fsShow
+      <> withoutLine (withIndent (level + 1) "---\n")
+      <> T.concat psShow
+      <> cShow
+   where
+    (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, prettyAssumption ln (level + 1) f)) line fs
+    (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + pLength p, pretty' ln' (level + 1) p)) line' ps
+    cShow = prettyDerivation line'' (level + 1) c
+
 instance Show Proof where
   show :: Proof -> String
   show = show' 1 0
