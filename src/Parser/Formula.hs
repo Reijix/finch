@@ -1,101 +1,101 @@
-module Parser.Formula (parseFormula) where
+module Parser.Formula where
 
 import Control.Monad (liftM2, liftM3)
 import Control.Monad.Combinators.Expr (
-  Operator (InfixL, Prefix),
   makeExprParser,
  )
-import Control.Monad.State qualified as ST
-import Data.Data (Proxy (Proxy))
-import Data.Set qualified as E
-import Data.Text (Text, pack, unpack)
-import Data.Text qualified as T
-import Data.Void
-import Fitch.Proof
+import Control.Monad.State (MonadState, evalState, gets)
+import Data.Text (Text, pack)
+import Data.Void (Void)
+import Fitch.Proof (Formula (..), Name, Term (..))
 import Miso.Router (RoutingError (ParseError))
-import Text.Megaparsec
-import Text.Megaparsec.Char (letterChar, space1, string)
-import Text.Megaparsec.Char.Lexer qualified as L
-import Text.Megaparsec.Unicode qualified as Unicode
+import Parser.Prelude (
+  binary,
+  brackets,
+  comma,
+  lexeme,
+  pName,
+  parens,
+  prefix,
+  symbol,
+ )
+import Text.Megaparsec (
+  MonadParsec (eof, try),
+  PosState (
+    PosState,
+    pstateInput,
+    pstateLinePrefix,
+    pstateOffset,
+    pstateSourcePos,
+    pstateTabWidth
+  ),
+  SourcePos (SourcePos, sourceColumn, sourceLine, sourceName),
+  State (
+    State,
+    stateInput,
+    stateOffset,
+    stateParseErrors,
+    statePosState
+  ),
+  chunk,
+  defaultTabWidth,
+  empty,
+  errorBundlePretty,
+  mkPos,
+  pos1,
+  runParserT',
+  sepBy,
+  (<?>),
+  (<|>),
+ )
 
 data FormulaParserState = FormulaParserState
   { operators :: [(Text, Text, Int)]
   , quantifiers :: [(Text, Text)]
   }
 
-type FormulaParser = ParsecT Void Text (ST.State FormulaParserState)
-
-sc :: FormulaParser ()
-sc =
-  L.space
-    space1 -- discard spaces
-    empty -- no line comments
-    empty -- no block comments
-
-lexeme :: FormulaParser a -> FormulaParser a
-lexeme = L.lexeme sc
-
-symbol :: Text -> FormulaParser Text
-symbol = L.symbol sc
-
-pName :: FormulaParser Name
-pName = lexeme (pack <$> some letterChar <?> "name")
-
-comma :: FormulaParser Text
-comma = symbol ","
+type FormulaParser m = (MonadParsec Void Text m, MonadState FormulaParserState m)
 
 -- The parser cant distinguish between function constants and variables.
 -- This does not matter for our application. => constants are treated as variables!
-pFun :: FormulaParser Term
+pFun :: (FormulaParser m) => m Term
 pFun = lexeme (liftM2 Fun pName (parens (pTerm `sepBy` comma)) <?> "function")
 
-pVar :: FormulaParser Term
+pVar :: (FormulaParser m) => m Term
 pVar = lexeme (Var <$> pName <?> "variable")
 
-pTerm :: FormulaParser Term
+pTerm :: (FormulaParser m) => m Term
 pTerm = try pFun <|> pVar <?> "term"
 
-parens :: FormulaParser a -> FormulaParser a
-parens = between (symbol "(") (symbol ")")
-
-brackets :: FormulaParser a -> FormulaParser a
-brackets = between (symbol "[") (symbol "]")
-
-pFreshVariable :: FormulaParser Formula
+pFreshVariable :: (FormulaParser m) => m Formula
 pFreshVariable = lexeme $ FreshVar <$> brackets pName
 
-pPredicate :: FormulaParser Formula
+pPredicate :: (FormulaParser m) => m Formula
 pPredicate = lexeme $ liftM2 Predicate pName $ parens (pTerm `sepBy` comma) <|> return []
 
-pPropAtom :: FormulaParser Formula
+pPropAtom :: (FormulaParser m) => m Formula
 pPropAtom = lexeme $ (`Predicate` []) <$> pName
 
-pQuantifierName :: FormulaParser Name
+pQuantifierName :: (FormulaParser m) => m Name
 pQuantifierName = do
-  symbols <- ST.gets quantifiers
+  symbols <- gets quantifiers
   foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
 
-pConstant :: FormulaParser Formula
+pConstant :: (FormulaParser m) => m Formula
 pConstant = do
-  ops <- ST.gets operators
+  ops <- gets operators
   op <- foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
   lexeme . return $ Op op []
 
-pQuantifier :: FormulaParser Formula
-pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (string ".") >> lexeme pFormula)
+pQuantifier :: (FormulaParser m) => m Formula
+pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pFormula)
 
-pFormulaAtomic :: FormulaParser Formula
+pFormulaAtomic :: (FormulaParser m) => m Formula
 pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
 
-binary :: Text -> (a -> a -> a) -> Operator FormulaParser a
-binary name f = InfixL (f <$ hidden (symbol name))
-
-prefix :: Text -> (a -> a) -> Operator FormulaParser a
-prefix name f = Prefix $ foldr1 (.) <$> some (f <$ hidden (symbol name))
-
-pFormula :: FormulaParser Formula
+pFormula :: (FormulaParser m) => m Formula
 pFormula = do
-  ops <- ST.gets operators
+  ops <- gets operators
   let operatorTable =
         [ concatMap (\(alias, u, arity) -> if arity == 1 then [prefix alias (\f -> Op u [f]), prefix u (\f -> Op u [f])] else []) ops
         , concatMap (\(alias, b, arity) -> if arity == 2 then [binary alias (\f1 f2 -> Op b [f1, f2]), binary b (\f1 f2 -> Op b [f1, f2])] else []) ops
@@ -103,7 +103,7 @@ pFormula = do
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
 parseFormula :: [(Text, Text, Int)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
-parseFormula operators quantifiers lineNo input = case ST.evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
+parseFormula operators quantifiers lineNo input = case evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right f) -> Right f
  where

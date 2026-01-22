@@ -109,10 +109,13 @@ library fitch-editor-lib
     Fitch.Proof
     Fitch.Unification
     Fitch.Verification
+    Parser.Prelude
     Parser.Formula
+    Parser.Proof
     Parser.Rule
 
   default-extensions:
+    FlexibleInstances
     OrPatterns
     OverloadedRecordDot
     OverloadedStrings

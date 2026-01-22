@@ -1,4 +1,4 @@
-module Parser.Rule (parseRuleApplication) where
+module Parser.Rule where
 
 import Control.Monad (liftM2, liftM3)
 import Control.Monad.Combinators.Expr (
@@ -10,47 +10,21 @@ import Data.Text (Text, pack, unpack)
 import Data.Text qualified as T
 import Data.Void
 import Fitch.Proof
+import Parser.Prelude
 import Text.Megaparsec
 import Text.Megaparsec.Char (digitChar, letterChar, printChar, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
-type Parser = Parsec Void Text
-
-sc :: Parser ()
-sc =
-  L.space
-    space1 -- discard spaces
-    empty -- no line comments
-    empty -- no block comments
-
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme sc
-
-symbol :: Text -> Parser Text
-symbol = L.symbol sc
-
-pName :: Parser Name
-pName = lexeme (pack <$> some (noneOf ['(', ')']) <?> "name")
-
-comma :: Parser Text
-comma = symbol ","
-
-minus :: Parser Text
-minus = symbol "-"
-
-pLine :: Parser Int
+pLine :: (Parser m) => m Int
 pLine = lexeme L.decimal <?> "line number"
 
-parens :: Parser a -> Parser a
-parens = between (symbol "(") (symbol ")")
-
-pReference :: Parser Reference
+pReference :: (Parser m) => m Reference
 pReference = proofReference <|> lineReference
  where
   proofReference = liftM2 ProofReference (try $ pLine <* lexeme minus) pLine <?> "line range"
   lineReference = LineReference <$> pLine <?> "line number"
 
-pRule :: Parser RuleApplication
+pRule :: (Parser m) => m RuleApplication
 pRule = liftM2 RuleApplication (parens pName) (lexeme pReference `sepBy` comma)
 
 parseRuleApplication :: Int -> Text -> Either Text RuleApplication
