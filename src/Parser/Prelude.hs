@@ -9,6 +9,7 @@ import Text.Megaparsec (
   MonadParsec (hidden),
   between,
   empty,
+  noneOf,
   some,
   (<?>),
  )
@@ -32,6 +33,9 @@ symbol = L.symbol sc
 
 pName :: (Parser m) => m Text
 pName = pack <$> some letterChar <?> "name"
+
+pSymbolicName :: (Parser m) => m Text
+pSymbolicName = pack <$> some (noneOf ['(', ')']) <?> "name"
 
 comma :: (Parser m) => m Text
 comma = symbol ","

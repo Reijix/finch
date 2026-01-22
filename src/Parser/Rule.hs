@@ -25,7 +25,7 @@ pReference = proofReference <|> lineReference
   lineReference = LineReference <$> pLine <?> "line number"
 
 pRule :: (Parser m) => m RuleApplication
-pRule = liftM2 RuleApplication (parens pName) (lexeme pReference `sepBy` comma)
+pRule = liftM2 RuleApplication (parens pSymbolicName) (lexeme pReference `sepBy` comma)
 
 parseRuleApplication :: Int -> Text -> Either Text RuleApplication
 parseRuleApplication lineNo input = case runParser' (pRule <* eof) initialParserState of

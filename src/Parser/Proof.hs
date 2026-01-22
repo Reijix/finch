@@ -22,9 +22,7 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec qualified as Parsec
 
 data ProofParserState = ProofParserState
-  { formulaParserState :: FormulaParserState
-  , indent :: Int
-  }
+  {formulaParserState :: FormulaParserState}
 
 type ProofParser = ParsecT Void Text (State ProofParserState)
 
@@ -47,38 +45,27 @@ pDerivation =
 pProofLine :: ProofParser Proof
 pProofLine = ProofLine <$> pDerivation
 
-pFormulaSep :: ProofParser ()
-pFormulaSep = withIndent $ void $ symbol "---"
+pFormulaSep :: Int -> ProofParser ()
+pFormulaSep ind = void . withIndent ind $ symbol "---"
 
-withIndent :: ProofParser a -> ProofParser a
-withIndent p = gets indent >>= go p
- where
-  go :: ProofParser a -> Int -> ProofParser a
-  go p 0 = p
-  go p n = symbol "|" *> go p (n - 1)
+withIndent :: Int -> ProofParser a -> ProofParser a
+withIndent 0 p = p
+withIndent n p = symbol "|" *> withIndent (n - 1) p
 
-pSubProof :: ProofParser Proof
-pSubProof = do
-  fs <- manyTill (withIndent (lexeme pAssumption)) (try pFormulaSep)
-  proofs <- some . try $ lexeme pProof
+pSubProof :: Int -> ProofParser Proof
+pSubProof ind = do
+  fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
+  proofs <- some . try $ lexeme (pProof ind)
 
   case unsnoc proofs of
     Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator! (SHOULD NOT HAPPEN)"
     Just (ps, ProofLine d) -> return $ SubProof fs ps d
     Just _ -> failure Nothing (S.singleton (Label $ NE.fromList "conclusion"))
 
-pProof :: ProofParser Proof
-pProof =
-  try (withIndent pProofLine)
-    <|> ( do
-            ind <- gets indent
-            modify (\s -> s{indent = ind + 1})
-            result <- observing pSubProof
-            modify (\s -> s{indent = ind})
-            case result of
-              Left err -> parseError err
-              Right r -> return r
-        )
+pProof :: Int -> ProofParser Proof
+pProof ind =
+  try (withIndent ind pProofLine)
+    <|> pSubProof (ind + 1)
     <?> "subproof or proofline"
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Derivation
@@ -107,7 +94,7 @@ parseLine operators quantifiers input = case evalState (runParserT' (pDerivation
       }
 
 parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Proof
-parseProof operators quantifiers input = case evalState (runParserT' (pProof <* eof) initialParserState) initialState of
+parseProof operators quantifiers input = case evalState (runParserT' (pProof 0 <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right p) -> Right p
  where
@@ -132,5 +119,4 @@ parseProof operators quantifiers input = case evalState (runParserT' (pProof <* 
             { operators
             , quantifiers
             }
-      , indent = 0
       }
