@@ -42,6 +42,7 @@ test-suite test
     tests
 
   other-modules:
+    FitchTest
     ProofSyntax
 
   main-is:
@@ -109,8 +110,8 @@ library fitch-editor-lib
     Fitch.Proof
     Fitch.Unification
     Fitch.Verification
-    Parser.Prelude
     Parser.Formula
+    Parser.Prelude
     Parser.Proof
     Parser.Rule
 

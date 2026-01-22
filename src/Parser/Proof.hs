@@ -23,7 +23,6 @@ import Text.Megaparsec qualified as Parsec
 
 data ProofParserState = ProofParserState
   { formulaParserState :: FormulaParserState
-  , lineNo :: Int
   , indent :: Int
   }
 
@@ -46,7 +45,7 @@ pDerivation =
     (match (lexeme pRule) <&> uncurry ParsedValid)
 
 pProofLine :: ProofParser Proof
-pProofLine = ProofLine <$> withIndent pDerivation
+pProofLine = ProofLine <$> pDerivation
 
 pFormulaSep :: ProofParser ()
 pFormulaSep = withIndent $ void $ symbol "---"
@@ -60,18 +59,27 @@ withIndent p = gets indent >>= go p
 
 pSubProof :: ProofParser Proof
 pSubProof = do
-  fs <- manyTill (withIndent (lexeme pAssumption)) pFormulaSep
-  proofs <- some (lexeme pProof)
+  fs <- manyTill (withIndent (lexeme pAssumption)) (try pFormulaSep)
+  proofs <- some . try $ lexeme pProof
+
   case unsnoc proofs of
-    Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator!"
+    Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator! (SHOULD NOT HAPPEN)"
     Just (ps, ProofLine d) -> return $ SubProof fs ps d
     Just _ -> failure Nothing (S.singleton (Label $ NE.fromList "conclusion"))
 
 pProof :: ProofParser Proof
 pProof =
-  try pProofLine
-    <|> (modify (\s -> s{indent = indent s + 1}) >> pSubProof <* modify (\s -> s{indent = indent s - 1}))
-    <?> "proof"
+  try (withIndent pProofLine)
+    <|> ( do
+            ind <- gets indent
+            modify (\s -> s{indent = ind + 1})
+            result <- observing pSubProof
+            modify (\s -> s{indent = ind})
+            case result of
+              Left err -> parseError err
+              Right r -> return r
+        )
+    <?> "subproof or proofline"
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Derivation
 parseLine operators quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of
@@ -96,4 +104,33 @@ parseLine operators quantifiers input = case evalState (runParserT' (pDerivation
     FormulaParserState
       { operators
       , quantifiers
+      }
+
+parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Proof
+parseProof operators quantifiers input = case evalState (runParserT' (pProof <* eof) initialParserState) initialState of
+  (_, Left e) -> Left $ pack $ errorBundlePretty e
+  (_, Right p) -> Right p
+ where
+  initialParserState =
+    Parsec.State
+      { stateInput = input
+      , stateOffset = 0
+      , statePosState =
+          PosState
+            { pstateInput = input
+            , pstateOffset = 0
+            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = pos1, sourceColumn = pos1}
+            , pstateTabWidth = defaultTabWidth
+            , pstateLinePrefix = ""
+            }
+      , stateParseErrors = []
+      }
+  initialState =
+    ProofParserState
+      { formulaParserState =
+          FormulaParserState
+            { operators
+            , quantifiers
+            }
+      , indent = 0
       }
