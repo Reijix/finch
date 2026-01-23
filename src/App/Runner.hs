@@ -12,21 +12,9 @@ module App.Runner (
 -----------------------------------------------------------------------------
 import App.Model
 import App.Views
-import Control.Monad (foldM, liftM2, liftM3, void, when)
-import Control.Monad.RWS
-import Control.Monad.State (MonadState (get), State)
-import Control.Monad.State qualified as ST
-import Data.Bifunctor (Bifunctor (first, second), bimap)
-import Data.Either (fromLeft, fromRight)
-import Data.Map (Map)
-import Data.Map qualified as M
-import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.Text (Text)
 import Data.Text qualified as T
 import Fitch.Proof
 import Fitch.Verification (verifyProof)
-
--- import Language.Javascript.JSaddle
 import Miso (
   App,
   CSS (Href),
@@ -73,7 +61,7 @@ import Miso (
   stopSub,
   text,
  )
-import Miso.DSL
+import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
@@ -106,7 +94,7 @@ runApp ::
   -- | Resulting program
   IO ()
 runApp proof operators infixPreds quantifiers rules =
-  run . startApp (dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
+  run . startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
       , initialAction = Just Setup
@@ -142,8 +130,8 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
         %=? pInsert
           ( Right . ProofLine $
               Derivation
-                (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")
-                (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")
+                (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Formula")
+                (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
           )
           targetAddr
           pos
@@ -152,13 +140,37 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
         %=? pInsert
           ( Right $
               SubProof
-                [tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"]
+                [ tryParse
+                    m
+                    []
+                    []
+                    []
+                    (lineNoOr999 targetAddr (m ^. proof))
+                    "Formula"
+                ]
                 []
-                (Derivation (tryParse m [] [] [] 1 "Formula") (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
+                ( Derivation
+                    (tryParse m [] [] [] 1 "Formula")
+                    (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
+                )
           )
           targetAddr
           pos
-    Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
+    Just SpawnAssumption ->
+      proof
+        %=? pInsert
+          ( Left
+              ( tryParse
+                  m
+                  []
+                  []
+                  []
+                  (lineNoOr999 targetAddr (m ^. proof))
+                  "Formula"
+              )
+          )
+          targetAddr
+          pos
   checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
@@ -184,11 +196,11 @@ updateModel (DoubleClick ea) = do
   p <- use proof
   case ea of
     Left a -> do
-      io_ . focus . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
-      io_ . select . ms $ "proof-line" ++ show (fromJust (fromNodeAddr a p))
+      io_ . focus . ms $ "proof-line" ++ show (lineNoOr999 a p)
+      io_ . select . ms $ "proof-line" ++ show (lineNoOr999 a p)
     Right a -> do
-      io_ . focus . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
-      io_ . select . ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr a p))
+      io_ . focus . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
+      io_ . select . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
 updateModel Blur = focusedLine .= Nothing
 updateModel Change = checkProof
 updateModel (Input str ref) = do
@@ -203,21 +215,51 @@ updateModel (Input str ref) = do
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  let p = tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
+  let p =
+        tryParse
+          m
+          (m ^. operators)
+          (m ^. infixPreds)
+          (m ^. quantifiers)
+          (lineNoOr999 addr (m ^. proof))
+          (fromMisoString str) ::
+          Wrapper Formula
   proof %= pUpdateFormula (const p) addr
   checkProof
-  let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
+  let delta = T.length (fromMisoString str) - (T.length . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
-  io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
+  io_ $
+    setSelectionRange
+      ( ms $
+          "proof-line"
+            ++ show (lineNoOr999 addr (m ^. proof))
+      )
+      (start - delta)
+      (end - delta)
 updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
-  let r = tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
+  let r =
+        tryParse
+          m
+          (m ^. operators)
+          (m ^. infixPreds)
+          (m ^. quantifiers)
+          (lineNoOr999 addr (m ^. proof))
+          (fromMisoString str) ::
+          Wrapper RuleApplication
   proof %= pUpdateRule (const r) addr
   ruleMap <- use rules
   proof %= verifyProof ruleMap
-  let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ r)
+  let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
-  io_ $ setSelectionRange (ms $ "proof-line-rule" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
+  io_ $
+    setSelectionRange
+      ( ms $
+          "proof-line-rule"
+            ++ show (lineNoOr999 addr (m ^. proof))
+      )
+      (start - delta)
+      (end - delta)
 updateModel (ProcessParens eaddr start end) = do
   m <- get
   p <- use proof
@@ -233,8 +275,24 @@ updateModel (ProcessParens eaddr start end) = do
         (second, third) = T.splitAt (end - start) rest
         newTxt = T.concat [first, "(", second, ")", third]
      in case eaddr of
-          Left addr -> Left $ tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
-          Right addr -> Right $ tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
+          Left addr ->
+            Left $
+              tryParse
+                m
+                (m ^. operators)
+                (m ^. infixPreds)
+                (m ^. quantifiers)
+                (lineNoOr999 addr (m ^. proof))
+                newTxt
+          Right addr ->
+            Right $
+              tryParse
+                m
+                (m ^. operators)
+                (m ^. infixPreds)
+                (m ^. quantifiers)
+                (lineNoOr999 addr (m ^. proof))
+                newTxt
 updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
 updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
 ------------------------------------
@@ -309,9 +367,9 @@ class FromText a where
   -}
   fromText :: Model -> Int -> Text -> Either Text a
 
-instance FromText RuleSpec where
-  fromText :: Model -> Int -> Text -> Either Text RuleSpec
-  fromText m n _ = Right $ RuleSpec [] [] (FPredicate "" [])
+-- instance FromText RuleSpec where
+--   fromText :: Model -> Int -> Text -> Either Text RuleSpec
+--   fromText _ _ _ = Right $ RuleSpec [] [] (FPred "" [])
 
 instance FromText Formula where
   fromText :: Model -> Int -> Text -> Either Text Formula
@@ -324,9 +382,16 @@ instance FromText RuleApplication where
 {- | Wrapper for `fromText` that also takes a list of aliases and
 tries to replace these aliases in the `Text`
 -}
-tryParse :: forall a. (FromText a) => Model -> [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Wrapper a
+tryParse ::
+  forall a.
+  (FromText a) =>
+  Model -> [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Wrapper a
 tryParse m ops infixPreds quantifiers n txt = case fromText m n replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
   Right result -> ParsedValid replacedTxt result
  where
-  replacedTxt = foldr (\(alias, name) t -> T.replace alias name t) (foldr (\(alias, name, _) t -> T.replace alias name t) txt ops) quantifiers
+  replacedTxt =
+    foldr
+      (\(alias, name) t -> T.replace alias name t)
+      (foldr (\(alias, name, _) t -> T.replace alias name t) txt ops)
+      quantifiers

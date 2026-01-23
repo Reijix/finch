@@ -1,12 +1,5 @@
 module App.Model where
 
-import Control.Monad (foldM)
-import Control.Monad.RWS (MonadState)
-import Data.List qualified as L
-import Data.Map (Map)
-import Data.Map qualified as M
-import Data.Maybe (isJust)
-import Data.Text (Text, pack)
 import Fitch.Proof
 import Miso (
   App,
@@ -31,9 +24,10 @@ import Miso (
   text,
  )
 import Miso.CSS qualified as CSS
-import Miso.Lens
+import Miso.Lens (Lens, lens, use, (%=), (.=), (<~))
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
+import Relude.Extra.Map (DynamicMap (insert), (!?))
 
 -----------------------------------------------------------------------------
 
@@ -140,8 +134,8 @@ initialModel p operators infixPreds quantifiers rules =
     , _operators = operators
     , _infixPreds = infixPreds
     , _quantifiers = quantifiers
-    , _functionSymbols = M.empty
-    , _predicateSymbols = M.empty
+    , _functionSymbols = mempty
+    , _predicateSymbols = mempty
     , _rules = rules
     }
 
@@ -194,8 +188,8 @@ The first occurence of a symbol fixes its arity, and all following symbols with 
 -}
 regenerateSymbols :: forall m. (MonadState Model m) => m ()
 regenerateSymbols = do
-  functionSymbols .= M.empty
-  predicateSymbols .= M.empty
+  functionSymbols .= mempty
+  predicateSymbols .= mempty
   proof <~ (use proof >>= pMapMAccumL goFormula goLine 1 <&> snd)
  where
   -- collect symbols inside a formula
@@ -212,7 +206,7 @@ regenerateSymbols = do
           return (n + 1, a')
    where
     goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> m (Maybe Text)
-    goArgs n fsyms = foldM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
+    goArgs n fsyms = foldlM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
      where
       goTerm :: Int -> Map Text (Int, Pos) -> Term -> m (Maybe Text)
       goTerm _ _ (Var{}) = return Nothing
@@ -223,35 +217,58 @@ regenerateSymbols = do
           Just termError -> return $ Just termError
           Nothing ->
             -- then check the function symbol
-            case fsyms M.!? name of
+            case fsyms !? name of
               Nothing -> do
-                functionSymbols %= M.insert name (length args, n)
+                functionSymbols %= insert name (length args, n)
                 return Nothing
               Just (expLen, pos) ->
                 return $
                   if expLen == length args
                     then Nothing
-                    else Just . pack $ "Function symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments."
+                    else
+                      Just $
+                        "Function symbol "
+                          <> show name
+                          <> " has "
+                          <> show (length args)
+                          <> " arguments,\nbut in line "
+                          <> show pos
+                          <> " it appears with "
+                          <> show expLen
+                          <> " arguments."
     -- proccesses a single formula.
     go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> m Assumption
-    go n fsyms psyms txt formula@(Predicate name args) = do
+    go n fsyms psyms txt formula@(Pred name args) = do
       -- first check function symbols
       mTermError <- goArgs n fsyms args
       case mTermError of
         Just termError -> return $ ParsedInvalid txt termError formula
         -- then check the predicate symbol
         Nothing ->
-          case psyms M.!? name of
+          case psyms !? name of
             Nothing -> do
-              predicateSymbols %= M.insert name (length args, n)
+              predicateSymbols %= insert name (length args, n)
               return (ParsedValid txt formula)
             Just (expLen, pos) ->
               return $
                 if expLen == length args
                   then ParsedValid txt formula
                   -- TODO singular/plural!
-                  else ParsedInvalid txt (pack $ "Predicate symbol " ++ show name ++ " has " ++ show (length args) ++ " arguments,\nbut in line " ++ show pos ++ " it appears with " ++ show expLen ++ " arguments.") formula
-    go n fsyms psyms txt form@(Op name fs) = foldM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
+                  else
+                    ParsedInvalid
+                      txt
+                      ( "Pred symbol "
+                          <> show name
+                          <> " has "
+                          <> show (length args)
+                          <> " arguments,\nbut in line "
+                          <> show pos
+                          <> " it appears with "
+                          <> show expLen
+                          <> " arguments."
+                      )
+                      formula
+    go n fsyms psyms txt form@(Opr name fs) = foldlM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
      where
       combineWrappers :: Wrapper Formula -> Wrapper Formula -> Wrapper Formula
       combineWrappers (Unparsed _ err) _ = Unparsed txt err

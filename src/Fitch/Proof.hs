@@ -1,13 +1,6 @@
 module Fitch.Proof where
 
-import Control.Monad (foldM, join, liftM3, liftM4, when)
-import Data.List qualified as L
-import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.Set (Set)
-import Data.Set qualified as S
-import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Traversable (mapAccumL)
 
 -- * Definitions
 
@@ -109,9 +102,9 @@ instance PrettyPrint TermSpec where
 data FormulaSpec
   = FSubst Name (Subst TermSpec)
   | FPlaceholder Name
-  | FPredicate Name [TermSpec]
+  | FPred Name [TermSpec]
   | FInfixPredicate Name TermSpec TermSpec
-  | FOp Text [FormulaSpec]
+  | FOpr Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
   | FFreshVar Name
   deriving (Eq, Show)
@@ -121,27 +114,27 @@ instance PrettyPrint FormulaSpec where
   prettyPrint f = go False f
    where
     go :: Bool -> FormulaSpec -> Text
-    go _ (FPredicate p []) = p
-    go _ (FPredicate p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+    go _ (FPred p []) = p
+    go _ (FPred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go _ (FPlaceholder n) = n
     go _ (FFreshVar n) = "[" <> n <> "]"
     go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> prettyPrint t <> "]"
     go True f = "(" <> go False f <> ")"
     go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
-    go False (FOp op fs)
+    go False (FOpr op fs)
       | null fs = op
-      | L.length fs == 2 = T.intercalate (" " <> op <> " ") (map (go True) fs)
+      | length fs == 2 = T.intercalate (" " <> op <> " ") (map (go True) fs)
       | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
 
--- | A formula for first-order logic (can be instantiated to 0th order, by using `Predicate` without the list of `Term`.
+-- | A formula for first-order logic (can be instantiated to 0th order, by using `Pred` without the list of `Term`.
 data Formula
-  = -- | A `Predicate` applied to terms.
-    Predicate Name [Term]
-  | -- | A `Predicate` applied to terms, written in infix notation.
+  = -- | A `Pred` applied to terms.
+    Pred Name [Term]
+  | -- | A `Pred` applied to terms, written in infix notation.
     InfixPredicate Name Term Term
   | -- | A n-ary operator, like @->@ for implication, or @~@ for negation.
-    Op Text [Formula]
+    Opr Text [Formula]
   | -- | A quantifier, like @∀@ for universal quantification.
     Quantifier Name Name Formula
   | -- | A fresh variable of a subproof, written like @[c]@
@@ -153,13 +146,13 @@ instance PrettyPrint Formula where
   prettyPrint f = go False f
    where
     go :: Bool -> Formula -> Text
-    go _ (Predicate p []) = p
-    go _ (Predicate p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+    go _ (Pred p []) = p
+    go _ (Pred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go True f = "(" <> go False f <> ")"
     go False (InfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
-    go False (Op op fs)
+    go False (Opr op fs)
       | null fs = op
-      | L.length fs == 2 = T.intercalate op (map (go True) fs)
+      | length fs == 2 = T.intercalate op (map (go True) fs)
       | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (Quantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
     go False (FreshVar v) = "[" <> v <> "]"
@@ -174,8 +167,8 @@ data Reference where
 
 instance PrettyPrint Reference where
   prettyPrint :: Reference -> Text
-  prettyPrint (LineReference n) = T.pack (show n)
-  prettyPrint (ProofReference start end) = T.pack (show start) <> "-" <> T.pack (show end)
+  prettyPrint (LineReference n) = show n
+  prettyPrint (ProofReference start end) = show start <> "-" <> show end
 
 -- | Assumptions are formulae wrapped with parsing and semantic information.
 type Assumption = Wrapper Formula
@@ -214,13 +207,14 @@ instance PrettyPrint Proof where
   prettyPrint :: Proof -> Text
   prettyPrint p = pretty' 1 0 p
    where
-    lineNoLen = length . show $ pLength p
+    lineNoLen :: Int
+    lineNoLen = T.length . show $ pLength p
     withLevel :: Int -> Text -> Text
     withLevel level t = T.replicate level "|" <> t
     withLine :: Int -> Text -> Text
     withLine line t = lineNo <> padding <> " " <> t
      where
-      lineNo = T.pack (show line)
+      lineNo = show line
       padding = T.replicate (lineNoLen - T.length lineNo) " "
     withoutLine :: Text -> Text
     withoutLine = (T.replicate (lineNoLen + 1) " " <>)
@@ -232,8 +226,8 @@ instance PrettyPrint Proof where
         <> T.concat psShow
         <> cShow
      where
-      (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
-      (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + pLength p, pretty' ln' (level + 1) p)) line' ps
+      (line', fsShow) = mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
+      (line'', psShow) = mapAccumL (\ln' p -> (ln' + pLength p, pretty' ln' (level + 1) p)) line' ps
       cShow = withLine line'' $ withLevel (level + 1) $ prettyPrint c
 
 -- | Returns `True` if the proof is a `SubProof`
@@ -328,7 +322,7 @@ pMapM ::
   m Proof
 pMapM af df (ProofLine d) = ProofLine <$> df d
 pMapM af df (SubProof fs ps d) =
-  liftM3
+  liftA3
     SubProof
     (mapM af fs)
     (mapM (pMapM af df) ps)
@@ -347,12 +341,12 @@ pMapMAccumL af df s (ProofLine d) = do
   return (s', ProofLine d')
 pMapMAccumL af df s (SubProof fs ps d) = do
   (s', fs') <-
-    foldM
+    foldlM
       (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', fs' ++ [f'])))
       (s, [])
       fs
   (s'', ps') <-
-    foldM
+    foldlM
       ( \(t, ps') p ->
           pMapMAccumL af df t p >>= (\(t', p') -> return (t', ps' ++ [p']))
       )
@@ -416,8 +410,8 @@ fromLineNo n (SubProof [] ps _) = helper n 0 ps
     addr <- fromLineNo n p
     return $ NAProof m (Just addr)
   helper n m (p : ps) = helper (n - pLength p) (m + 1) ps
-fromLineNo n (SubProof fs _ _) | (n - 1) < L.length fs = Just $ NAAssumption (n - 1)
-fromLineNo n (SubProof fs ps l) = fromLineNo (n - L.length fs) (SubProof [] ps l)
+fromLineNo n (SubProof fs _ _) | (n - 1) < length fs = Just $ NAAssumption (n - 1)
+fromLineNo n (SubProof fs ps l) = fromLineNo (n - length fs) (SubProof [] ps l)
 fromLineNo n p = Nothing
 
 fromLineRange :: Int -> Int -> Proof -> Maybe NodeAddr
@@ -450,42 +444,49 @@ fromNodeAddr = go 1
  where
   go :: Int -> NodeAddr -> Proof -> Maybe Int
   go 1 (NAProof 0 Nothing) (ProofLine{}) = Just 1
-  go n (NAAssumption m) (SubProof fs _ _) | m < L.length fs = return $ n + m
+  go n (NAAssumption m) (SubProof fs _ _) | m < length fs = return $ n + m
   go n (NAAssumption m) (SubProof fs _ _) = Nothing
   go 1 (NAProof 0 Nothing) (SubProof [] [] _) = Just 1
-  go n (NAProof m Nothing) (SubProof fs ps _) | m < L.length ps && isProofLine (ps !! m) = return $ L.length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)
-  go n NAConclusion (SubProof fs ps _) = return $ L.length fs + n + foldr (\p n -> n + pLength p) 0 ps
-  go n (NAProof m (Just addr)) (SubProof fs ps _) | m < L.length ps && isSubProof (ps !! m) = go (L.length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)) addr (ps !! m)
+  go n (NAProof m Nothing) (SubProof fs ps _)
+    | holdsAt isProofLine ps m =
+        return $ length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)
+  go n NAConclusion (SubProof fs ps _) = return $ length fs + n + foldr (\p n -> n + pLength p) 0 ps
+  go n (NAProof m (Just addr)) (SubProof fs ps _)
+    | holdsAt isSubProof ps m =
+        go (length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)) addr =<< (ps !!? m)
   go _ _ _ = Nothing
+
+lineNoOr999 :: NodeAddr -> Proof -> Int
+lineNoOr999 na p = fromMaybe 999 (fromNodeAddr na p)
 
 -- ** Utilities for working with addresses
 
 {- | Appends an assumption inside the `NodeAddr`, if no `NodeAddr` is given, returns `NAAssumption` @m@
 
-Fails if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
+Fails silently if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
 -}
 naAppendAssumption :: Int -> Maybe NodeAddr -> NodeAddr
 naAppendAssumption m Nothing = NAAssumption m
 naAppendAssumption m (Just (NAProof n a)) = NAProof n (Just $ naAppendAssumption m a)
-naAppendAssumption m a = error $ show a ++ "\n cannot append assumption."
+naAppendAssumption _ (Just na) = na
 
 {- | Appends an empty proof inside the `NodeAddr`, if no `NodeAddr` is given, returns `NAProof` @m@ `Nothing`
 
-Fails if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
+Fails silently  if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
 -}
 naAppendProof :: Int -> Maybe NodeAddr -> NodeAddr
 naAppendProof m Nothing = NAProof m Nothing
 naAppendProof m (Just (NAProof n a)) = NAProof n (Just $ naAppendProof m a)
-naAppendProof m a = error $ show a ++ "\n cannot append line."
+naAppendProof _ (Just na) = na
 
 {- | Appends a conclusion inside the `NodeAddr`, if no `NodeAddr` is given, returns `NAConclusion`
 
-Fails if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
+Fails silently if the `NodeAddr` does not allow appending (e.g. `NAConclusion`)
 -}
 naAppendConclusion :: Maybe NodeAddr -> NodeAddr
 naAppendConclusion Nothing = NAConclusion
 naAppendConclusion (Just (NAProof n a)) = NAProof n (Just $ naAppendConclusion a)
-naAppendConclusion a = error $ show a ++ "\n cannot append conclusion."
+naAppendConclusion (Just na) = na
 
 -- | `incrementNodeAddr` increments an address by 1, while keeping the nesting structure unchanged.
 incrementNodeAddr :: NodeAddr -> NodeAddr
@@ -502,44 +503,47 @@ naLevelUp _ = Nothing
 
 -- * Querying proofs
 
+holdsAt :: (a -> Bool) -> [a] -> Int -> Bool
+holdsAt f xs n = maybe False f (xs !!? n)
+
 -- | Returns `True` if the line at `NodeAddr` is the first formula of the proof.
 pIsFirstFormula :: NodeAddr -> Proof -> Bool
 pIsFirstFormula (NAAssumption 0) (SubProof fs _ _) = True
 pIsFirstFormula (NAProof n (Just a)) (SubProof _ ps _) =
-  n < L.length ps && isSubProof (ps !! n) && pIsFirstFormula a (ps !! n)
+  holdsAt isSubProof ps n && holdsAt (pIsFirstFormula a) ps n
 pIsFirstFormula _ _ = False
 
 -- | Returns `True` if the line at `NodeAddr` is a formula.
 pIsFormula :: NodeAddr -> Proof -> Bool
-pIsFormula (NAAssumption n) (SubProof fs _ _) = n < L.length fs
+pIsFormula (NAAssumption n) (SubProof fs _ _) = n < length fs
 pIsFormula (NAProof n (Just a)) (SubProof _ ps _) =
-  n < L.length ps && isSubProof (ps !! n) && pIsFormula a (ps !! n)
+  holdsAt isSubProof ps n && holdsAt (pIsFormula a) ps n
 pIsFormula _ _ = False
 
 -- | Returns `True` if the line at `NodeAddr` is the last formula of the proof.
 pIsLastFormula :: NodeAddr -> Proof -> Bool
-pIsLastFormula (NAAssumption n) (SubProof fs _ _) = n == L.length fs - 1
+pIsLastFormula (NAAssumption n) (SubProof fs _ _) = n == length fs - 1
 pIsLastFormula (NAProof n (Just a)) (SubProof _ ps _) =
-  n < L.length ps && isSubProof (ps !! n) && pIsLastFormula a (ps !! n)
+  holdsAt isSubProof ps n && holdsAt (pIsLastFormula a) ps n
 pIsLastFormula _ _ = False
 
 -- | Returns `True` if the line at `NodeAddr` is the first `ProofLine` or `SubProof` in the proof.
 pIsFirstLine :: NodeAddr -> Proof -> Bool
 pIsFirstLine (NAProof 0 Nothing) (SubProof fs _ _) = True
 pIsFirstLine (NAProof n (Just a)) (SubProof _ ps _) =
-  n < L.length ps && isSubProof (ps !! n) && pIsFirstLine a (ps !! n)
+  holdsAt isSubProof ps n && holdsAt (pIsFirstLine a) ps n
 pIsFirstLine _ _ = False
 
 -- | Returns `True` if the line at `NodeAddr` is a `ProofLine`
 pIsLine :: NodeAddr -> Proof -> Bool
-pIsLine (NAProof n Nothing) (SubProof _ ps _) = n < L.length ps && isProofLine (ps !! n)
-pIsLine (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && pIsLine a (ps !! n)
+pIsLine (NAProof n Nothing) (SubProof _ ps _) = holdsAt isProofLine ps n
+pIsLine (NAProof n (Just a)) (SubProof _ ps _) = holdsAt (pIsLine a) ps n
 pIsLine _ _ = False
 
 -- | Returns `True` if the line at `NodeAddr` is a conclusion.
 pIsConclusion :: NodeAddr -> Proof -> Bool
 pIsConclusion NAConclusion _ = True
-pIsConclusion (NAProof n (Just a)) (SubProof _ ps _) = n < L.length ps && pIsConclusion a (ps !! n)
+pIsConclusion (NAProof n (Just a)) (SubProof _ ps _) = holdsAt (pIsConclusion a) ps n
 pIsConclusion _ _ = False
 
 {- | Returns the line at a given `NodeAddr`.
@@ -547,15 +551,10 @@ pIsConclusion _ _ = False
 Returns `Nothing` if the `NodeAddr` does not specify a line of the proof.
 -}
 pLookup :: NodeAddr -> Proof -> Maybe (Either Assumption Proof)
-pLookup (NAAssumption n) (SubProof fs _ _)
-  | n < L.length fs = Just . Left $ fs !! n
-pLookup (NAProof n Nothing) (SubProof _ ps _)
-  | n < L.length ps = Just . Right $ ps !! n
+pLookup (NAAssumption n) (SubProof fs _ _) = Left <$> fs !!? n
+pLookup (NAProof n Nothing) (SubProof _ ps _) = Right <$> ps !!? n
 pLookup NAConclusion (SubProof _ ps l) = Just . Right $ ProofLine l
-pLookup (NAProof n (Just a)) (SubProof _ ps _)
-  | n < L.length ps = pLookup a (ps !! n)
-pLookup (NAProof n Nothing) (SubProof _ ps _)
-  | n < L.length ps = Just . Right $ ps !! n
+pLookup (NAProof n (Just a)) (SubProof _ ps _) = pLookup a =<< (ps !!? n)
 pLookup _ _ = Nothing
 
 pIndex :: Int -> Proof -> Maybe (Either Assumption Derivation)
@@ -599,12 +598,17 @@ Fails silently
 -}
 pUpdateFormula :: (Wrapper Formula -> Wrapper Formula) -> NodeAddr -> Proof -> Proof
 pUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
-pUpdateFormula f (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n updateProofLine ps) l
+pUpdateFormula f (NAProof n Nothing) (SubProof fs ps l)
+  | holdsAt isProofLine ps n =
+      SubProof fs (updateAt n updateProofLine ps) l
  where
   updateProofLine :: Proof -> Proof
   updateProofLine (ProofLine (Derivation formula rule)) = ProofLine (Derivation (f formula) rule)
-pUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) = SubProof fs ps (Derivation (f formula) rule)
-pUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (pUpdateFormula f addr) ps) l
+pUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) =
+  SubProof fs ps (Derivation (f formula) rule)
+pUpdateFormula f (NAProof n (Just addr)) (SubProof fs ps l)
+  | n < length ps =
+      SubProof fs (updateAt n (pUpdateFormula f addr) ps) l
 pUpdateFormula _ _ p = p
 
 {- | `pUpdateRule` @f@ @addr@ @proof@ replaces the rule at @addr@ in @proof@ using @f@.
@@ -613,9 +617,10 @@ Fails silently
 -}
 pUpdateRule :: (Wrapper RuleApplication -> Wrapper RuleApplication) -> NodeAddr -> Proof -> Proof
 pUpdateRule f (NAProof n Nothing) (SubProof fs ps d)
-  | n < L.length ps && isProofLine (ps !! n) = SubProof fs (updateAt n (\(ProofLine (Derivation form rule)) -> ProofLine (Derivation form (f rule))) ps) d
+  | holdsAt isProofLine ps n =
+      SubProof fs (updateAt n (\(ProofLine (Derivation form rule)) -> ProofLine (Derivation form (f rule))) ps) d
 pUpdateRule f (NAProof n (Just addr)) (SubProof fs ps d)
-  | n < L.length ps && isSubProof (ps !! n) = SubProof fs (updateAt n (pUpdateRule f addr) ps) d
+  | holdsAt isSubProof ps n = SubProof fs (updateAt n (pUpdateRule f addr) ps) d
 pUpdateRule f NAConclusion (SubProof fs ps (Derivation form rule)) = SubProof fs ps (Derivation form (f rule))
 pUpdateRule _ _ p = p
 
@@ -626,9 +631,9 @@ Otherwise @proof@ is returned.
 -}
 pRemove :: NodeAddr -> Proof -> Proof
 pRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
-pRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps && isProofLine (ps !! n) = SubProof fs (removeAt n ps) l
-pRemove (NAProof n Nothing) (SubProof fs ps l) | n < L.length ps = SubProof fs (removeAt n ps) l
-pRemove (NAProof n (Just addr)) (SubProof fs ps l) | n < L.length ps = SubProof fs (updateAt n (pRemove addr) ps) l
+pRemove (NAProof n Nothing) (SubProof fs ps l) | holdsAt isProofLine ps n = SubProof fs (removeAt n ps) l
+pRemove (NAProof n Nothing) (SubProof fs ps l) | n < length ps = SubProof fs (removeAt n ps) l
+pRemove (NAProof n (Just addr)) (SubProof fs ps l) | n < length ps = SubProof fs (updateAt n (pRemove addr) ps) l
 pRemove _ p = p
 
 -- | Enumeration for specifying where to insert an element into a proof.
@@ -647,22 +652,22 @@ Both formulae and derivations are either inserted `Before` or `After` the specif
 -}
 pInsert :: Either Assumption Proof -> NodeAddr -> InsertPosition -> Proof -> Maybe Proof
 pInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
-  | n < L.length fs = case pos of
+  | n < length fs = case pos of
       Before -> Just $ SubProof (insertAt f n fs) ps l
       After -> Just $ SubProof (insertAt f (n + 1) fs) ps l
-pInsert (Left f) (NAProof 0 Nothing) Before (SubProof fs ps l) = Just $ SubProof (insertAt f (L.length fs) fs) ps l
-pInsert (Left f) NAConclusion Before (SubProof fs [] l) = Just $ SubProof (insertAt f (L.length fs) fs) [] l
+pInsert (Left f) (NAProof 0 Nothing) Before (SubProof fs ps l) = Just $ SubProof (insertAt f (length fs) fs) ps l
+pInsert (Left f) NAConclusion Before (SubProof fs [] l) = Just $ SubProof (insertAt f (length fs) fs) [] l
 pInsert (Right p) (NAProof n Nothing) pos (SubProof fs ps l)
-  | n < L.length ps = case pos of
+  | n < length ps = case pos of
       Before -> Just $ SubProof fs (insertAt p n ps) l
       After -> Just $ SubProof fs (insertAt p (n + 1) ps) l
-pInsert (Right p) NAConclusion Before (SubProof fs ps l) = Just $ SubProof fs (insertAt p (L.length ps) ps) l
+pInsert (Right p) NAConclusion Before (SubProof fs ps l) = Just $ SubProof fs (insertAt p (length ps) ps) l
 pInsert (Right p) (NAAssumption n) After p'@(SubProof fs _ _)
-  | n == L.length fs - 1 = pInsert (Right p) (NAProof 0 Nothing) Before p'
+  | n == length fs - 1 = pInsert (Right p) (NAProof 0 Nothing) Before p'
 pInsert (Right p) (NAProof n (Just (NAAssumption 0))) Before p' = pInsert (Right p) (NAProof n Nothing) Before p'
 pInsert (Right p) (NAProof n (Just NAConclusion)) After p' = pInsert (Right p) (NAProof n Nothing) After p'
 pInsert e (NAProof n (Just a)) pos (SubProof fs ps l)
-  | n < L.length ps && isSubProof (ps !! n) = pInsert e a pos (ps !! n) >>= (\p' -> pure $ SubProof fs (updateAt n (const p') ps) l)
+  | holdsAt isSubProof ps n = ps !!? n >>= pInsert e a pos >>= (\p' -> pure $ SubProof fs (updateAt n (const p') ps) l)
 pInsert _ _ _ p = Nothing
 
 {- | `pMove` @target@ @pos@ @source@ @p@ moves the line at the source address

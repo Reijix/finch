@@ -1,14 +1,7 @@
 module Parser.Formula where
 
-import Control.Monad (liftM2, liftM3)
-import Control.Monad.Combinators.Expr (
-  makeExprParser,
- )
-import Control.Monad.State (MonadState, evalState, gets)
-import Data.Text (Text, pack)
-import Data.Void (Void)
+import Control.Monad.Combinators.Expr (makeExprParser)
 import Fitch.Proof (Formula (..), Name, Term (..))
-import Miso.Router (RoutingError (ParseError))
 import Parser.Prelude (
   binary,
   brackets,
@@ -20,33 +13,18 @@ import Parser.Prelude (
   symbol,
  )
 import Text.Megaparsec (
-  MonadParsec (eof, try),
-  PosState (
-    PosState,
-    pstateInput,
-    pstateLinePrefix,
-    pstateOffset,
-    pstateSourcePos,
-    pstateTabWidth
-  ),
-  SourcePos (SourcePos, sourceColumn, sourceLine, sourceName),
-  State (
-    State,
-    stateInput,
-    stateOffset,
-    stateParseErrors,
-    statePosState
-  ),
+  MonadParsec (..),
+  PosState (..),
+  SourcePos (..),
+  State (..),
   chunk,
   defaultTabWidth,
-  empty,
   errorBundlePretty,
   mkPos,
   pos1,
   runParserT',
   sepBy,
   (<?>),
-  (<|>),
  )
 
 data FormulaParserState = FormulaParserState
@@ -60,7 +38,7 @@ type FormulaParser m = (MonadParsec Void Text m, MonadState FormulaParserState m
 -- The parser cant distinguish between function constants and variables.
 -- This does not matter for our application. => constants are treated as variables!
 pFun :: (FormulaParser m) => m Term
-pFun = lexeme (liftM2 Fun pName (parens (pTerm `sepBy` comma)) <?> "function")
+pFun = lexeme (liftA2 Fun pName (parens (pTerm `sepBy` comma)) <?> "function")
 
 pVar :: (FormulaParser m) => m Term
 pVar = lexeme (Var <$> pName <?> "variable")
@@ -72,10 +50,10 @@ pFreshVariable :: (FormulaParser m) => m Formula
 pFreshVariable = lexeme $ FreshVar <$> brackets pName
 
 pPredicate :: (FormulaParser m) => m Formula
-pPredicate = lexeme $ liftM2 Predicate pName $ parens (pTerm `sepBy` comma) <|> return []
+pPredicate = lexeme $ liftA2 Pred pName $ parens (pTerm `sepBy` comma) <|> return []
 
 pPropAtom :: (FormulaParser m) => m Formula
-pPropAtom = lexeme $ (`Predicate` []) <$> pName
+pPropAtom = lexeme $ (`Pred` []) <$> pName
 
 pQuantifierName :: (FormulaParser m) => m Name
 pQuantifierName = do
@@ -86,10 +64,10 @@ pConstant :: (FormulaParser m) => m Formula
 pConstant = do
   ops <- gets operators
   op <- foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
-  lexeme . return $ Op op []
+  lexeme . return $ Opr op []
 
 pQuantifier :: (FormulaParser m) => m Formula
-pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pFormula)
+pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pFormula)
 
 pInfixPredName :: (FormulaParser m) => m Name
 pInfixPredName = do
@@ -101,7 +79,7 @@ pInfixPred = do
   t1 <- lexeme pTerm
   op <- lexeme pInfixPredName
   t2 <- lexeme pTerm
-  return $ Predicate op [t1, t2]
+  return $ Pred op [t1, t2]
 
 pFormulaAtomic :: (FormulaParser m) => m Formula
 pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> try pInfixPred <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
@@ -110,14 +88,14 @@ pFormula :: (FormulaParser m) => m Formula
 pFormula = do
   ops <- gets operators
   let operatorTable =
-        [ concatMap (\(alias, u, arity) -> if arity == 1 then [prefix alias (\f -> Op u [f]), prefix u (\f -> Op u [f])] else []) ops
-        , concatMap (\(alias, b, arity) -> if arity == 2 then [binary alias (\f1 f2 -> Op b [f1, f2]), binary b (\f1 f2 -> Op b [f1, f2])] else []) ops
+        [ concatMap (\(alias, u, arity) -> if arity == 1 then [prefix alias (\f -> Opr u [f]), prefix u (\f -> Opr u [f])] else []) ops
+        , concatMap (\(alias, b, arity) -> if arity == 2 then [binary alias (\f1 f2 -> Opr b [f1, f2]), binary b (\f1 f2 -> Opr b [f1, f2])] else []) ops
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
 parseFormula :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
 parseFormula operators infixPreds quantifiers lineNo input = case evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
-  (_, Left e) -> Left $ pack $ errorBundlePretty e
+  (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right f) -> Right f
  where
   initialParserState =

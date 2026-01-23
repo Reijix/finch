@@ -186,7 +186,7 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
     ProofLine _ -> error "Tried calling viewProof on a ProofLine"
     SubProof fs ps d -> H.div_ [HP.class_ "outer-subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
      where
-      (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == L.length fs - 1) (Left f))) 0 fs
+      (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == length fs - 1) (Left f))) 0 fs
       (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
       viewConclusion = viewLine model NAConclusion False (Right d)
   _viewProof :: Int -> Maybe NodeAddr -> Proof -> View Model Action
@@ -202,7 +202,7 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       (viewAssumptions ++ viewProofs ++ [viewConclusion])
    where
     a = naAppendProof n ma
-    (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m (Just $ naAppendProof n ma)) (m == L.length fs - 1) (Left f))) 0 fs
+    (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m (Just $ naAppendProof n ma)) (m == length fs - 1) (Left f))) 0 fs
     (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
     viewConclusion = viewLine model (naAppendConclusion $ Just a) False (Right d)
 

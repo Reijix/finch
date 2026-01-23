@@ -48,11 +48,17 @@ test-suite test
   main-is:
     test.hs
 
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude,
+
   build-depends:
     base >=4.21.0 && <4.22,
     containers,
     fitch-editor-lib,
     miso >=1.9 && <1.9.1,
+    relude,
     tasty >=1.5.2 && <1.6,
     tasty-coverage >=0.1.4 && <0.2,
     tasty-hunit >=0.10.2 && <0.11,
@@ -118,6 +124,11 @@ library fitch-editor-lib
     Specification.FOL
     Specification.Prop
 
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude,
+
   default-extensions:
     FlexibleInstances
     OrPatterns
@@ -131,6 +142,7 @@ library fitch-editor-lib
     miso >=1.9 && <1.9.1,
     mtl >=2.3.1 && <3,
     parser-combinators >=1.3.0 && <2,
+    relude,
     text >=2.1.2 && <2.2,
 
   hs-source-dirs:

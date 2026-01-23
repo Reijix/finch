@@ -1,15 +1,16 @@
 module Specification.Prop where
 
-import Data.Map qualified as M
-import Data.Text (Text)
-import Fitch.Proof
+import Fitch.Proof (
+  FormulaSpec (FOpr, FPlaceholder),
+  RuleSpec (..),
+ )
 
 operatorsProp :: [(Text, Text, Int)]
 operatorsProp = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
 
-rulesProp :: M.Map Text RuleSpec
+rulesProp :: Map Text RuleSpec
 rulesProp =
-  M.fromList
+  fromList
     [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
     , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
     , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
@@ -27,9 +28,9 @@ rulesProp =
   phi = FPlaceholder "φ"
   psi = FPlaceholder "ψ"
   chi = FPlaceholder "χ"
-  top = FOp "⊤" []
-  bot = FOp "⊥" []
-  neg f = FOp "¬" [f]
-  f1 ∧ f2 = FOp "∧" [f1, f2]
-  f1 ∨ f2 = FOp "∨" [f1, f2]
-  f1 → f2 = FOp "→" [f1, f2]
+  top = FOpr "⊤" []
+  bot = FOpr "⊥" []
+  neg f = FOpr "¬" [f]
+  f1 ∧ f2 = FOpr "∧" [f1, f2]
+  f1 ∨ f2 = FOpr "∨" [f1, f2]
+  f1 → f2 = FOpr "→" [f1, f2]

@@ -1,8 +1,5 @@
 module FOLTest where
 
-import Data.Map (Map)
-import Data.Map qualified as M
-import Data.Text (Text, pack)
 import Data.Text.IO
 import Fitch.Proof
 import Parser.Formula (parseFormula)

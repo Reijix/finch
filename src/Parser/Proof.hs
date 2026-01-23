@@ -1,13 +1,5 @@
 module Parser.Proof where
 
-import Control.Monad (liftM2, liftM3, void)
-import Control.Monad.State (MonadState, State, evalState, get, gets, modify, put)
-import Data.Functor ((<&>))
-import Data.List (unsnoc)
-import Data.List.NonEmpty qualified as NE
-import Data.Set qualified as S
-import Data.Text (Text, pack)
-import Data.Void (Void)
 import Fitch.Proof (
   Assumption,
   Derivation (..),
@@ -16,9 +8,23 @@ import Fitch.Proof (
   Wrapper (ParsedValid),
  )
 import Parser.Formula (FormulaParser, FormulaParserState (..), pFormula)
-import Parser.Prelude
+import Parser.Prelude (Parser, lexeme, symbol)
 import Parser.Rule (pRule)
-import Text.Megaparsec hiding (State)
+import Text.Megaparsec (
+  ErrorItem (..),
+  PosState (..),
+  SourcePos (..),
+  defaultTabWidth,
+  eof,
+  errorBundlePretty,
+  manyTill,
+  match,
+  pos1,
+  runParserT',
+  try,
+  unexpected,
+  (<?>),
+ )
 import Text.Megaparsec qualified as Parsec
 
 pAssumption :: (FormulaParser m) => m Assumption
@@ -26,7 +32,7 @@ pAssumption = match (lexeme pFormula) <&> uncurry ParsedValid
 
 pDerivation :: (FormulaParser m) => m Derivation
 pDerivation =
-  liftM2
+  liftA2
     Derivation
     pAssumption
     (match (lexeme pRule) <&> uncurry ParsedValid)
@@ -46,10 +52,10 @@ pSubProof ind = do
   fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
   proofs <- some . try $ lexeme (pProof ind)
 
-  case unsnoc proofs of
+  case viaNonEmpty (\l -> (init l, last l)) proofs of
     Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator! (SHOULD NOT HAPPEN)"
     Just (ps, ProofLine d) -> return $ SubProof fs ps d
-    Just _ -> failure Nothing (S.singleton (Label $ NE.fromList "conclusion"))
+    Just _ -> unexpected (Label $ fromList "subproof")
 
 pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
@@ -59,7 +65,7 @@ pProof ind =
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
 parseLine operators infixPreds quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of
-  (_, Left e) -> Left $ pack $ errorBundlePretty e
+  (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right d) -> Right d
  where
   initialParserState =
@@ -85,7 +91,7 @@ parseLine operators infixPreds quantifiers input = case evalState (runParserT' (
 
 parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
 parseProof operators infixPreds quantifiers input = case evalState (runParserT' (pProof 0 <* eof) initialParserState) initialState of
-  (_, Left e) -> Left $ pack $ errorBundlePretty e
+  (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right p) -> Right p
  where
   initialParserState =

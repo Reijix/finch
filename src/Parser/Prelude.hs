@@ -3,14 +3,10 @@ module Parser.Prelude where
 import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),
  )
-import Data.Text (Text, pack)
-import Data.Void (Void)
+import Data.Char (isLetter)
 import Text.Megaparsec (
-  MonadParsec (hidden),
+  MonadParsec (hidden, takeWhile1P),
   between,
-  empty,
-  noneOf,
-  some,
   (<?>),
  )
 import Text.Megaparsec.Char (letterChar, space1)
@@ -32,10 +28,10 @@ symbol :: (Parser m) => Text -> m Text
 symbol = L.symbol sc
 
 pName :: (Parser m) => m Text
-pName = pack <$> some letterChar <?> "name"
+pName = takeWhile1P (Just "letter") isLetter <?> "name"
 
 pSymbolicName :: (Parser m) => m Text
-pSymbolicName = pack <$> some (noneOf ['(', ')']) <?> "name"
+pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ['(', ')']) <?> "name"
 
 comma :: (Parser m) => m Text
 comma = symbol ","
@@ -53,4 +49,4 @@ binary :: (Parser m) => Text -> (a -> a -> a) -> Operator m a
 binary name f = InfixL (f <$ hidden (symbol name))
 
 prefix :: (Parser m) => Text -> (a -> a) -> Operator m a
-prefix name f = Prefix $ foldr1 (.) <$> some (f <$ hidden (symbol name))
+prefix name f = Prefix $ foldr (.) id <$> some (f <$ hidden (symbol name))

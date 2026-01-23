@@ -1,8 +1,18 @@
 module Specification.FOL where
 
-import Data.Map qualified as M
-import Data.Text (Text)
-import Fitch.Proof
+import Fitch.Proof (
+  FormulaSpec (
+    FFreshVar,
+    FOpr,
+    FPlaceholder,
+    FPred,
+    FQuantifier,
+    FSubst
+  ),
+  RuleSpec (..),
+  TermSpec (TPlaceholder, TVar),
+  (~>),
+ )
 
 operatorsFOL :: [(Text, Text, Int)]
 operatorsFOL = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
@@ -13,9 +23,9 @@ infixPredsFOL = [("", "=")]
 quantifiersFOL :: [(Text, Text)]
 quantifiersFOL = [("forall", "∀")]
 
-rulesFOL :: M.Map Text RuleSpec
+rulesFOL :: Map Text RuleSpec
 rulesFOL =
-  M.fromList
+  fromList
     [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
     , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
     , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
@@ -28,12 +38,12 @@ rulesFOL =
     , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
     , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
     , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
-    , ("=I", RuleSpec [] [] (FPredicate "=" [TPlaceholder "E", TPlaceholder "E"]))
+    , ("=I", RuleSpec [] [] (FPred "=" [TPlaceholder "E", TPlaceholder "E"]))
     ,
       ( "=E"
       , RuleSpec
           [ FSubst "φ" ("x" ~> TPlaceholder "E")
-          , FPredicate "=" [TPlaceholder "E", TPlaceholder "D"]
+          , FPred "=" [TPlaceholder "E", TPlaceholder "D"]
           ]
           []
           (FSubst "φ" ("x" ~> TPlaceholder "D"))
@@ -55,14 +65,14 @@ rulesFOL =
   chi :: FormulaSpec
   chi = FPlaceholder "χ"
   top :: FormulaSpec
-  top = FOp "⊤" []
+  top = FOpr "⊤" []
   bot :: FormulaSpec
-  bot = FOp "⊥" []
+  bot = FOpr "⊥" []
   neg :: FormulaSpec -> FormulaSpec
-  neg f = FOp "¬" [f]
+  neg f = FOpr "¬" [f]
   (∧) :: FormulaSpec -> FormulaSpec -> FormulaSpec
-  f1 ∧ f2 = FOp "∧" [f1, f2]
+  f1 ∧ f2 = FOpr "∧" [f1, f2]
   (∨) :: FormulaSpec -> FormulaSpec -> FormulaSpec
-  f1 ∨ f2 = FOp "∨" [f1, f2]
+  f1 ∨ f2 = FOpr "∨" [f1, f2]
   (→) :: FormulaSpec -> FormulaSpec -> FormulaSpec
-  f1 → f2 = FOp "→" [f1, f2]
+  f1 → f2 = FOpr "→" [f1, f2]

@@ -1,10 +1,5 @@
 module ProofSyntax where
 
-import Control.Monad
-import Data.Functor
-import Data.List qualified as L
-import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.Text (pack)
 import Fitch.Proof
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -16,7 +11,7 @@ import Test.Tasty.QuickCheck as QC
 -- Definitions for unit testing:
 
 formula :: Int -> Wrapper Formula
-formula n = ParsedValid "" $ Predicate (pack $ show n) []
+formula n = ParsedValid "" $ Pred (show n) []
 
 rule :: Int -> [Reference] -> Wrapper RuleApplication
 rule str ref = ParsedValid "" (RuleApplication "Rule" ref)
@@ -68,11 +63,11 @@ instance Arbitrary Name where
 
 instance Arbitrary Formula where
   arbitrary :: Gen Formula
-  arbitrary = return $ Predicate "Formula" []
+  arbitrary = return $ Pred "Formula" []
 
 instance Arbitrary FormulaSpec where
   arbitrary :: Gen FormulaSpec
-  arbitrary = return $ FPredicate "Formula" []
+  arbitrary = return $ FPred "Formula" []
 
 instance Arbitrary RuleSpec where
   arbitrary :: Gen RuleSpec
@@ -80,7 +75,7 @@ instance Arbitrary RuleSpec where
 
 instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication
-  arbitrary = liftM2 RuleApplication arbitrary (pure [])
+  arbitrary = liftA2 RuleApplication arbitrary (pure [])
 
 instance (Arbitrary a) => Arbitrary (Wrapper a) where
   arbitrary :: Gen (Wrapper a)
@@ -88,7 +83,7 @@ instance (Arbitrary a) => Arbitrary (Wrapper a) where
 
 instance Arbitrary Derivation where
   arbitrary :: Gen Derivation
-  arbitrary = liftM2 Derivation arbitrary arbitrary
+  arbitrary = liftA2 Derivation arbitrary arbitrary
 
 instance Arbitrary Proof where
   arbitrary :: Gen Proof
@@ -96,7 +91,7 @@ instance Arbitrary Proof where
    where
     proof' :: Int -> Gen Proof
     proof' 0 = fmap ProofLine arbitrary
-    proof' n | n > 0 = oneof [fmap ProofLine arbitrary, liftM3 SubProof arbitrary ps arbitrary]
+    proof' n | n > 0 = oneof [fmap ProofLine arbitrary, liftA3 SubProof arbitrary ps arbitrary]
      where
       ps :: Gen [Proof]
       ps = do
@@ -117,14 +112,16 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   (_, AnyKind) -> oneof [naAssumption, naLine ps, naSubProof AnyKind, naConclusion]
  where
   naConclusion = return NAConclusion
-  naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isProofLine $ ps !! n)
-  naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, L.length ps - 1)) (\n -> isSubProof $ ps !! n)
-  naAssumption = fmap NAAssumption (chooseInt (0, L.length fs - 1))
+  naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isProofLine ps)
+  naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isSubProof ps)
+  naAssumption = fmap NAAssumption (chooseInt (0, length fs - 1))
   naSubProof ak = do
-    mn <- chooseInt (0, L.length ps - 1) `suchThatMaybe` (\n -> isSubProof $ ps !! n)
+    mn <- chooseInt (0, length ps - 1) `suchThatMaybe` holdsAt isSubProof ps
     case mn of
-      Nothing -> discard
-      Just n -> arbitraryNodeAddrFor (ps !! n) ak <&> (NAProof n . Just)
+      Just n -> case ps !!? n of
+        Just p -> arbitraryNodeAddrFor p ak <&> (NAProof n . Just)
+        _ -> discard
+      _ -> discard
 
 prop_lRemoveMinus1 :: Proof -> Property
 prop_lRemoveMinus1 (ProofLine{}) = discard
@@ -152,32 +149,32 @@ prop_lInsertBeforeFormulaPlus1 :: Proof -> Property
 prop_lInsertBeforeFormulaPlus1 (ProofLine{}) = discard
 prop_lInsertBeforeFormulaPlus1 p@(SubProof{}) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    pLength (fromJust (pInsert (Left $ formula 0) a Before p)) === pLength p + 1
+    (pLength <$> pInsert (Left $ formula 0) a Before p) === Just (pLength p + 1)
 
 prop_lInsertAfterFormulaPlus1 :: Proof -> Property
 prop_lInsertAfterFormulaPlus1 p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    pLength (fromJust (pInsert (Left $ formula 0) a After p)) === pLength p + 1
+    (pLength <$> pInsert (Left $ formula 0) a After p) === Just (pLength p + 1)
 
 prop_lInsertlLookupFormulaBefore :: Proof -> Property
 prop_lInsertlLookupFormulaBefore p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    pLookup a (fromJust (pInsert (Left $ formula 0) a Before p)) === Just (Left $ formula 0)
+    (pLookup a <$> pInsert (Left $ formula 0) a Before p) === (Just . Just . Left $ formula 0)
 
 prop_lInsertlLookupFormulaAfter :: Proof -> Property
 prop_lInsertlLookupFormulaAfter p =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    pLookup (incrementNodeAddr a) (fromJust (pInsert (Left $ formula 0) a After p)) === Just (Left $ formula 0)
+    (pLookup (incrementNodeAddr a) <$> pInsert (Left $ formula 0) a After p) === (Just . Just . Left $ formula 0)
 
 prop_lInsertBeforeLinePlus1 :: Proof -> Property
 prop_lInsertBeforeLinePlus1 p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    pLength (fromJust (pInsert (Right . ProofLine $ derivation 0) a Before p)) === pLength p + 1
+    (pLength <$> pInsert (Right . ProofLine $ derivation 0) a Before p) === Just (pLength p + 1)
 
 prop_lInsertAfterLinePlus1 :: Proof -> Property
 prop_lInsertAfterLinePlus1 p =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    pLength (fromJust (pInsert (Right . ProofLine $ derivation 0) a After p)) === pLength p + 1
+    (pLength <$> pInsert (Right . ProofLine $ derivation 0) a After p) === Just (pLength p + 1)
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
@@ -194,14 +191,14 @@ lInsertQCTests =
 prop_fromLineNoInverse :: Proof -> Property
 prop_fromLineNoInverse p = forAll (chooseInt (1, pLength p - 1)) $ \n ->
   isJust (fromLineNo n p)
-    ==> fromNodeAddr (fromJust $ fromLineNo n p) p
-    === Just n
+    ==> ((`fromNodeAddr` p) <$> fromLineNo n p)
+    === Just (Just n)
 
 prop_fromNodeAddrInverse :: Proof -> Property
 prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
   isJust (fromNodeAddr a p)
-    ==> fromLineNo (fromJust $ fromNodeAddr a p) p
-    === Just a
+    ==> ((`fromLineNo` p) <$> fromNodeAddr a p)
+    === Just (Just a)
 
 lineNoQCTests :: TestTree
 lineNoQCTests =
@@ -218,7 +215,7 @@ prop_compareLineNo p =
       isJust (fromNodeAddr a p)
         ==> isJust (fromNodeAddr b p)
         ==> compare a b
-        === compare (fromJust $ fromNodeAddr a p) (fromJust $ fromNodeAddr b p)
+        === compare (fromNodeAddr a p) (fromNodeAddr b p)
 
 compareQCTests :: TestTree
 compareQCTests =

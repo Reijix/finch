@@ -1,20 +1,11 @@
 module Fitch.Verification where
 
 import App.Model (Model)
-import Control.Monad (foldM, foldM_, forM, liftM2, zipWithM)
-import Control.Monad.RWS (MonadState)
-import Data.Bifunctor
-import Data.Either (fromLeft)
-import Data.Functor ((<&>))
-import Data.List.NonEmpty (NonEmpty ((:|)))
-import Data.List.NonEmpty qualified as NE
-import Data.Map (Map)
 import Data.Map qualified as M
-import Data.Maybe (fromJust)
-import Data.Text (Text, append, pack)
 import Data.Traversable (mapAccumM)
 import Fitch.Proof
 import Fitch.Unification
+import Relude.Extra.Map
 
 {-@ allCombinations :: xss:[[a]] -> [{v:[a]| len v == len xss}] @-}
 allCombinations :: [[a]] -> [[a]]
@@ -72,7 +63,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Left err -> ParsedInvalid ruleText err ra
             Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
               Left err -> ParsedInvalid ruleText err ra
-              Right formMap -> ParsedInvalid ruleText (pack $ show formMap) ra
+              Right formMap -> ParsedInvalid ruleText (toText $ show formMap) ra
    where
     ---------------------------------------------------
     -- Unwrap variables
@@ -85,7 +76,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
     -- 1. Check that the rule exists.
     checkExistence :: Map Name RuleSpec -> Either Text RuleSpec
-    checkExistence rules = case rules M.!? ruleName of
+    checkExistence rules = case rules !? ruleName of
       Nothing -> Left ("Rule (" <> ruleName <> ") does not exist.")
       Just spec -> Right spec
     ---------------------------------------------------
@@ -99,7 +90,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           "Rule cannot be applied to "
             <> formulaText
             <> "\nExpecting a formula of the form "
-            <> pack (show expected)
+            <> show expected
       Just (actual', expected') -> Right (actual', expected')
     ---------------------------------------------------
 
@@ -110,11 +101,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       Nothing ->
         Left $
           "Found "
-            <> pack (show f)
+            <> show f
             <> " at line "
-            <> pack (show line)
+            <> show line
             <> ".\nBut expected a formula of the form "
-            <> pack (show fSpec)
+            <> show fSpec
             <> "."
       Just (f', fSpec') -> Right (f', fSpec')
     handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Formula, FormulaSpec)
@@ -136,18 +127,24 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       Nothing ->
         Left $
           "Line range "
-            <> pack (show start)
+            <> show start
             <> "-"
-            <> pack (show end)
+            <> show end
             <> " does not correspond to a subproof.\nLine "
-            <> pack (show start)
+            <> show start
             <> " should mark the start of a subproof and line "
-            <> pack (show end)
+            <> show end
             <> " should be its conclusion."
       Just prf -> do
         case (fromLineNo ruleLine p, fromLineRange start end p) of
-          (Nothing, _) -> Left $ "Line " <> pack (show ruleLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-          (_, Nothing) -> Left $ "Line range " <> pack (show start) <> "-" <> pack (show end) <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
+          (Nothing, _) -> Left $ "Line " <> show ruleLine <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+          (_, Nothing) ->
+            Left $
+              "Line range "
+                <> show start
+                <> "-"
+                <> show end
+                <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
           (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
             Nothing -> Right ()
             Just err -> Left err
@@ -176,47 +173,47 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         "Rule ("
           <> ruleName
           <> ") expects a single line at position "
-          <> pack (show n)
+          <> show n
           <> " but got the range "
-          <> pack (show start)
+          <> show start
           <> "-"
-          <> pack (show end)
+          <> show end
           <> "."
     unifyReferences n (RuleSpec _ (_ : _) _) (LineReference line : refs) =
       Left $
         "Rule ("
           <> ruleName
           <> ") expects a line range at position "
-          <> pack (show n)
+          <> show n
           <> " but got the single line "
-          <> pack (show line)
+          <> show line
           <> "."
     unifyReferences n (RuleSpec (_ : fs) ps _) [] =
       Left $
         "Rule ("
           <> ruleName
           <> ") expects "
-          <> pack (show $ n + length fs + length ps + 1)
+          <> show (n + length fs + length ps + 1)
           <> " references,\nbut got "
-          <> pack (show n)
+          <> show n
           <> " references."
     unifyReferences n (RuleSpec [] (_ : ps) _) [] =
       Left $
         "Rule ("
           <> ruleName
           <> ") expects "
-          <> pack (show $ n + length ps + 1)
+          <> show (n + length ps + 1)
           <> " references,\nbut got "
-          <> pack (show n)
+          <> show n
           <> " references."
     unifyReferences n (RuleSpec [] [] _) (_ : refs) =
       Left $
         "Rule ("
           <> ruleName
           <> ") expects "
-          <> pack (show n)
+          <> show n
           <> " references,\nbut got "
-          <> pack (show $ n + length refs + 1)
+          <> show (n + length refs + 1)
           <> " references."
     unifyReferences _ (RuleSpec [] [] _) [] = Right []
     ---------------------------------------------------
@@ -224,40 +221,40 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
     -- 4. Collect terms
     collectTerms :: [(Formula, FormulaSpec)] -> Map Name [Term]
-    collectTerms ((Predicate _ ps, FPredicate _ qs) : rest) =
+    collectTerms ((Pred _ ps, FPred _ qs) : rest) =
       M.unionWith
         (++)
         (collectTerms' (zip ps qs))
         (collectTerms rest)
      where
       collectTerms' :: [(Term, TermSpec)] -> Map Name [Term]
-      collectTerms' [] = M.empty
+      collectTerms' [] = mempty
       collectTerms' ((Fun _ ts, TFun _ ss) : rest) = collectTerms' (zip ts ss ++ rest)
       collectTerms' ((t, TPlaceholder n) : rest) =
-        M.insertWith
+        insertWith
           (++)
           n
           [t]
           (collectTerms' rest)
       collectTerms' (_ : rest) = collectTerms' rest
-    collectTerms ((Op _ fs, FOp _ fs') : rest) =
+    collectTerms ((Opr _ fs, FOpr _ fs') : rest) =
       collectTerms (zip fs fs' ++ rest)
     collectTerms ((Quantifier _ _ f, FQuantifier _ _ f') : rest) =
       collectTerms ((f, f') : rest)
-    collectTerms ((FreshVar m, FFreshVar n) : rest) = M.insertWith (++) n [Var m] $ collectTerms rest
+    collectTerms ((FreshVar m, FFreshVar n) : rest) = insertWith (++) n [Var m] $ collectTerms rest
     collectTerms (_ : rest) = collectTerms rest
-    collectTerms [] = M.empty
+    collectTerms [] = mempty
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 5. Verify term mappings
     verifyTerms :: Map Name [Term] -> Either Text (Map Name Term)
-    verifyTerms m = M.fromList <$> mapM makeUnique (M.toList m)
+    verifyTerms m = fromList <$> mapM makeUnique (toPairs m)
      where
       makeUnique :: (Name, [Term]) -> Either Text (Name, Term)
       makeUnique (_, []) = Left "INTERNAL ERROR, makeUnique got empty list of Terms!"
       makeUnique (v, t : ts) = do
-        foldM_
+        foldlM
           ( \lastTerm currTerm ->
               if lastTerm == currTerm
                 then Right currTerm
@@ -268,11 +265,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                       <> " are the same, found\n"
                       <> v
                       <> "↦"
-                      <> pack (show lastTerm)
+                      <> show lastTerm
                       <> " and\n"
                       <> v
                       <> "↦"
-                      <> pack (show currTerm)
+                      <> show currTerm
                       <> "."
           )
           t
@@ -284,17 +281,17 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     -- 6. Collect formula mappings using backward substitution
     verifyFormulae :: Map Name Term -> [(Formula, FormulaSpec)] -> Either Text (Map Name Formula)
     verifyFormulae termMap formsAndSpecs = do
-      formMap <- reduceFormulae $ M.map (NE.map Left) $ collectSimpleFormulae formsAndSpecs
+      formMap <- reduceFormulae $ M.map (Left <$>) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
       reduceFormulae formMap'
      where
       collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name (NonEmpty Formula)
-      collectSimpleFormulae [] = M.empty
-      collectSimpleFormulae ((Predicate{}, FPredicate{}) : rest) = collectSimpleFormulae rest
-      collectSimpleFormulae ((Op _ fs, FOp _ fSpecs) : rest) = collectSimpleFormulae $ zip fs fSpecs <> rest
+      collectSimpleFormulae [] = mempty
+      collectSimpleFormulae ((Pred{}, FPred{}) : rest) = collectSimpleFormulae rest
+      collectSimpleFormulae ((Opr _ fs, FOpr _ fSpecs) : rest) = collectSimpleFormulae $ zip fs fSpecs <> rest
       collectSimpleFormulae ((Quantifier _ _ f, FQuantifier _ _ fSpec) : rest) = collectSimpleFormulae $ (f, fSpec) : rest
       collectSimpleFormulae ((FreshVar n, FFreshVar m) : rest) = collectSimpleFormulae rest
-      collectSimpleFormulae ((f, FPlaceholder n) : rest) = M.insertWith (<>) n (f :| []) $ collectSimpleFormulae rest
+      collectSimpleFormulae ((f, FPlaceholder n) : rest) = insertWith (<>) n (f :| []) $ collectSimpleFormulae rest
       collectSimpleFormulae (_ : rest) = collectSimpleFormulae rest
       reduceFormulae :: Map Name (NonEmpty (Either Formula [Formula])) -> Either Text (Map Name Formula)
       reduceFormulae = M.traverseWithKey reduceHelper
@@ -302,7 +299,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         reduceHelper :: Name -> NonEmpty (Either Formula [Formula]) -> Either Text Formula
         reduceHelper n (Left f :| rest) = go n f rest
         reduceHelper n (Right [] :| rest) = Left "reduceHelper: can't find match!"
-        -- reduceHelper n (Right fs :| rest) = Left $ "reduceHelper: can't find match!" <> pack (show fs)
+        -- reduceHelper n (Right fs :| rest) = Left $ "reduceHelper: can't find match!" <> show fs)
         reduceHelper n (Right (f : fs) :| rest) = case go n f rest of
           Left err -> reduceHelper n (Right fs :| rest)
           Right f -> Right f
@@ -312,29 +309,29 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         go n f (Right fs' : rest) = mapFs fs'
          where
           mapFs :: [Formula] -> Either Text Formula
-          mapFs [] = Left $ "reduceFormulae: can't find match for f=" <> pack (show f)
+          mapFs [] = Left $ "reduceFormulae: can't find match for f=" <> show f
           mapFs (f' : fs) = if f /= f' then mapFs fs else Right f'
 
       collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name (NonEmpty (Either Formula [Formula])))
       collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
-      collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap M.!? phi of
+      collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap !? phi of
         -- unify fs
         Just phiF -> case unifyFormulae [(phiF, f)] of
-          Nothing -> Left $ "Error unifying " <> pack (show phiF) <> " with\n" <> pack (show f)
+          Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
           -- compare assignment of E
-          Just mgu -> case (mgu M.!? n, termMap M.!? n) of
-            ((Nothing, _); (_, Nothing)) -> M.insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
+          Just mgu -> case (mgu !? n, termMap !? n) of
+            ((Nothing, _); (_, Nothing)) -> insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
             (Just e, Just e') -> undefined
         Nothing -> case t of
-          TPlaceholder e -> case termMap M.!? e of
+          TPlaceholder e -> case termMap !? e of
             Nothing -> Left "Term has wrong form, RULEERROR!" -- error
             -- backwards
-            Just t' -> M.insertWith (<>) phi (Right (substBackwardsForm (Subst n t') f) :| []) <$> collectMoreFormulae formMap rest
+            Just t' -> insertWith (<>) phi (Right (substBackwardsForm (Subst n t') f) :| []) <$> collectMoreFormulae formMap rest
           _ -> Left "Term has wrong form, RULEERROR!" -- error
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> Formula -> [Formula]
-      substBackwardsForm s (Predicate p ts) = map (Predicate p) . allCombinations $ map (substBackwardsTerm s) ts
-      substBackwardsForm s (Op o fs) = map (Op o) . allCombinations $ map (substBackwardsForm s) fs
+      substBackwardsForm s (Pred p ts) = map (Pred p) . allCombinations $ map (substBackwardsTerm s) ts
+      substBackwardsForm s (Opr o fs) = map (Opr o) . allCombinations $ map (substBackwardsForm s) fs
       -- TODO need freshness here :(
       substBackwardsForm s@(Subst n t) (Quantifier q v f) = if n == v then undefined else map (Quantifier q v) (substBackwardsForm s f)
       substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
@@ -358,20 +355,20 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       | ruleLine < refLine =
           Left $
             "Line "
-              <> pack (show refLine)
+              <> show refLine
               <> " can not be referenced because it appears after this line."
       | ruleLine == refLine =
           Left "Can not reference the same line."
     lookupReference refLine p = case (fromLineNo ruleLine p, fromLineNo refLine p) of
-      (Nothing, _) -> Left $ "Line " <> pack (show ruleLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-      (_, Nothing) -> Left $ "Line " <> pack (show refLine) <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+      (Nothing, _) -> Left $ "Line " <> show ruleLine <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+      (_, Nothing) -> Left $ "Line " <> show refLine <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
       (Just ruleAddr, Just refAddr) ->
         maybe
           ( case pIndex refLine p of
-              Nothing -> Left $ "Line " <> pack (show refLine) <> " is not a valid line."
+              Nothing -> Left $ "Line " <> show refLine <> " is not a valid line."
               Just (Left (ParsedValid _ f)) -> Right f
               Just (Right (Derivation (ParsedValid _ f) _)) -> Right f
-              Just _ -> Left $ "Parse error in line: " <> pack (show refLine)
+              Just _ -> Left $ "Parse error in line: " <> show refLine
           )
           Left
           (refIsVisible refLine ruleAddr refAddr)

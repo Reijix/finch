@@ -33,8 +33,8 @@ concatMapU f = foldr ((++!) . f) []
 
 instance FreeVars Formula where
   freeVars :: Formula -> [Name]
-  freeVars (Predicate _ args) = concatMapU freeVars args
-  freeVars (Op _ fs) = concatMapU freeVars fs
+  freeVars (Pred _ args) = concatMapU freeVars args
+  freeVars (Opr _ fs) = concatMapU freeVars fs
   freeVars (Quantifier _ v f) = filter (/= v) $ freeVars f
   freeVars (FreshVar _) = []
 
@@ -46,8 +46,8 @@ instance FreeVars TermSpec where
 
 instance FreeVars FormulaSpec where
   freeVars :: FormulaSpec -> [Name]
-  freeVars (FPredicate _ args) = concatMapU freeVars args
-  freeVars (FOp _ fs) = concatMapU freeVars fs
+  freeVars (FPred _ args) = concatMapU freeVars args
+  freeVars (FOpr _ fs) = concatMapU freeVars fs
   freeVars (FQuantifier _ v f) = filter (/= v) $ freeVars f
   freeVars (FSubst f (Subst v t)) = freeVars t
   freeVars (FFreshVar _) = []
@@ -72,8 +72,8 @@ instance Substitute TermSpec TermSpec where
 
 instance Substitute Formula Term where
   subst :: Subst Term -> Formula -> Formula
-  subst sub (Predicate name args) = Predicate name (map (subst sub) args)
-  subst sub (Op op fs) = Op op (map (subst sub) fs)
+  subst sub (Pred name args) = Pred name (map (subst sub) args)
+  subst sub (Opr op fs) = Opr op (map (subst sub) fs)
   subst s@(Subst x t) (Quantifier q v f)
     | x == v = Quantifier q v f
     | v `elem` freeVars t = subst (Subst x t) (Quantifier q v' f')
@@ -85,8 +85,8 @@ instance Substitute Formula Term where
 
 instance Substitute FormulaSpec TermSpec where
   subst :: Subst TermSpec -> FormulaSpec -> FormulaSpec
-  subst sub (FPredicate name args) = FPredicate name (map (subst sub) args)
-  subst sub (FOp op fs) = FOp op (map (subst sub) fs)
+  subst sub (FPred name args) = FPred name (map (subst sub) args)
+  subst sub (FOpr op fs) = FOpr op (map (subst sub) fs)
   subst s@(Subst x t) (FQuantifier q v f)
     | x == v = FQuantifier q v f
     | v `elem` freeVars t = subst (Subst x t) (FQuantifier q v' f')
@@ -102,7 +102,7 @@ unifyTermSpec :: [(Term, TermSpec)] -> Maybe (Map Name Term)
 unifyTermSpec ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTermSpec (zip ts ss ++ rest)
 unifyTermSpec ((Var x, TVar y) : rest) | x == y = unifyTermSpec rest
 unifyTermSpec ((t, TPlaceholder n) : rest) = (M.singleton n t <>) <$> unifyTermSpec rest
-unifyTermSpec [] = Just M.empty
+unifyTermSpec [] = Just mempty
 unifyTermSpec _ = Nothing
 
 unifyTerms :: [(Term, Term)] -> Maybe [(Name, Term)]
@@ -129,24 +129,24 @@ unifyFormulae = fmap M.fromList . go
  where
   go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
   go [] = Just []
-  go ((Predicate p ts, Predicate q ss) : rest) | p == q && length ts == length ss = do
+  go ((Pred p ts, Pred q ss) : rest) | p == q && length ts == length ss = do
     mapping <- go rest
     unifyTerms $ zip ts ss <> map (first Var) mapping
-  go ((Op o1 fs1, Op o2 fs2) : rest) | o1 == o2 && length fs1 == length fs2 = go (zip fs1 fs2 <> rest)
+  go ((Opr o1 fs1, Opr o2 fs2) : rest) | o1 == o2 && length fs1 == length fs2 = go (zip fs1 fs2 <> rest)
   go ((Quantifier q1 v1 f1, Quantifier q2 v2 f2) : rest) | q1 == q2 && v1 == v2 = go ((f1, f2) : rest)
   go _ = Nothing
 
 unifyAlphaEq :: Formula -> FormulaSpec -> Maybe (Formula, FormulaSpec)
 unifyAlphaEq f@(FreshVar v) fs@(FFreshVar v') = Just (f, fs)
 unifyAlphaEq (FreshVar{}) _ = Nothing
-unifyAlphaEq f@(Predicate p ts) fs@(FPredicate p' ts')
+unifyAlphaEq f@(Pred p ts) fs@(FPred p' ts')
   | p == p' && length ts == length ts' = do
       unifyTermSpec (zip ts ts')
       return (f, fs)
-unifyAlphaEq (Op op fs) (FOp op' fs')
+unifyAlphaEq (Opr op fs) (FOpr op' fs')
   | op == op' = do
       fss <- zipWithM unifyAlphaEq fs fs'
-      return $ bimap (Op op) (FOp op') $ unzip fss
+      return $ bimap (Opr op) (FOpr op') $ unzip fss
 -- TODO the renaming for freshness needs to happen GLOBALLY!!
 unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
   | q == q' && v == v' = return (f, fs)
