@@ -42,7 +42,7 @@ test-suite test
     tests
 
   other-modules:
-    FitchTest
+    FOLTest
     ProofSyntax
 
   main-is:
@@ -50,6 +50,7 @@ test-suite test
 
   build-depends:
     base >=4.21.0 && <4.22,
+    containers,
     fitch-editor-lib,
     miso >=1.9 && <1.9.1,
     tasty >=1.5.2 && <1.6,
@@ -114,6 +115,8 @@ library fitch-editor-lib
     Parser.Prelude
     Parser.Proof
     Parser.Rule
+    Specification.FOL
+    Specification.Prop
 
   default-extensions:
     FlexibleInstances
