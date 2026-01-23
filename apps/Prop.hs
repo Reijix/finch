@@ -8,7 +8,7 @@ import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof operators [] rules
+main = runApp exProof operators [] [] rules
  where
   operators = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
   rules =
@@ -36,9 +36,9 @@ main = runApp exProof operators [] rules
   f1 ∨ f2 = FOp "∨" [f1, f2]
   f1 → f2 = FOp "→" [f1, f2]
 
-  fakeModel = initialModel undefined operators [] M.empty
+  fakeModel = initialModel undefined operators [] [] M.empty
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] [] 1
+  mkFormula = tryParse fakeModel [] [] [] 1
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
   mkRuleApplication txt = Unparsed txt ""

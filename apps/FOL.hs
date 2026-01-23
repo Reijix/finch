@@ -8,9 +8,10 @@ import Fitch.Proof
 
 -----------------------------------------------------------------------------
 main :: IO ()
-main = runApp exProof operators quantifiers rules
+main = runApp exProof operators infixPreds quantifiers rules
  where
   operators = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
+  infixPreds = [("", "=")]
   quantifiers = [("forall", "∀")]
   rules =
     M.fromList
@@ -26,12 +27,12 @@ main = runApp exProof operators quantifiers rules
       , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
       , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
       , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
-      , ("=I", RuleSpec [] [] (FPredicate "Eq" [TPlaceholder "E", TPlaceholder "E"]))
+      , ("=I", RuleSpec [] [] (FPredicate "=" [TPlaceholder "E", TPlaceholder "E"]))
       ,
         ( "=E"
         , RuleSpec
             [ FSubst "φ" ("x" ~> TPlaceholder "E")
-            , FPredicate "Eq" [TPlaceholder "E", TPlaceholder "D"]
+            , FPredicate "=" [TPlaceholder "E", TPlaceholder "D"]
             ]
             []
             (FSubst "φ" ("x" ~> TPlaceholder "D"))
@@ -55,13 +56,13 @@ main = runApp exProof operators quantifiers rules
   f1 ∧ f2 = FOp "∧" [f1, f2]
   f1 ∨ f2 = FOp "∨" [f1, f2]
   f1 → f2 = FOp "→" [f1, f2]
-  fakeModel = initialModel undefined operators quantifiers M.empty
+  fakeModel = initialModel undefined operators infixPreds quantifiers M.empty
 
   mkFormula :: Text -> Assumption
-  mkFormula = tryParse fakeModel [] [] 1
+  mkFormula = tryParse fakeModel [] [] [] 1
 
   mkRuleApplication :: Text -> Wrapper RuleApplication
-  mkRuleApplication = tryParse fakeModel [] [] 1
+  mkRuleApplication = tryParse fakeModel [] [] [] 1
 
   mkDerivation :: Text -> Text -> Derivation
   mkDerivation f r = Derivation (mkFormula f) (mkRuleApplication r)
@@ -74,11 +75,11 @@ main = runApp exProof operators quantifiers rules
     SubProof
       [mkFormula "A", mkFormula "A → B"]
       [ mkLine "P(x)" "(→E) 1, 2"
-      , mkLine "Eq(x,y)" "(→E) 1, 2"
+      , mkLine "x = y" "(→E) 1, 2"
       , SubProof
           [mkFormula "[c]"]
           []
-          (mkDerivation "Eq(c,c)" "(∨I1) 4")
+          (mkDerivation "c = c" "(∨I1) 4")
       ]
       (mkDerivation "P(y)" "(=E) 3,4")
 

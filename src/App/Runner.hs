@@ -99,18 +99,20 @@ runApp ::
   [(Text, Text, Int)] ->
   -- | List of quantifiers with aliases (alias, operator)
   [(Text, Text)] ->
+  -- | List of infix predicates with aliases (alias, predicate)
+  [(Text, Text)] ->
   -- | A map that contains all rules, mapping their names to their specification
   Map Name RuleSpec ->
   -- | Resulting program
   IO ()
-runApp proof operators quantifiers rules =
+runApp proof operators infixPreds quantifiers rules =
   run . startApp (dragEvents <> M.fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
       , initialAction = Just Setup
       }
  where
-  m = initialModel proof operators quantifiers rules
+  m = initialModel proof operators infixPreds quantifiers rules
 
 checkProof :: Effect ROOT Model Action
 checkProof = do
@@ -140,8 +142,8 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
         %=? pInsert
           ( Right . ProofLine $
               Derivation
-                (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")
-                (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")
+                (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")
+                (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule")
           )
           targetAddr
           pos
@@ -150,13 +152,13 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
         %=? pInsert
           ( Right $
               SubProof
-                [tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"]
+                [tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula"]
                 []
-                (Derivation (tryParse m [] [] 1 "Formula") (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
+                (Derivation (tryParse m [] [] [] 1 "Formula") (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Rule"))
           )
           targetAddr
           pos
-    Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
+    Just SpawnAssumption -> proof %=? pInsert (Left (tryParse m [] [] [] (fromJust $ fromNodeAddr targetAddr (m ^. proof)) "Formula")) targetAddr pos
   checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
@@ -201,7 +203,7 @@ updateModel (Input str ref) = do
       return $ ProcessInput str start end addr
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  let p = tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
+  let p = tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper Formula
   proof %= pUpdateFormula (const p) addr
   checkProof
   let delta = length (fromMisoString str :: String) - (length . T.unpack . getText $ p)
@@ -209,7 +211,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
   io_ $ setSelectionRange (ms $ "proof-line" ++ show (fromJust (fromNodeAddr addr (m ^. proof)))) (start - delta) (end - delta)
 updateModel (ProcessInput str start end (Right addr)) = do
   m <- get
-  let r = tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
+  let r = tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) (fromMisoString str :: Text) :: Wrapper RuleApplication
   proof %= pUpdateRule (const r) addr
   ruleMap <- use rules
   proof %= verifyProof ruleMap
@@ -231,8 +233,8 @@ updateModel (ProcessParens eaddr start end) = do
         (second, third) = T.splitAt (end - start) rest
         newTxt = T.concat [first, "(", second, ")", third]
      in case eaddr of
-          Left addr -> Left $ tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
-          Right addr -> Right $ tryParse m (m ^. operators) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
+          Left addr -> Left $ tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
+          Right addr -> Right $ tryParse m (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) (fromJust $ fromNodeAddr addr (m ^. proof)) newTxt
 updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
 updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
 ------------------------------------
@@ -313,7 +315,7 @@ instance FromText RuleSpec where
 
 instance FromText Formula where
   fromText :: Model -> Int -> Text -> Either Text Formula
-  fromText m = parseFormula (m ^. operators) (m ^. quantifiers)
+  fromText m = parseFormula (m ^. operators) (m ^. infixPreds) (m ^. quantifiers)
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication
@@ -322,8 +324,8 @@ instance FromText RuleApplication where
 {- | Wrapper for `fromText` that also takes a list of aliases and
 tries to replace these aliases in the `Text`
 -}
-tryParse :: forall a. (FromText a) => Model -> [(Text, Text, Int)] -> [(Text, Text)] -> Int -> Text -> Wrapper a
-tryParse m ops quantifiers n txt = case fromText m n replacedTxt :: Either Text a of
+tryParse :: forall a. (FromText a) => Model -> [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Wrapper a
+tryParse m ops infixPreds quantifiers n txt = case fromText m n replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
   Right result -> ParsedValid replacedTxt result
  where

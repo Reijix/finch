@@ -93,6 +93,7 @@ data Model = Model
   {- ^ list of operators, consisting of (alias, symbol, arity)
   where alias is an alternative notation for the symbol
   -}
+  , _infixPreds :: [(Text, Text)]
   , _quantifiers :: [(Text, Text)]
   {- ^ list of quantifiers, consisting of (alias, symbol)
   where alias is an alternative notation for the symbol
@@ -122,10 +123,12 @@ initialModel ::
   [(Text, Text, Int)] ->
   -- | A list of quantifiers (alias, quantifier)
   [(Text, Text)] ->
+  -- | A list of infix predicates (alias, predicate name)
+  [(Text, Text)] ->
   -- | The map of rules
   Map Name RuleSpec ->
   Model
-initialModel p operators quantifiers rules =
+initialModel p operators infixPreds quantifiers rules =
   Model
     { _focusedLine = Nothing
     , _proof = p
@@ -135,6 +138,7 @@ initialModel p operators quantifiers rules =
     , _currentLineAfter = Nothing
     , _dragging = False
     , _operators = operators
+    , _infixPreds = infixPreds
     , _quantifiers = quantifiers
     , _functionSymbols = M.empty
     , _predicateSymbols = M.empty
@@ -165,6 +169,9 @@ dragging = lens (._dragging) $ \model d -> model{_dragging = d}
 
 operators :: Lens Model [(Text, Text, Int)]
 operators = lens (._operators) $ \model op -> model{_operators = op}
+
+infixPreds :: Lens Model [(Text, Text)]
+infixPreds = lens (._infixPreds) $ \model p -> model{_infixPreds = p}
 
 quantifiers :: Lens Model [(Text, Text)]
 quantifiers = lens (._quantifiers) $ \model q -> model{_quantifiers = q}

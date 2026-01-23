@@ -51,6 +51,7 @@ import Text.Megaparsec (
 
 data FormulaParserState = FormulaParserState
   { operators :: [(Text, Text, Int)]
+  , infixPreds :: [(Text, Text)]
   , quantifiers :: [(Text, Text)]
   }
 
@@ -90,8 +91,20 @@ pConstant = do
 pQuantifier :: (FormulaParser m) => m Formula
 pQuantifier = lexeme $ liftM3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pFormula)
 
+pInfixPredName :: (FormulaParser m) => m Name
+pInfixPredName = do
+  tops <- gets infixPreds
+  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty tops
+
+pInfixPred :: (FormulaParser m) => m Formula
+pInfixPred = do
+  t1 <- lexeme pTerm
+  op <- lexeme pInfixPredName
+  t2 <- lexeme pTerm
+  return $ Predicate op [t1, t2]
+
 pFormulaAtomic :: (FormulaParser m) => m Formula
-pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
+pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> try pInfixPred <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
 
 pFormula :: (FormulaParser m) => m Formula
 pFormula = do
@@ -102,8 +115,8 @@ pFormula = do
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
-parseFormula :: [(Text, Text, Int)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
-parseFormula operators quantifiers lineNo input = case evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
+parseFormula :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Either Text Formula
+parseFormula operators infixPreds quantifiers lineNo input = case evalState (runParserT' (pFormula <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right f) -> Right f
  where
@@ -124,5 +137,6 @@ parseFormula operators quantifiers lineNo input = case evalState (runParserT' (p
   initialState =
     FormulaParserState
       { operators
+      , infixPreds
       , quantifiers
       }

@@ -57,8 +57,8 @@ pProof ind =
     <|> pSubProof (ind + 1)
     <?> "subproof or proofline"
 
-parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Derivation
-parseLine operators quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of
+parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
+parseLine operators infixPreds quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right d) -> Right d
  where
@@ -79,11 +79,12 @@ parseLine operators quantifiers input = case evalState (runParserT' (pDerivation
   initialState =
     FormulaParserState
       { operators
+      , infixPreds
       , quantifiers
       }
 
-parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> Text -> Either Text Proof
-parseProof operators quantifiers input = case evalState (runParserT' (pProof 0 <* eof) initialParserState) initialState of
+parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
+parseProof operators infixPreds quantifiers input = case evalState (runParserT' (pProof 0 <* eof) initialParserState) initialState of
   (_, Left e) -> Left $ pack $ errorBundlePretty e
   (_, Right p) -> Right p
  where
@@ -104,5 +105,6 @@ parseProof operators quantifiers input = case evalState (runParserT' (pProof 0 <
   initialState =
     FormulaParserState
       { operators
+      , infixPreds
       , quantifiers
       }
