@@ -63,7 +63,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Left err -> ParsedInvalid ruleText err ra
             Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
               Left err -> ParsedInvalid ruleText err ra
-              Right formMap -> ParsedInvalid ruleText (toText $ show formMap) ra
+              Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
    where
     ---------------------------------------------------
     -- Unwrap variables
@@ -113,16 +113,16 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       Unparsed{} -> Left "Unparsed assumption --- INTERNAL ERROR SHOULD NOT HAPPEN"
       (ParsedInvalid txt err f) -> do
         (f', fSpec') <- handleFormula line f fSpec
-        return (f', fSpec')
+        pure (f', fSpec')
       (ParsedValid txt f) -> do
         (f', fSpec') <- handleFormula line f fSpec
-        return (f', fSpec')
+        pure (f', fSpec')
     unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text [(Formula, FormulaSpec)]
     unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
       f <- lookupReference refLine p
       f' <- handleFormula refLine f fSpec
       fs <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
-      return (f' : fs)
+      pure (f' : fs)
     unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = case pIndexProof start end p of
       Nothing ->
         Left $
@@ -150,7 +150,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Just err -> Left err
         fs <- handleProof (start, end) prf pSpec
         fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-        return (fs ++ fs')
+        pure (fs ++ fs')
      where
       handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [(Formula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
@@ -161,12 +161,12 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                 <$> mapAccumM
                   ( \s (a, fSpec) -> do
                       (a', fSpec') <- handleAssumption s a fSpec
-                      return (s + 1, (a', fSpec'))
+                      pure (s + 1, (a', fSpec'))
                   )
                   start
                   (zip fs fSpecs)
             (c', cSpec') <- handleAssumption end c cSpec
-            return (zip (fs' ++ [c']) (fSpecs' ++ [cSpec']))
+            pure (zip (fs' ++ [c']) (fSpecs' ++ [cSpec']))
       handleProof _ (ProofLine{}) _ = Left "handleProof found ProofLine -- SHOULD NOT HAPPEN - INTERNAL ERROR."
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
@@ -274,7 +274,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           )
           t
           ts
-        return (v, t)
+        pure (v, t)
     ---------------------------------------------------
 
     ---------------------------------------------------

@@ -1,11 +1,5 @@
 module Fitch.Unification where
 
-import Control.Monad (zipWithM)
-import Data.Bifunctor (Bifunctor (bimap, first))
-import Data.Map (Map)
-import Data.Map qualified as M
-import Data.Text (Text)
-import Data.Text qualified as T
 import Fitch.Proof
 
 class FreeVars a where
@@ -101,7 +95,7 @@ instance Substitute FormulaSpec TermSpec where
 unifyTermSpec :: [(Term, TermSpec)] -> Maybe (Map Name Term)
 unifyTermSpec ((Fun t ts, TFun s ss) : rest) | t == s && length ts == length ss = unifyTermSpec (zip ts ss ++ rest)
 unifyTermSpec ((Var x, TVar y) : rest) | x == y = unifyTermSpec rest
-unifyTermSpec ((t, TPlaceholder n) : rest) = (M.singleton n t <>) <$> unifyTermSpec rest
+unifyTermSpec ((t, TPlaceholder n) : rest) = (one (n, t) <>) <$> unifyTermSpec rest
 unifyTermSpec [] = Just mempty
 unifyTermSpec _ = Nothing
 
@@ -125,7 +119,7 @@ unifyTerms ((Var x, t) : rest)
 unifyTerms ((t@Fun{}, Var x) : rest) = unifyTerms ((Var x, t) : rest)
 
 unifyFormulae :: [(Formula, Formula)] -> Maybe (Map Name Term)
-unifyFormulae = fmap M.fromList . go
+unifyFormulae = fmap fromList . go
  where
   go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
   go [] = Just []
@@ -142,14 +136,14 @@ unifyAlphaEq (FreshVar{}) _ = Nothing
 unifyAlphaEq f@(Pred p ts) fs@(FPred p' ts')
   | p == p' && length ts == length ts' = do
       unifyTermSpec (zip ts ts')
-      return (f, fs)
+      pure (f, fs)
 unifyAlphaEq (Opr op fs) (FOpr op' fs')
   | op == op' = do
       fss <- zipWithM unifyAlphaEq fs fs'
-      return $ bimap (Opr op) (FOpr op') $ unzip fss
+      pure $ bimap (Opr op) (FOpr op') $ unzip fss
 -- TODO the renaming for freshness needs to happen GLOBALLY!!
 unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
-  | q == q' && v == v' = return (f, fs)
+  | q == q' && v == v' = pure (f, fs)
   | q == q' && notElem v (freeVars form') = Just (f, FQuantifier q' v $ subst (Subst v (TVar v')) form')
   | q == q' =
       let
@@ -160,5 +154,5 @@ unifyAlphaEq f@(Quantifier q v form) fs@(FQuantifier q' v' form')
           , FQuantifier q' v'' $ subst (Subst v (TVar v'')) form'
           )
 unifyAlphaEq f fs@(FPlaceholder n) = Just (f, fs)
-unifyAlphaEq f fs@(FSubst n sub) = return (f, fs)
+unifyAlphaEq f fs@(FSubst n sub) = pure (f, fs)
 unifyAlphaEq _ _ = Nothing

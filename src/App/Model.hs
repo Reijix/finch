@@ -203,26 +203,26 @@ regenerateSymbols = do
           fsyms <- use functionSymbols
           psyms <- use predicateSymbols
           a' <- go n fsyms psyms txt formula
-          return (n + 1, a')
+          pure (n + 1, a')
    where
     goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> m (Maybe Text)
-    goArgs n fsyms = foldlM (\mErr t -> if isJust mErr then return mErr else goTerm n fsyms t) Nothing
+    goArgs n fsyms = foldlM (\mErr t -> if isJust mErr then pure mErr else goTerm n fsyms t) Nothing
      where
       goTerm :: Int -> Map Text (Int, Pos) -> Term -> m (Maybe Text)
-      goTerm _ _ (Var{}) = return Nothing
+      goTerm _ _ (Var{}) = pure Nothing
       goTerm n fsyms (Fun name args) = do
         -- first check inner symbols
         mTermError <- goArgs n fsyms args
         case mTermError of
-          Just termError -> return $ Just termError
+          Just termError -> pure $ Just termError
           Nothing ->
             -- then check the function symbol
             case fsyms !? name of
               Nothing -> do
                 functionSymbols %= insert name (length args, n)
-                return Nothing
+                pure Nothing
               Just (expLen, pos) ->
-                return $
+                pure $
                   if expLen == length args
                     then Nothing
                     else
@@ -242,15 +242,15 @@ regenerateSymbols = do
       -- first check function symbols
       mTermError <- goArgs n fsyms args
       case mTermError of
-        Just termError -> return $ ParsedInvalid txt termError formula
+        Just termError -> pure $ ParsedInvalid txt termError formula
         -- then check the predicate symbol
         Nothing ->
           case psyms !? name of
             Nothing -> do
               predicateSymbols %= insert name (length args, n)
-              return (ParsedValid txt formula)
+              pure (ParsedValid txt formula)
             Just (expLen, pos) ->
-              return $
+              pure $
                 if expLen == length args
                   then ParsedValid txt formula
                   -- TODO singular/plural!
@@ -279,9 +279,9 @@ regenerateSymbols = do
       combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
       combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
     go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
-    go _ _ _ txt (FreshVar var) = return $ ParsedValid txt $ FreshVar var
+    go _ _ _ txt (FreshVar var) = pure $ ParsedValid txt $ FreshVar var
   -- proccesses a single line, by proccessing its formula.
   goLine :: Int -> Derivation -> m (Int, Derivation)
   goLine n (Derivation f r) = do
     (n', f') <- goFormula n f
-    return (n', Derivation f' r)
+    pure (n', Derivation f' r)

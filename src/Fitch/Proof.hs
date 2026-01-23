@@ -1,6 +1,7 @@
 module Fitch.Proof where
 
 import Data.Text qualified as T
+import Relude.Extra.Map (toPairs)
 
 -- * Definitions
 
@@ -183,6 +184,11 @@ instance PrettyPrint RuleApplication where
   prettyPrint :: RuleApplication -> Text
   prettyPrint (RuleApplication n refs) = "(" <> n <> ")" <> " " <> T.intercalate "," (map prettyPrint refs)
 
+-- helper for debugging:
+instance (PrettyPrint a) => PrettyPrint (Map Name a) where
+  prettyPrint :: Map Name a -> Text
+  prettyPrint m = unlines $ map (\(n, a) -> n <> " |-> " <> prettyPrint a) (toPairs m)
+
 -- | A derivation inside a proof.
 data Derivation
   = {- | A derivation inside a proof, i.e. a single line consisting of a formula
@@ -338,22 +344,22 @@ pMapMAccumL ::
   m (s, Proof)
 pMapMAccumL af df s (ProofLine d) = do
   (s', d') <- df s d
-  return (s', ProofLine d')
+  pure (s', ProofLine d')
 pMapMAccumL af df s (SubProof fs ps d) = do
   (s', fs') <-
     foldlM
-      (\(t, fs') f -> af t f >>= (\(t', f') -> return (t', fs' ++ [f'])))
+      (\(t, fs') f -> af t f >>= (\(t', f') -> pure (t', fs' ++ [f'])))
       (s, [])
       fs
   (s'', ps') <-
     foldlM
       ( \(t, ps') p ->
-          pMapMAccumL af df t p >>= (\(t', p') -> return (t', ps' ++ [p']))
+          pMapMAccumL af df t p >>= (\(t', p') -> pure (t', ps' ++ [p']))
       )
       (s', [])
       ps
   (s''', d') <- df s'' d
-  return (s''', SubProof fs' ps' d')
+  pure (s''', SubProof fs' ps' d')
 
 -- * Indexing proofs
 
@@ -408,7 +414,7 @@ fromLineNo n (SubProof [] ps _) = helper n 0 ps
   helper 1 m ((ProofLine{}) : ps) = Just $ NAProof m Nothing
   helper n m (p : ps) | (n - 1) < pLength p = do
     addr <- fromLineNo n p
-    return $ NAProof m (Just addr)
+    pure $ NAProof m (Just addr)
   helper n m (p : ps) = helper (n - pLength p) (m + 1) ps
 fromLineNo n (SubProof fs _ _) | (n - 1) < length fs = Just $ NAAssumption (n - 1)
 fromLineNo n (SubProof fs ps l) = fromLineNo (n - length fs) (SubProof [] ps l)
@@ -444,13 +450,13 @@ fromNodeAddr = go 1
  where
   go :: Int -> NodeAddr -> Proof -> Maybe Int
   go 1 (NAProof 0 Nothing) (ProofLine{}) = Just 1
-  go n (NAAssumption m) (SubProof fs _ _) | m < length fs = return $ n + m
+  go n (NAAssumption m) (SubProof fs _ _) | m < length fs = pure $ n + m
   go n (NAAssumption m) (SubProof fs _ _) = Nothing
   go 1 (NAProof 0 Nothing) (SubProof [] [] _) = Just 1
   go n (NAProof m Nothing) (SubProof fs ps _)
     | holdsAt isProofLine ps m =
-        return $ length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)
-  go n NAConclusion (SubProof fs ps _) = return $ length fs + n + foldr (\p n -> n + pLength p) 0 ps
+        pure $ length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)
+  go n NAConclusion (SubProof fs ps _) = pure $ length fs + n + foldr (\p n -> n + pLength p) 0 ps
   go n (NAProof m (Just addr)) (SubProof fs ps _)
     | holdsAt isSubProof ps m =
         go (length fs + n + foldr (\p n -> n + pLength p) 0 (take m ps)) addr =<< (ps !!? m)

@@ -1,21 +1,20 @@
 module FOLTest where
 
-import Data.Text.IO
 import Fitch.Proof
 import Parser.Formula (parseFormula)
 import Parser.Proof
 import Specification.FOL
-import System.IO (IOMode (..), openFile)
 import Test.Tasty
 import Test.Tasty.HUnit
 
 readProof :: String -> IO (Either Text Proof)
 readProof filePath = do
-  handle <- openFile filePath ReadMode
-  contents <- hGetContents handle
-  case parseProof operatorsFOL infixPredsFOL quantifiersFOL contents of
-    Left err -> return $ Left err
-    Right p -> return $ Right p
+  contents <- readFileBS filePath
+  pure $ parseProof operatorsFOL infixPredsFOL quantifiersFOL (decodeUtf8 contents)
 
 main :: IO ()
-main = undefined
+main = do
+  ep <- readProof "tests/Examples/Proof1.fitch"
+  case ep of
+    Left err -> putTextLn err
+    Right p -> putTextLn $ prettyPrint p

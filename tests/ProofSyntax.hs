@@ -59,15 +59,15 @@ exProof3 = SubProof [] [SubProof [formula 0] [line 1] (derivation 2), line 3] (d
 -- PROPERTIES
 instance Arbitrary Name where
   arbitrary :: Gen Name
-  arbitrary = return "Rule"
+  arbitrary = pure "Rule"
 
 instance Arbitrary Formula where
   arbitrary :: Gen Formula
-  arbitrary = return $ Pred "Formula" []
+  arbitrary = pure $ Pred "Formula" []
 
 instance Arbitrary FormulaSpec where
   arbitrary :: Gen FormulaSpec
-  arbitrary = return $ FPred "Formula" []
+  arbitrary = pure $ FPred "Formula" []
 
 instance Arbitrary RuleSpec where
   arbitrary :: Gen RuleSpec
@@ -101,7 +101,7 @@ instance Arbitrary Proof where
 data AddrKind = AssumptionKind | LineKind | ProofKind | ConclusionKind | AnyKind
 
 arbitraryNodeAddrFor :: Proof -> AddrKind -> Gen NodeAddr
-arbitraryNodeAddrFor (ProofLine{}) _ = discard -- return $ NAProof 0 Nothing
+arbitraryNodeAddrFor (ProofLine{}) _ = discard
 arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   ([], AssumptionKind) -> discard
   ([], AnyKind) -> oneof [naLine ps, naSubProof AnyKind, naConclusion]
@@ -111,7 +111,7 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   (_, ConclusionKind) -> oneof [naConclusion, naSubProof ConclusionKind]
   (_, AnyKind) -> oneof [naAssumption, naLine ps, naSubProof AnyKind, naConclusion]
  where
-  naConclusion = return NAConclusion
+  naConclusion = pure NAConclusion
   naLine ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isProofLine ps)
   naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isSubProof ps)
   naAssumption = fmap NAAssumption (chooseInt (0, length fs - 1))

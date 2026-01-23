@@ -14,8 +14,8 @@ rulesProp =
     [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
     , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
     , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
-    , ("→I", RuleSpec [] [([phi], psi)] (phi → psi))
-    , ("→E", RuleSpec [phi → psi, phi] [] psi)
+    , ("→I", RuleSpec [] [([phi], psi)] (phi ↝ psi))
+    , ("→E", RuleSpec [phi ↝ psi, phi] [] psi)
     , ("¬I", RuleSpec [] [([phi], bot)] (neg phi))
     , ("¬E", RuleSpec [phi, neg phi] [] bot)
     , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
@@ -33,4 +33,4 @@ rulesProp =
   neg f = FOpr "¬" [f]
   f1 ∧ f2 = FOpr "∧" [f1, f2]
   f1 ∨ f2 = FOpr "∨" [f1, f2]
-  f1 → f2 = FOpr "→" [f1, f2]
+  f1 ↝ f2 = FOpr "→" [f1, f2]

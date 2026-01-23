@@ -24,10 +24,17 @@ main = runApp exProof operatorsFOL infixPredsFOL quantifiersFOL rulesFOL
     |∀x. P(x) → Q(x)
     |∀z. Q(z) → R(z)
     |---
-    |P(d)                  (=I)
+    ||[d]
     ||---
-    ||P(d)                 (=I)
+    |||P(d)
+    |||---
+    |||P(d) → Q(d)        (∀E) 1
+    |||Q(d)               (→E) 4,5
+    |||Q(d) → R(d)        (∀E) 2
+    |||R(d)               (→E) 6,7
+    ||P(d) → R(d)         (→I) 4-8
     |∀x.P(x) → R(x)       (∀I) 3-9
+
     """
 
 -----------------------------------------------------------------------------

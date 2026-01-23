@@ -29,8 +29,8 @@ rulesFOL =
     [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
     , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
     , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
-    , ("→I", RuleSpec [] [([phi], psi)] (phi → psi))
-    , ("→E", RuleSpec [phi, phi → psi] [] psi)
+    , ("→I", RuleSpec [] [([phi], psi)] (phi ↝ psi))
+    , ("→E", RuleSpec [phi, phi ↝ psi] [] psi)
     , ("¬I", RuleSpec [] [([phi], bot)] (neg phi))
     , ("¬E", RuleSpec [phi, neg phi] [] bot)
     , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
@@ -58,21 +58,12 @@ rulesFOL =
       )
     ]
  where
-  phi :: FormulaSpec
   phi = FPlaceholder "φ"
-  psi :: FormulaSpec
   psi = FPlaceholder "ψ"
-  chi :: FormulaSpec
   chi = FPlaceholder "χ"
-  top :: FormulaSpec
   top = FOpr "⊤" []
-  bot :: FormulaSpec
   bot = FOpr "⊥" []
-  neg :: FormulaSpec -> FormulaSpec
   neg f = FOpr "¬" [f]
-  (∧) :: FormulaSpec -> FormulaSpec -> FormulaSpec
   f1 ∧ f2 = FOpr "∧" [f1, f2]
-  (∨) :: FormulaSpec -> FormulaSpec -> FormulaSpec
   f1 ∨ f2 = FOpr "∨" [f1, f2]
-  (→) :: FormulaSpec -> FormulaSpec -> FormulaSpec
-  f1 → f2 = FOpr "→" [f1, f2]
+  f1 ↝ f2 = FOpr "→" [f1, f2]

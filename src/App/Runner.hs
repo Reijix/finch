@@ -115,15 +115,15 @@ updateModel Setup = checkProof
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
-    Nothing -> pure ()
+    Nothing -> pass
     Just addr -> proof %= pRemove addr
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
-    Nothing -> pure ()
+    Nothing -> pass
     Just sourceAddr -> proof %= pMove targetAddr pos sourceAddr
   use spawnType >>= \case
-    Nothing -> pure ()
+    Nothing -> pass
     -- TODO adjust linenos
     Just SpawnLine ->
       proof
@@ -208,11 +208,11 @@ updateModel (Input str ref) = do
   fline <- use focusedLine
   -- save selectionStart and selectionEnd
   case fline of
-    Nothing -> return ()
+    Nothing -> pass
     Just addr -> io $ do
       Just (start :: Int) <- castJSVal =<< getProperty ref "selectionStart"
       Just (end :: Int) <- castJSVal =<< getProperty ref "selectionEnd"
-      return $ ProcessInput str start end addr
+      pure $ ProcessInput str start end addr
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   let p =
@@ -296,7 +296,7 @@ updateModel (ProcessParens eaddr start end) = do
 updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
 updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
 ------------------------------------
-updateModel Nop = pure ()
+updateModel Nop = pass
 
 -- | Takes a `Model` and returns the corresponding `View`.
 viewModel :: Model -> View Model Action

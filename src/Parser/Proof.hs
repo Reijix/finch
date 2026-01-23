@@ -54,7 +54,7 @@ pSubProof ind = do
 
   case viaNonEmpty (\l -> (init l, last l)) proofs of
     Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator! (SHOULD NOT HAPPEN)"
-    Just (ps, ProofLine d) -> return $ SubProof fs ps d
+    Just (ps, ProofLine d) -> pure $ SubProof fs ps d
     Just _ -> unexpected (Label $ fromList "subproof")
 
 pProof :: (FormulaParser m) => Int -> m Proof

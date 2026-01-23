@@ -50,7 +50,7 @@ pFreshVariable :: (FormulaParser m) => m Formula
 pFreshVariable = lexeme $ FreshVar <$> brackets pName
 
 pPredicate :: (FormulaParser m) => m Formula
-pPredicate = lexeme $ liftA2 Pred pName $ parens (pTerm `sepBy` comma) <|> return []
+pPredicate = lexeme $ liftA2 Pred pName $ parens (pTerm `sepBy` comma) <|> pure []
 
 pPropAtom :: (FormulaParser m) => m Formula
 pPropAtom = lexeme $ (`Pred` []) <$> pName
@@ -58,13 +58,13 @@ pPropAtom = lexeme $ (`Pred` []) <$> pName
 pQuantifierName :: (FormulaParser m) => m Name
 pQuantifierName = do
   symbols <- gets quantifiers
-  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty symbols
+  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> pure s) <|> p) empty symbols
 
 pConstant :: (FormulaParser m) => m Formula
 pConstant = do
   ops <- gets operators
   op <- foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
-  lexeme . return $ Opr op []
+  lexeme . pure $ Opr op []
 
 pQuantifier :: (FormulaParser m) => m Formula
 pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pFormula)
@@ -72,14 +72,14 @@ pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pName
 pInfixPredName :: (FormulaParser m) => m Name
 pInfixPredName = do
   tops <- gets infixPreds
-  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> return s) <|> p) empty tops
+  foldr (\(alias, s) p -> chunk s <|> (chunk alias >> pure s) <|> p) empty tops
 
 pInfixPred :: (FormulaParser m) => m Formula
 pInfixPred = do
   t1 <- lexeme pTerm
   op <- lexeme pInfixPredName
   t2 <- lexeme pTerm
-  return $ Pred op [t1, t2]
+  pure $ Pred op [t1, t2]
 
 pFormulaAtomic :: (FormulaParser m) => m Formula
 pFormulaAtomic = (pFreshVariable <|> pQuantifier <|> try pInfixPred <|> parens pFormula <|> pConstant <|> pPredicate) <?> "formula"
