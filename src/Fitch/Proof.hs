@@ -11,6 +11,9 @@ import Data.Traversable (mapAccumL)
 
 -- * Definitions
 
+class PrettyPrint a where
+  prettyPrint :: a -> Text
+
 -- | Wraps data contained in a `Proof` to store further information.
 data Wrapper a where
   -- | Semantically valid parse success
@@ -27,6 +30,10 @@ data Wrapper a where
   -- | Parse failure
   Unparsed :: Text -> Text -> Wrapper a
   deriving (Show, Eq)
+
+instance PrettyPrint (Wrapper a) where
+  prettyPrint :: Wrapper a -> Text
+  prettyPrint = getText
 
 isUnparsed :: Wrapper a -> Bool
 isUnparsed (Unparsed{}) = True
@@ -74,11 +81,11 @@ data Term
     Fun Name [Term]
   deriving (Eq, Ord, Show)
 
--- instance Show Term where
---   show :: Term -> String
---   show (Var v) = T.unpack v
---   show (Fun f []) = T.unpack f
---   show (Fun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
+instance PrettyPrint Term where
+  prettyPrint :: Term -> Text
+  prettyPrint (Var v) = v
+  prettyPrint (Fun f []) = f
+  prettyPrint (Fun f ts) = f <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
 
 data Subst a = Subst Name a
   deriving (Show, Eq)
@@ -91,44 +98,48 @@ data TermSpec
   = TVar Name
   | TFun Name [TermSpec]
   | TPlaceholder Name
-  deriving (Eq)
+  deriving (Eq, Show)
 
-instance Show TermSpec where
-  show :: TermSpec -> String
-  show (TVar n) = T.unpack n
-  show (TFun f ts) = T.unpack f ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-  show (TPlaceholder n) = T.unpack n
+instance PrettyPrint TermSpec where
+  prettyPrint :: TermSpec -> Text
+  prettyPrint (TVar n) = n
+  prettyPrint (TFun f ts) = f <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+  prettyPrint (TPlaceholder n) = n
 
 data FormulaSpec
   = FSubst Name (Subst TermSpec)
   | FPlaceholder Name
   | FPredicate Name [TermSpec]
+  | FInfixPredicate Name TermSpec TermSpec
   | FOp Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
   | FFreshVar Name
-  deriving (Eq)
+  deriving (Eq, Show)
 
-instance Show FormulaSpec where
-  show :: FormulaSpec -> String
-  show f = go False f
+instance PrettyPrint FormulaSpec where
+  prettyPrint :: FormulaSpec -> Text
+  prettyPrint f = go False f
    where
-    go :: Bool -> FormulaSpec -> String
-    go _ (FPredicate p []) = T.unpack p
-    go _ (FPredicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
-    go _ (FPlaceholder n) = T.unpack n
-    go _ (FFreshVar n) = "[" ++ T.unpack n ++ "]"
-    go _ (FSubst f (Subst n t)) = T.unpack f ++ "[" ++ T.unpack n ++ " -> " ++ show t ++ "]"
-    go True f = "(" ++ go False f ++ ")"
-    go _ (FOp op fs)
-      | null fs = T.unpack op
-      | L.length fs == 2 = L.intercalate (" " ++ T.unpack op ++ " ") (map (go True) fs)
-      | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
-    go _ (FQuantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
+    go :: Bool -> FormulaSpec -> Text
+    go _ (FPredicate p []) = p
+    go _ (FPredicate p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+    go _ (FPlaceholder n) = n
+    go _ (FFreshVar n) = "[" <> n <> "]"
+    go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> prettyPrint t <> "]"
+    go True f = "(" <> go False f <> ")"
+    go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
+    go False (FOp op fs)
+      | null fs = op
+      | L.length fs == 2 = T.intercalate (" " <> op <> " ") (map (go True) fs)
+      | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
+    go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
 
 -- | A formula for first-order logic (can be instantiated to 0th order, by using `Predicate` without the list of `Term`.
 data Formula
-  = -- | A single `Predicate` applied to terms
+  = -- | A `Predicate` applied to terms.
     Predicate Name [Term]
+  | -- | A `Predicate` applied to terms, written in infix notation.
+    InfixPredicate Name Term Term
   | -- | A n-ary operator, like @->@ for implication, or @~@ for negation.
     Op Text [Formula]
   | -- | A quantifier, like @∀@ for universal quantification.
@@ -137,28 +148,34 @@ data Formula
     FreshVar Name
   deriving (Eq, Ord, Show)
 
--- instance Show Formula where
---   show :: Formula -> String
---   show f = go False f
---    where
---     go :: Bool -> Formula -> String
---     go _ (Predicate p []) = T.unpack p
---     go _ (Predicate p ts) = T.unpack p ++ "(" ++ L.intercalate "," (map show ts) ++ ")"
---     go True f = "(" ++ go False f ++ ")"
---     go _ (Op op fs)
---       | null fs = T.unpack op
---       | L.length fs == 2 = L.intercalate (T.unpack op) (map (go True) fs)
---       | otherwise = T.unpack op ++ "(" ++ L.intercalate "," (map show fs) ++ ")"
---     go _ (Quantifier q v f) = T.unpack q ++ " " ++ T.unpack v ++ ". " ++ show f
---     go _ (FreshVar v) = "[" ++ T.unpack v ++ "]"
+instance PrettyPrint Formula where
+  prettyPrint :: Formula -> Text
+  prettyPrint f = go False f
+   where
+    go :: Bool -> Formula -> Text
+    go _ (Predicate p []) = p
+    go _ (Predicate p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+    go True f = "(" <> go False f <> ")"
+    go False (InfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
+    go False (Op op fs)
+      | null fs = op
+      | L.length fs == 2 = T.intercalate op (map (go True) fs)
+      | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
+    go False (Quantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
+    go False (FreshVar v) = "[" <> v <> "]"
 
--- | A reference to a line (either `Assumption` or `ProofLine`) or a `SubProof`
+-- | A reference to a line (either `Assumption` or `ProofLine` or a `SubProof`).
 data Reference where
   -- | Referencing a single line
   LineReference :: Int -> Reference
   -- | Referencing a subproof by a line interval, i.e. `ProofReference` @from@ @to@
   ProofReference :: Int -> Int -> Reference
   deriving (Show, Eq)
+
+instance PrettyPrint Reference where
+  prettyPrint :: Reference -> Text
+  prettyPrint (LineReference n) = T.pack (show n)
+  prettyPrint (ProofReference start end) = T.pack (show start) <> "-" <> T.pack (show end)
 
 -- | Assumptions are formulae wrapped with parsing and semantic information.
 type Assumption = Wrapper Formula
@@ -169,6 +186,10 @@ data RuleApplication
     RuleApplication Name [Reference]
   deriving (Show, Eq)
 
+instance PrettyPrint RuleApplication where
+  prettyPrint :: RuleApplication -> Text
+  prettyPrint (RuleApplication n refs) = "(" <> n <> ")" <> " " <> T.intercalate "," (map prettyPrint refs)
+
 -- | A derivation inside a proof.
 data Derivation
   = {- | A derivation inside a proof, i.e. a single line consisting of a formula
@@ -177,59 +198,43 @@ data Derivation
     Derivation Assumption (Wrapper RuleApplication)
   deriving (Show, Eq)
 
+instance PrettyPrint Derivation where
+  prettyPrint :: Derivation -> Text
+  prettyPrint (Derivation a ra) = prettyPrint a <> " " <> prettyPrint ra
+
 -- | A datatype for respresenting fitch-style proofs.
 data Proof where
   -- | A single line of the proof consisting of a derivation.
   ProofLine :: Derivation -> Proof
   -- | A subproof consisting of a list of assumptions, a list of subproofs (or derivations) and a conclusion.
   SubProof :: [Assumption] -> [Proof] -> Derivation -> Proof
-  deriving (Eq)
+  deriving (Eq, Show)
 
-prettyProof :: Proof -> Text
-prettyProof p = pretty' 1 0 p
- where
-  lineNoLen = length . show $ pLength p
-  withIndent :: Int -> Text -> Text
-  withIndent level t = T.replicate level "|" <> t
-  withLine :: Int -> Text -> Text
-  withLine line t = lineNo <> padding <> " " <> t
+instance PrettyPrint Proof where
+  prettyPrint :: Proof -> Text
+  prettyPrint p = pretty' 1 0 p
    where
-    lineNo = T.pack (show line)
-    padding = T.replicate (lineNoLen - T.length lineNo) " "
-  withoutLine :: Text -> Text
-  withoutLine = (T.replicate (lineNoLen + 1) " " <>)
-  prettyAssumption :: Int -> Int -> Assumption -> Text
-  prettyAssumption line level a = withLine line $ withIndent level (getText a)
-  prettyDerivation :: Int -> Int -> Derivation -> Text
-  prettyDerivation line level (Derivation f r) = withLine line $ withIndent level (getText f <> "|" <> getText r)
-  pretty' :: Int -> Int -> Proof -> Text
-  pretty' line level (ProofLine d) = prettyDerivation line level d
-  pretty' line level (SubProof fs ps c) =
-    T.concat fsShow
-      <> withoutLine (withIndent (level + 1) "---\n")
-      <> T.concat psShow
-      <> cShow
-   where
-    (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, prettyAssumption ln (level + 1) f)) line fs
-    (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + pLength p, pretty' ln' (level + 1) p)) line' ps
-    cShow = prettyDerivation line'' (level + 1) c
-
-instance Show Proof where
-  show :: Proof -> String
-  show = show' 1 0
-   where
-    withIndent :: Int -> Int -> String -> String
-    withIndent line level s = (if line < 0 then "  " else show line ++ replicate ((2 :: Int) - length (show line)) ' ') ++ concat (replicate level "  |") ++ "  |" ++ s ++ "\n"
-    showProof :: Int -> Int -> Proof -> String
-    showProof line level p@(ProofLine _) = withIndent line level $ show' line level p
-    showProof line level p@(SubProof{}) = show' line (level + 1) p
-    show' :: Int -> Int -> Proof -> String
-    show' line level (ProofLine (Derivation f r)) = show f ++ show r
-    show' line level (SubProof fs ps l) = concat fsShow ++ withIndent (-1) level "------" ++ concat psShow ++ conclusionShow
+    lineNoLen = length . show $ pLength p
+    withLevel :: Int -> Text -> Text
+    withLevel level t = T.replicate level "|" <> t
+    withLine :: Int -> Text -> Text
+    withLine line t = lineNo <> padding <> " " <> t
      where
-      (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withIndent ln level $ show f)) line fs
-      (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + pLength p, showProof ln' level p)) line' ps
-      conclusionShow = withIndent line'' level (show' line'' level (ProofLine l))
+      lineNo = T.pack (show line)
+      padding = T.replicate (lineNoLen - T.length lineNo) " "
+    withoutLine :: Text -> Text
+    withoutLine = (T.replicate (lineNoLen + 1) " " <>)
+    pretty' :: Int -> Int -> Proof -> Text
+    pretty' line level (ProofLine d) = withLine line $ withLevel level $ prettyPrint d
+    pretty' line level (SubProof fs ps c) =
+      T.concat fsShow
+        <> withoutLine (withLevel (level + 1) "---\n")
+        <> T.concat psShow
+        <> cShow
+     where
+      (line', fsShow) = L.mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
+      (line'', psShow) = L.mapAccumL (\ln' p -> (ln' + pLength p, pretty' ln' (level + 1) p)) line' ps
+      cShow = withLine line'' $ withLevel (level + 1) $ prettyPrint c
 
 -- | Returns `True` if the proof is a `SubProof`
 isSubProof :: Proof -> Bool

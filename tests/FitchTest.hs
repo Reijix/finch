@@ -2,7 +2,7 @@ module FitchTest where
 
 import Data.Text (Text, pack)
 import Data.Text.IO
-import Fitch.Proof (prettyProof)
+import Fitch.Proof (prettyPrint)
 import Parser.Formula (parseFormula)
 import Parser.Proof
 import System.IO (IOMode (..), openFile)
@@ -22,4 +22,4 @@ main = do
   contents <- hGetContents handle
   case parseProof operators infixPreds quantifiers contents of
     Left err -> Data.Text.IO.putStrLn err
-    Right p -> Data.Text.IO.putStrLn $ prettyProof p
+    Right p -> Data.Text.IO.putStrLn $ prettyPrint p
