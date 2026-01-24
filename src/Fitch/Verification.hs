@@ -47,7 +47,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
  where
   verifyRule :: Int -> Derivation -> Derivation
   verifyRule _ d@(Derivation _ (Unparsed{})) = d
-  verifyRule _ d@(Derivation f@(Unparsed{}) r) = Derivation f $ ParsedInvalid (getText r) "Parse error in formula." (fromWrapper r)
+  verifyRule _ d@(Derivation f@(Unparsed{}) r) =
+    Derivation f $ ParsedInvalid (getText r) "Parse error in formula." (fromWrapper r)
   verifyRule ruleLine (Derivation f r) =
     -- 1. Check that the rule exists.
     Derivation f $ case checkExistence rules of
@@ -65,6 +66,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
               Left err -> ParsedInvalid ruleText err ra
               Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
    where
+    -- Right formMap -> ParsedValid ruleText ra
+
     ---------------------------------------------------
     -- Unwrap variables
     formula = fromWrapper f
@@ -123,34 +126,35 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       f' <- handleFormula refLine f fSpec
       fs <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
       pure (f' : fs)
-    unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = case pIndexProof start end p of
-      Nothing ->
-        Left $
-          "Line range "
-            <> show start
-            <> "-"
-            <> show end
-            <> " does not correspond to a subproof.\nLine "
-            <> show start
-            <> " should mark the start of a subproof and line "
-            <> show end
-            <> " should be its conclusion."
-      Just prf -> do
-        case (fromLineNo ruleLine p, fromLineRange start end p) of
-          (Nothing, _) -> Left $ "Line " <> show ruleLine <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-          (_, Nothing) ->
-            Left $
-              "Line range "
-                <> show start
-                <> "-"
-                <> show end
-                <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
-          (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
-            Nothing -> Right ()
-            Just err -> Left err
-        fs <- handleProof (start, end) prf pSpec
-        fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-        pure (fs ++ fs')
+    unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) =
+      case pIndexProof start end p of
+        Nothing ->
+          Left $
+            "Line range "
+              <> show start
+              <> "-"
+              <> show end
+              <> " does not correspond to a subproof.\nLine "
+              <> show start
+              <> " should mark the start of a subproof and line "
+              <> show end
+              <> " should be its conclusion."
+        Just prf -> do
+          case (fromLineNo ruleLine p, fromLineRange start end p) of
+            (Nothing, _) -> Left $ "Line " <> show ruleLine <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
+            (_, Nothing) ->
+              Left $
+                "Line range "
+                  <> show start
+                  <> "-"
+                  <> show end
+                  <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
+            (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
+              Nothing -> Right ()
+              Just err -> Left err
+          fs <- handleProof (start, end) prf pSpec
+          fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
+          pure (fs ++ fs')
      where
       handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [(Formula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
@@ -312,10 +316,13 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           mapFs [] = Left $ "reduceFormulae: can't find match for f=" <> show f
           mapFs (f' : fs) = if f /= f' then mapFs fs else Right f'
 
-      collectMoreFormulae :: Map Name Formula -> [(Formula, FormulaSpec)] -> Either Text (Map Name (NonEmpty (Either Formula [Formula])))
+      collectMoreFormulae ::
+        Map Name Formula ->
+        [(Formula, FormulaSpec)] ->
+        Either Text (Map Name (NonEmpty (Either Formula [Formula])))
       collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
       collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap !? phi of
-        -- unify fs
+        -- unify fs, TODO: only unify on one variable!
         Just phiF -> case unifyFormulae [(phiF, f)] of
           Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
           -- compare assignment of E
@@ -326,14 +333,22 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           TPlaceholder e -> case termMap !? e of
             Nothing -> Left "Term has wrong form, RULEERROR!" -- error
             -- backwards
-            Just t' -> insertWith (<>) phi (Right (substBackwardsForm (Subst n t') f) :| []) <$> collectMoreFormulae formMap rest
+            Just t' ->
+              insertWith
+                (<>)
+                phi
+                (Right (substBackwardsForm (Subst n t') f) :| [])
+                <$> collectMoreFormulae formMap rest
           _ -> Left "Term has wrong form, RULEERROR!" -- error
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> Formula -> [Formula]
       substBackwardsForm s (Pred p ts) = map (Pred p) . allCombinations $ map (substBackwardsTerm s) ts
       substBackwardsForm s (Opr o fs) = map (Opr o) . allCombinations $ map (substBackwardsForm s) fs
       -- TODO need freshness here :(
-      substBackwardsForm s@(Subst n t) (Quantifier q v f) = if n == v then undefined else map (Quantifier q v) (substBackwardsForm s f)
+      substBackwardsForm s@(Subst n t) (Quantifier q v f) =
+        if n == v
+          then undefined
+          else map (Quantifier q v) (substBackwardsForm s f)
       substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
       substBackwardsTerm :: Subst Term -> Term -> [Term]
       substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
@@ -347,7 +362,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       | ruleAddr <= refAddr = Just "Can only reference lines that appear before this line!"
     refIsVisible line (NAProof n (Just na1)) (NAProof m (Just na2))
       | n == m = refIsVisible line na1 na2
-    refIsVisible line rua ra@(NAProof _ (Just _)) = Just "Line cannot be referenced because it is located inside of a subproof."
+    refIsVisible line rua ra@(NAProof _ (Just _)) =
+      Just "Line cannot be referenced because it is located inside of a subproof."
     refIsVisible _ _ _ = Nothing
 
     lookupReference :: Int -> Proof -> Either Text Formula
