@@ -111,32 +111,36 @@ unifyTermsOnVariable n ts = do
         (False, ts'') -> makeUnificator ts''
  where
   decompConflict :: [(Term, Term)] -> Maybe (Bool, [(Term, Term)])
-  decompConflict = undefined
-  elimDeleteOccursOrient :: [(Term, Term)] -> Maybe (Bool, [(Term, Term)])
-  elimDeleteOccursOrient = undefined
-  makeUnificator :: [(Term, Term)] -> Maybe [(Name, Term)]
-  makeUnificator = undefined
+  decompConflict ts = foldlM once (False, ts) ts
+   where
+    once :: (Bool, [(Term, Term)]) -> (Term, Term) -> Maybe (Bool, [(Term, Term)])
+    once (_, list) tup@(Fun f args1, Fun g args2)
+      -- (decomp)
+      | f == g = Just (True, zip args1 args2 <> filter (/= tup) list)
+      -- (conflict)
+      | otherwise = Nothing
+    once ret _ = Just ret
 
--- unifyTermsOnVariable :: Name -> [(Term, Term)] -> Maybe [(Name, Term)]
--- unifyTermsOnVariable n [] = Just []
--- unifyTermsOnVariable n ((Fun f ts, Fun g ss) : rest)
---   -- (decomp)
---   | f == g && length ts == length ss = unifyTermsOnVariable n (zip ts ss <> rest)
---   -- (conflict)
---   | otherwise = Nothing
--- -- (delete)
--- unifyTermsOnVariable n ((Var x, Var y) : rest) | x == y = unifyTermsOnVariable n rest
--- unifyTermsOnVariable n ((Var x, t) : rest)
---   -- (occurs)
---   | x `elem` freeVars t = Nothing
---   -- (elim)
---   | x `elem` concatMapU (\(t1, t2) -> freeVars t1 <> freeVars t2) rest =
---       unifyTermsOnVariable n $ (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) rest
---   | otherwise = ((x, t) :) <$> unifyTermsOnVariable n rest
--- -- (orient)
--- unifyTermsOnVariable n ((t@Fun{}, Var x) : rest) = unifyTermsOnVariable n ((Var x, t) : rest)
--- -- (orient (possibly) on variables)
--- unifyTermsOnVariable n ((t, Var x) : rest) | x == n = unifyTermsOnVariable n ((Var x, t) : rest)
+  elimDeleteOccursOrient :: [(Term, Term)] -> Maybe (Bool, [(Term, Term)])
+  elimDeleteOccursOrient ts = foldlM once (False, ts) ts
+   where
+    once :: (Bool, [(Term, Term)]) -> (Term, Term) -> Maybe (Bool, [(Term, Term)])
+    once (b, list) tup@(Var x, t)
+      -- (occurs)
+      | x `elem` freeVars t = Nothing
+      -- (elim)
+      | x `elem` concatMapU (\(t1, t2) -> freeVars t1 <> freeVars t2) (filter (/= tup) list) =
+          Just (True, (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) (filter (/= (Var x, t)) list))
+    -- (delete)
+    once (_, list) tup@(Var x, Var y) | x == y = Just (True, filter (/= tup) list)
+    -- (orient) [with special case to also orient `n`]
+    once (_, list) tup@(t, Var x) | isFun t || x == n = Just (True, (Var x, t) : filter (/= tup) list)
+    once ret _ = Just ret
+
+  makeUnificator :: [(Term, Term)] -> Maybe [(Name, Term)]
+  makeUnificator [] = Just []
+  makeUnificator ((Var x, t) : rest) = ((x, t) :) <$> makeUnificator rest
+  makeUnificator _ = Nothing
 
 unifyFormulaeOnVariable :: Name -> [(Formula, Formula)] -> Maybe (Map Name Term)
 unifyFormulaeOnVariable n = fmap fromList . go

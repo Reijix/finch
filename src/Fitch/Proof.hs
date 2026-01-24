@@ -75,6 +75,10 @@ data Term
     Fun Name [Term]
   deriving (Eq, Ord, Show)
 
+isFun :: Term -> Bool
+isFun (Fun{}) = True
+isFun _ = False
+
 instance PrettyPrint Term where
   prettyPrint :: Term -> Text
   prettyPrint (Var v) = v
