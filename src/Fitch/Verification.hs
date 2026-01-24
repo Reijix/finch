@@ -323,7 +323,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
       collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap !? phi of
         -- unify fs, TODO: only unify on one variable!
-        Just phiF -> case unifyFormulae [(phiF, f)] of
+        Just phiF -> case unifyFormulaeOnVariable n [(phiF, f)] of
           Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
           -- compare assignment of E
           Just mgu -> case (mgu !? n, termMap !? n) of

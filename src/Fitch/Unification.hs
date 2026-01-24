@@ -99,33 +99,53 @@ unifyTermSpec ((t, TPlaceholder n) : rest) = (one (n, t) <>) <$> unifyTermSpec r
 unifyTermSpec [] = Just mempty
 unifyTermSpec _ = Nothing
 
-unifyTerms :: [(Term, Term)] -> Maybe [(Name, Term)]
-unifyTerms [] = Just []
-unifyTerms ((Fun f ts, Fun g ss) : rest)
-  -- (decomp)
-  | f == g && length ts == length ss = unifyTerms (zip ts ss <> rest)
-  -- (conflict)
-  | otherwise = Nothing
--- (delete)
-unifyTerms ((Var x, Var y) : rest) | x == y = unifyTerms rest
-unifyTerms ((Var x, t) : rest)
-  -- (occurs)
-  | x `elem` freeVars t = Nothing
-  -- (elim)
-  | x `elem` concatMapU (\(t1, t2) -> freeVars t1 <> freeVars t2) rest =
-      unifyTerms $ (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) rest
-  | otherwise = ((x, t) :) <$> unifyTerms rest
--- (orient)
-unifyTerms ((t@Fun{}, Var x) : rest) = unifyTerms ((Var x, t) : rest)
+unifyTermsOnVariable :: Name -> [(Term, Term)] -> Maybe [(Name, Term)]
+unifyTermsOnVariable n ts = do
+  dc <- decompConflict ts
+  case dc of
+    (True, ts') -> unifyTermsOnVariable n ts'
+    (False, ts') -> do
+      edoo <- elimDeleteOccursOrient ts'
+      case edoo of
+        (True, ts'') -> unifyTermsOnVariable n ts''
+        (False, ts'') -> makeUnificator ts''
+ where
+  decompConflict :: [(Term, Term)] -> Maybe (Bool, [(Term, Term)])
+  decompConflict = undefined
+  elimDeleteOccursOrient :: [(Term, Term)] -> Maybe (Bool, [(Term, Term)])
+  elimDeleteOccursOrient = undefined
+  makeUnificator :: [(Term, Term)] -> Maybe [(Name, Term)]
+  makeUnificator = undefined
 
-unifyFormulae :: [(Formula, Formula)] -> Maybe (Map Name Term)
-unifyFormulae = fmap fromList . go
+-- unifyTermsOnVariable :: Name -> [(Term, Term)] -> Maybe [(Name, Term)]
+-- unifyTermsOnVariable n [] = Just []
+-- unifyTermsOnVariable n ((Fun f ts, Fun g ss) : rest)
+--   -- (decomp)
+--   | f == g && length ts == length ss = unifyTermsOnVariable n (zip ts ss <> rest)
+--   -- (conflict)
+--   | otherwise = Nothing
+-- -- (delete)
+-- unifyTermsOnVariable n ((Var x, Var y) : rest) | x == y = unifyTermsOnVariable n rest
+-- unifyTermsOnVariable n ((Var x, t) : rest)
+--   -- (occurs)
+--   | x `elem` freeVars t = Nothing
+--   -- (elim)
+--   | x `elem` concatMapU (\(t1, t2) -> freeVars t1 <> freeVars t2) rest =
+--       unifyTermsOnVariable n $ (Var x, t) : map (bimap (subst (Subst x t)) (subst (Subst x t))) rest
+--   | otherwise = ((x, t) :) <$> unifyTermsOnVariable n rest
+-- -- (orient)
+-- unifyTermsOnVariable n ((t@Fun{}, Var x) : rest) = unifyTermsOnVariable n ((Var x, t) : rest)
+-- -- (orient (possibly) on variables)
+-- unifyTermsOnVariable n ((t, Var x) : rest) | x == n = unifyTermsOnVariable n ((Var x, t) : rest)
+
+unifyFormulaeOnVariable :: Name -> [(Formula, Formula)] -> Maybe (Map Name Term)
+unifyFormulaeOnVariable n = fmap fromList . go
  where
   go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
   go [] = Just []
   go ((Pred p ts, Pred q ss) : rest) | p == q && length ts == length ss = do
     mapping <- go rest
-    unifyTerms $ zip ts ss <> map (first Var) mapping
+    unifyTermsOnVariable n $ zip ts ss <> map (first Var) mapping
   go ((Opr o1 fs1, Opr o2 fs2) : rest) | o1 == o2 && length fs1 == length fs2 = go (zip fs1 fs2 <> rest)
   go ((Quantifier q1 v1 f1, Quantifier q2 v2 f2) : rest) | q1 == q2 && v1 == v2 = go ((f1, f2) : rest)
   go _ = Nothing
