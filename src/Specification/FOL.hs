@@ -21,7 +21,7 @@ infixPredsFOL :: [(Text, Text)]
 infixPredsFOL = [("", "=")]
 
 quantifiersFOL :: [(Text, Text)]
-quantifiersFOL = [("forall", "∀")]
+quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 
 rulesFOL :: Map Text RuleSpec
 rulesFOL =

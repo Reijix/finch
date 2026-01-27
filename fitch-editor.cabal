@@ -54,6 +54,7 @@ test-suite test
     relude,
 
   build-depends:
+    directory,
     base >=4.21.0 && <4.22,
     containers,
     fitch-editor-lib,

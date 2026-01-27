@@ -64,10 +64,9 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Left err -> ParsedInvalid ruleText err ra
             Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
               Left err -> ParsedInvalid ruleText err ra
+              -- Right formMap -> ParsedValid ruleText ra
               Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
    where
-    -- Right formMap -> ParsedValid ruleText ra
-
     ---------------------------------------------------
     -- Unwrap variables
     formula = fromWrapper f
@@ -287,7 +286,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     verifyFormulae termMap formsAndSpecs = do
       formMap <- reduceFormulae $ M.map (Left <$>) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
-      reduceFormulae formMap'
+      -- reduceFormulae formMap'
+      Left $ prettyPrint formMap'
      where
       collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name (NonEmpty Formula)
       collectSimpleFormulae [] = mempty
@@ -322,23 +322,28 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         Either Text (Map Name (NonEmpty (Either Formula [Formula])))
       collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
       collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap !? phi of
-        -- unify fs, TODO: only unify on one variable!
+        -- unify fs
         Just phiF -> case unifyFormulaeOnVariable n [(phiF, f)] of
           Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
           -- compare assignment of E
           Just mgu -> case (mgu !? n, termMap !? n) of
             ((Nothing, _); (_, Nothing)) -> insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
-            (Just e, Just e') -> undefined
+            (Just e, Just e') ->
+              if e == e'
+                then insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
+                else Left "Found different assignments for E"
         Nothing -> case t of
           TPlaceholder e -> case termMap !? e of
             Nothing -> Left "Term has wrong form, RULEERROR!" -- error
             -- backwards
-            Just t' ->
-              insertWith
-                (<>)
-                phi
-                (Right (substBackwardsForm (Subst n t') f) :| [])
-                <$> collectMoreFormulae formMap rest
+            Just t' -> case substBackwardsForm (Subst n t') f of
+              l@(_ : _ : _) ->
+                insertWith
+                  (<>)
+                  phi
+                  (Right l :| [])
+                  <$> collectMoreFormulae formMap rest
+              _ -> Left $ "backwards substituting " <> prettyPrint f <> " failed."
           _ -> Left "Term has wrong form, RULEERROR!" -- error
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> Formula -> [Formula]

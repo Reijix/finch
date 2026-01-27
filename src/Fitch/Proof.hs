@@ -8,6 +8,19 @@ import Relude.Extra.Map (toPairs)
 class PrettyPrint a where
   prettyPrint :: a -> Text
 
+instance (PrettyPrint a) => PrettyPrint [a] where
+  prettyPrint :: [a] -> Text
+  prettyPrint xs = unlines $ map prettyPrint xs
+
+instance (PrettyPrint a) => PrettyPrint (NonEmpty a) where
+  prettyPrint :: NonEmpty a -> Text
+  prettyPrint (x :| xs) = prettyPrint (x : xs)
+
+instance (PrettyPrint a, PrettyPrint b) => PrettyPrint (Either a b) where
+  prettyPrint :: Either a b -> Text
+  prettyPrint (Left x) = "Left " <> prettyPrint x
+  prettyPrint (Right x) = "Right " <> prettyPrint x
+
 -- | Wraps data contained in a `Proof` to store further information.
 data Wrapper a where
   -- | Semantically valid parse success
@@ -265,6 +278,19 @@ pFold ::
   a
 pFold af df s (ProofLine d) = df s d
 pFold af df s (SubProof fs ps d) = df (foldl' (pFold af df) (foldl' af s fs) ps) d
+
+pFoldM ::
+  (Monad m) =>
+  (a -> Assumption -> m a) ->
+  (a -> Derivation -> m a) ->
+  a ->
+  Proof ->
+  m a
+pFoldM af df s (ProofLine d) = df s d
+pFoldM af df s (SubProof fs ps d) = do
+  result1 <- foldlM af s fs
+  result2 <- foldlM (pFoldM af df) result1 ps
+  df result2 d
 
 -- | `pSerialize` @af@ @df@ @p@ serializes the proof @p@ by applying a function for each line in the proof and storing the results in a list.
 pSerialize :: (Assumption -> a) -> (Derivation -> a) -> Proof -> [a]
