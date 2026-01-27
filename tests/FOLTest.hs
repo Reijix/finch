@@ -49,17 +49,33 @@ assertProofValid =
 assertProofInvalidAt :: Int -> Proof -> Assertion
 assertProofInvalidAt n p = case pIndex n p of
   Just (Right (Derivation _ r)) -> assertInvalid r
-  _ -> assertFailure . toString $ "assertProofInvalidAt: indexing line " <> show n <> " went wrong for proof:\n" <> show p
+  _ ->
+    assertFailure . toString $
+      "assertProofInvalidAt: indexing line "
+        <> show n
+        <> " went wrong for proof:\n"
+        <> prettyPrint p
 
 testValidProofs :: TestTree
 testValidProofs =
   testCaseSteps "Testing valid proofs" $ \step ->
-    mapM_ ((\str -> step str >> pure str) >=> readProof >=> assertProofValid) =<< pathsInDir "tests/ValidProofs/"
+    mapM_
+      ( (\str -> step str >> pure str)
+          >=> readProof
+          >=> assertProofValid
+      )
+      =<< pathsInDir "tests/ValidProofs/"
 
 testInvalidProofs :: TestTree
 testInvalidProofs =
   testCaseSteps "Testing invalid proofs" $ \step ->
-    mapM_ (\(fp, n) -> step fp >> readProof ("tests/InvalidProofs/" <> fp) >>= assertProofInvalidAt n) [("eqE1.fitch", 3), ("eqE2.fitch", 3)]
+    mapM_
+      ( \(fp, n) ->
+          step fp
+            >> readProof ("tests/InvalidProofs/" <> fp)
+            >>= assertProofInvalidAt n
+      )
+      [("eqE1.fitch", 3), ("eqE2.fitch", 3)]
 
 verificationTests :: TestTree
 verificationTests =

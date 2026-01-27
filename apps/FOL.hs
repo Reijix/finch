@@ -21,17 +21,14 @@ main = runApp exProof operatorsFOL infixPredsFOL quantifiersFOL rulesFOL
   proofText :: Text
   proofText =
     """
-    |x ∨ y
-    |x → z
-    |y → z
     |---
-    ||x
+    ||[c]
     ||---
-    ||z (→E) 4,2
-    ||y
-    ||---
-    ||z (→E) 6,3
-    |z (∨E) 1, 4-5, 6-7
+    |||P(c)
+    |||---
+    |||P(c) (R) 2
+    ||P(c) → P(c) (→I) 2-3
+    |∀x. P(x) → P(x) (∀I) 1-4
     """
 
 -- """
