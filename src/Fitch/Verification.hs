@@ -64,8 +64,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             Left err -> ParsedInvalid ruleText err ra
             Right termMap -> case verifyFormulae termMap ((conclusion, conclusionSpec) : formulaSpecs) of
               Left err -> ParsedInvalid ruleText err ra
-              -- Right formMap -> ParsedValid ruleText ra
-              Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
+              -- Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
+              Right formMap -> ParsedValid ruleText ra
    where
     ---------------------------------------------------
     -- Unwrap variables
@@ -286,8 +286,8 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     verifyFormulae termMap formsAndSpecs = do
       formMap <- reduceFormulae $ M.map (Left <$>) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
-      -- reduceFormulae formMap'
-      Left $ prettyPrint formMap'
+      -- Left $ prettyPrint formMap'
+      reduceFormulae formMap'
      where
       collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name (NonEmpty Formula)
       collectSimpleFormulae [] = mempty

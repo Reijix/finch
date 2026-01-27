@@ -56,6 +56,10 @@ rulesFOL =
           [([FFreshVar "c"], FSubst "φ" ("x" ~> TVar "c"))]
           (FQuantifier "∀" "x" phi)
       )
+    , ("∃I", RuleSpec [FSubst "φ" ("x" ~> TPlaceholder "E")] [] (FQuantifier "∃" "x" phi))
+    , ("∃E", RuleSpec [FQuantifier "∃" "x" phi] [([FFreshVar "c", FSubst "φ" ("x" ~> TVar "c")], psi)] psi)
+    , ("⊤I", RuleSpec [] [] (FOpr "⊤" []))
+    , ("⊥E", RuleSpec [FOpr "⊥" []] [] phi)
     ]
  where
   phi = FPlaceholder "φ"
