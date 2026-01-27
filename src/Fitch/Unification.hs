@@ -4,6 +4,8 @@ import Fitch.Proof
 
 class FreeVars a where
   freeVars :: a -> [Name]
+
+  -- TODO makeFresh should use allVars, not freeVars!!
   makeFresh :: Name -> a -> Name
   makeFresh n t = if n `elem` freeVars t then makeFresh (n <> "'") t else n
 
@@ -154,6 +156,7 @@ unifyFormulaeOnVariable n = fmap fromList . go
   go ((Quantifier q1 v1 f1, Quantifier q2 v2 f2) : rest) | q1 == q2 && v1 == v2 = go ((f1, f2) : rest)
   go _ = Nothing
 
+-- TODO overthink handling of quantified variables!!
 unifyAlphaEq :: Formula -> FormulaSpec -> Maybe (Formula, FormulaSpec)
 unifyAlphaEq f@(FreshVar v) fs@(FFreshVar v') = Just (f, fs)
 unifyAlphaEq (FreshVar{}) _ = Nothing
