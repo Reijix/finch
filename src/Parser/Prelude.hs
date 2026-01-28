@@ -31,7 +31,7 @@ pName :: (Parser m) => m Text
 pName = takeWhile1P (Just "letter") isLetter <?> "name"
 
 pSymbolicName :: (Parser m) => m Text
-pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ['(', ')']) <?> "name"
+pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ("()" :: String)) <?> "name"
 
 comma :: (Parser m) => m Text
 comma = symbol ","

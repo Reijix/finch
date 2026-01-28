@@ -54,9 +54,9 @@ test-suite test
     relude,
 
   build-depends:
-    directory,
     base >=4.21.0 && <4.22,
     containers,
+    directory,
     fitch-editor-lib,
     miso >=1.9 && <1.9.1,
     relude,
@@ -133,6 +133,7 @@ library fitch-editor-lib
   default-extensions:
     FlexibleInstances
     OrPatterns
+    OverloadedLists
     OverloadedRecordDot
     OverloadedStrings
 

@@ -118,7 +118,7 @@ instance PrettyPrint TermSpec where
   prettyPrint (TPlaceholder n) = n
 
 data FormulaSpec
-  = FSubst Name (Subst TermSpec)
+  = FSubst Name (Subst Name)
   | FPlaceholder Name
   | FPred Name [TermSpec]
   | FInfixPredicate Name TermSpec TermSpec
@@ -136,7 +136,7 @@ instance PrettyPrint FormulaSpec where
     go _ (FPred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go _ (FPlaceholder n) = n
     go _ (FFreshVar n) = "[" <> n <> "]"
-    go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> prettyPrint t <> "]"
+    go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> t <> "]"
     go True f = "(" <> go False f <> ")"
     go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
     go False (FOpr op fs)

@@ -1,4 +1,4 @@
-module Fitch.Verification where
+module Fitch.Verification (verifyProof) where
 
 import App.Model (Model)
 import Data.Map qualified as M
@@ -7,14 +7,18 @@ import Fitch.Proof
 import Fitch.Unification
 import Relude.Extra.Map
 
-{-@ allCombinations :: xss:[[a]] -> [{v:[a]| len v == len xss}] @-}
-allCombinations :: [[a]] -> [[a]]
+{- | Returns all combinations of a list of list.
+Taken from package 'liquid-fixpoint' and adjusted to use `NonEmpty`.
+
+Satisfies:
+@allCombinations :: xss:[[a]] -> [{v:[a]| len v == len xss}]@
+-}
+allCombinations :: [NonEmpty a] -> NonEmpty [a]
 allCombinations xs = assert (all ((length xs ==) . length)) $ go xs
  where
   go [] = [[]]
-  go [[]] = []
-  go ([] : _) = []
-  go ((x : xs') : ys) = ((x :) <$> go ys) ++ go (xs' : ys)
+  go ((x :| []) : ys) = (x :) <$> go ys -- TODO test, maybe append `<> go ys` ??
+  go ((x :| (x' : xs')) : ys) = ((x :) <$> go ys) <> go ((x' :| xs') : ys)
 
   assert b x = if b x then x else error "allCombinations: assertion violation"
 
@@ -86,30 +90,32 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
     -- 2. Unify conclusion.
     checkConclusion :: RuleSpec -> Formula -> Either Text (Formula, FormulaSpec)
-    checkConclusion (RuleSpec _ _ expected) actual = case unifyAlphaEq actual expected of
-      Nothing ->
-        Left $
-          "Rule cannot be applied to "
-            <> formulaText
-            <> "\nExpecting a formula of the form "
-            <> show expected
-      Just (actual', expected') -> Right (actual', expected')
+    checkConclusion (RuleSpec _ _ expected) actual =
+      if formulaMatchesSpec actual expected
+        then Right (actual, expected)
+        else
+          Left $
+            "Rule cannot be applied to "
+              <> formulaText
+              <> "\nExpecting a formula of the form "
+              <> show expected
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 3. Unify references
     handleFormula :: Int -> Formula -> FormulaSpec -> Either Text (Formula, FormulaSpec)
-    handleFormula line f fSpec = case unifyAlphaEq f fSpec of
-      Nothing ->
-        Left $
-          "Found "
-            <> show f
-            <> " at line "
-            <> show line
-            <> ".\nBut expected a formula of the form "
-            <> show fSpec
-            <> "."
-      Just (f', fSpec') -> Right (f', fSpec')
+    handleFormula line f fSpec =
+      if formulaMatchesSpec f fSpec
+        then Right (f, fSpec)
+        else
+          Left $
+            "Found "
+              <> show f
+              <> " at line "
+              <> show line
+              <> ".\nBut expected a formula of the form "
+              <> show fSpec
+              <> "."
     handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Formula, FormulaSpec)
     handleAssumption line fw fSpec = case fw of
       Unparsed{} -> Left "Unparsed assumption --- INTERNAL ERROR SHOULD NOT HAPPEN"
@@ -242,8 +248,12 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       collectTerms' (_ : rest) = collectTerms' rest
     collectTerms ((Opr _ fs, FOpr _ fs') : rest) =
       collectTerms (zip fs fs' ++ rest)
-    collectTerms ((Quantifier _ _ f, FQuantifier _ _ f') : rest) =
-      collectTerms ((f, f') : rest)
+    collectTerms ((Quantifier _ v f, FQuantifier _ v' f') : rest) =
+      insertWith
+        (++)
+        v'
+        [Var v]
+        (collectTerms ((f, f') : rest))
     collectTerms ((FreshVar m, FFreshVar n) : rest) = insertWith (++) n [Var m] $ collectTerms rest
     collectTerms (_ : rest) = collectTerms rest
     collectTerms [] = mempty
@@ -286,8 +296,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     verifyFormulae termMap formsAndSpecs = do
       formMap <- reduceFormulae $ M.map (Left <$>) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
-      -- Left $ prettyPrint formMap'
-      reduceFormulae formMap'
+      reduceFormulae (fmap toList <<$>> formMap')
      where
       collectSimpleFormulae :: [(Formula, FormulaSpec)] -> Map Name (NonEmpty Formula)
       collectSimpleFormulae [] = mempty
@@ -319,46 +328,58 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
       collectMoreFormulae ::
         Map Name Formula ->
         [(Formula, FormulaSpec)] ->
-        Either Text (Map Name (NonEmpty (Either Formula [Formula])))
+        Either Text (Map Name (NonEmpty (Either Formula (NonEmpty Formula))))
       collectMoreFormulae formMap [] = Right . M.map (\f -> Left f :| []) $ formMap
-      collectMoreFormulae formMap ((f, FSubst phi (Subst n t)) : rest) = case formMap !? phi of
+      collectMoreFormulae formMap ((f, FSubst phi (Subst x t)) : rest) = case formMap !? phi of
         -- unify fs
-        Just phiF -> case unifyFormulaeOnVariable n [(phiF, f)] of
-          Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
-          -- compare assignment of E
-          Just mgu -> case (mgu !? n, termMap !? n) of
-            ((Nothing, _); (_, Nothing)) -> insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
-            (Just e, Just e') ->
-              if e == e'
-                then insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
-                else Left "Found different assignments for E"
-        Nothing -> case t of
-          TPlaceholder e -> case termMap !? e of
-            Nothing -> Left "Term has wrong form, RULEERROR!" -- error
-            -- backwards
-            Just t' -> case substBackwardsForm (Subst n t') f of
-              l@(_ : _ : _) ->
-                insertWith
-                  (<>)
-                  phi
-                  (Right l :| [])
-                  <$> collectMoreFormulae formMap rest
-              _ -> Left $ "backwards substituting " <> prettyPrint f <> " failed."
-          _ -> Left "Term has wrong form, RULEERROR!" -- error
+        Just phiF ->
+          let x' = case termMap !? x of
+                Just (Var x') -> x'
+                _ -> "_" <> x
+           in case unifyFormulaeOnVariable x' [(phiF, f)] of
+                Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
+                -- compare assignment of E
+                Just mgu -> case (mgu !? x', termMap !? t) of
+                  ((Nothing, _); (_, Nothing)) -> insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
+                  (Just e, Just e') ->
+                    if e == e'
+                      then insertWith (<>) phi (Left phiF :| []) <$> collectMoreFormulae formMap rest
+                      else Left $ "Found different assignments for " <> x' <> ":\n" <> prettyPrint e <> "\nand\n" <> prettyPrint e'
+        Nothing -> case termMap !? t of
+          -- TODO better error message
+          Nothing -> Left "Term has wrong form, RULEERROR!" -- error
+          -- backwards
+          Just t' ->
+            let x' = case termMap !? x of
+                  Just (Var x') -> x'
+                  _ -> "_" <> x -- NOTE: we use ('_' <> x) because it can not clash with a variable name.
+             in case substBackwardsForm (Subst x' t') f of
+                  f :| [] ->
+                    insertWith
+                      (<>)
+                      phi
+                      (Left f :| [])
+                      <$> collectMoreFormulae formMap rest
+                  l@(_ :| _ : _) ->
+                    insertWith
+                      (<>)
+                      phi
+                      (Right l :| [])
+                      <$> collectMoreFormulae formMap rest
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
-      substBackwardsForm :: Subst Term -> Formula -> [Formula]
-      substBackwardsForm s (Pred p ts) = map (Pred p) . allCombinations $ map (substBackwardsTerm s) ts
-      substBackwardsForm s (Opr o fs) = map (Opr o) . allCombinations $ map (substBackwardsForm s) fs
-      -- TODO need freshness here :(
-      substBackwardsForm s@(Subst n t) (Quantifier q v f) =
-        if n == v
-          then undefined
-          else map (Quantifier q v) (substBackwardsForm s f)
+      substBackwardsForm :: Subst Term -> Formula -> NonEmpty Formula
+      substBackwardsForm s (Pred p ts) = fmap (Pred p) . allCombinations $ fmap (substBackwardsTerm s) ts
+      substBackwardsForm s (Opr o fs) = fmap (Opr o) . allCombinations $ fmap (substBackwardsForm s) fs
+      -- NOTE: @x == v@ is not possible, because we only backwardsubst if @E@ is assigned and in
+      -- this case there is no rule where @x@ is assigned.
+      -- Thus @v@ here will be something like '_x' that does not occur naturally, i.e. not in Subst!
+      substBackwardsForm s@(Subst x t) (Quantifier q v f) = fmap (Quantifier q v) (substBackwardsForm s f)
       substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
-      substBackwardsTerm :: Subst Term -> Term -> [Term]
+      substBackwardsTerm :: Subst Term -> Term -> NonEmpty Term
       substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
-      substBackwardsTerm s (Var x) = [Var x]
-      substBackwardsTerm s (Fun f ts) | not (null ts) = map (Fun f) . allCombinations $ map (substBackwardsTerm s) ts
+      substBackwardsTerm s (Var x) = one $ Var x
+      substBackwardsTerm s (Fun f ts) =
+        fmap (Fun f) . allCombinations . toList $ fmap (substBackwardsTerm s) ts
     ---------------------------------------------------
 
     -- helpers

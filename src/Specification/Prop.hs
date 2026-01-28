@@ -10,20 +10,21 @@ operatorsProp = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\"
 
 rulesProp :: Map Text RuleSpec
 rulesProp =
-  fromList
-    [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
-    , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
-    , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
-    , ("→I", RuleSpec [] [([phi], psi)] (phi ↝ psi))
-    , ("→E", RuleSpec [phi ↝ psi, phi] [] psi)
-    , ("¬I", RuleSpec [] [([phi], bot)] (neg phi))
-    , ("¬E", RuleSpec [phi, neg phi] [] bot)
-    , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
-    , ("R", RuleSpec [phi] [] phi)
-    , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
-    , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
-    , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
-    ]
+  [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
+  , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
+  , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
+  , ("→I", RuleSpec [] [([phi], psi)] (phi ↝ psi))
+  , ("→E", RuleSpec [phi, phi ↝ psi] [] psi)
+  , ("¬I", RuleSpec [] [([phi], bot)] (neg phi))
+  , ("¬E", RuleSpec [phi, neg phi] [] bot)
+  , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
+  , ("R", RuleSpec [phi] [] phi)
+  , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
+  , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
+  , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
+  , ("⊤I", RuleSpec [] [] (FOpr "⊤" []))
+  , ("⊥E", RuleSpec [FOpr "⊥" []] [] phi)
+  ]
  where
   phi = FPlaceholder "φ"
   psi = FPlaceholder "ψ"
