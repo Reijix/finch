@@ -326,7 +326,7 @@ Used for detecting presses of '(' and 'Enter'.
 * On '(' inserts the closing parenthesis at the end of selection.
 -}
 onKeyDownSub :: Either NodeAddr NodeAddr -> DOMRef -> Sub Action
-onKeyDownSub addr domRef = createSub acquire (removeEventListener domRef "keydown")
+onKeyDownSub addr domRef = createSub acquire (const pass)
  where
   acquire = do
     addEventListener domRef "keydown" $ \evt -> do
