@@ -14,4 +14,4 @@ else
 source-repository-package
   type: git
   location: https://github.com/dmjio/miso.git
-  tag: 0f2808233f58a1345ec27f35bc95c7a47b05f495
+  tag: master

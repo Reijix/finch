@@ -1,6 +1,7 @@
 module App.Model where
 
 import Fitch.Proof
+import Fitch.Unification
 import Miso (
   App,
   Attribute,
@@ -181,6 +182,28 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 -- * Semantic checking
 
+checkFreshness :: forall m. (MonadState Model m) => m ()
+checkFreshness = do
+  proof <~ (use proof >>= \p -> pure (pMapWithAddr (goFormula p) (goLine p) p))
+ where
+  goFormula :: Proof -> NodeAddr -> Assumption -> Assumption
+  goFormula p _ a@(fromWrapper -> Nothing) = a
+  goFormula p na a@(fromWrapper -> Just f@(FreshVar v)) = case pCollectVisibleNodes na p of
+    Nothing -> ParsedInvalid (getText a) "Could not collect visible nodes..." f
+    Just nodes ->
+      if isFreshList v nodes
+        then a
+        -- TODO error message
+        else ParsedInvalid (getText a) ("Failed to verify freshness of " <> v <> "\nGot list:\n" <> prettyPrint nodes) f
+  goFormula p na a@(fromWrapper -> Just _) = a
+  goLine :: Proof -> NodeAddr -> Derivation -> Derivation
+  goLine p na (Derivation f r) = Derivation (goFormula p na f) r
+  isFreshList :: Name -> [Either Assumption Derivation] -> Bool
+  isFreshList v [] = True
+  isFreshList v (Left (fromWrapper -> Nothing) : rest) = isFreshList v rest
+  isFreshList v (Left (fromWrapper -> Just f) : rest) = isFresh v f && isFreshList v rest
+  isFreshList v (Right (Derivation f _) : rest) = isFreshList v (Left f : rest)
+
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
 
 This is done by iterating over the proof and collecting all symbols.
@@ -197,7 +220,9 @@ regenerateSymbols = do
   -- skip unparsed formulae
   goFormula n a@(Unparsed{}) = pure (n + 1, a)
   goFormula n a =
-    let (formula, txt) = (fromWrapper a, getText a)
+    let (formula, txt) = case a of
+          (ParsedInvalid txt _ f) -> (f, txt)
+          (ParsedValid txt f) -> (f, txt)
      in do
           -- fetch current lists of symbols
           fsyms <- use functionSymbols

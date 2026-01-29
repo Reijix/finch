@@ -32,7 +32,10 @@ class AllVars a where
   w.r.t. all the variables occuring in the structure.
   -}
   makeFresh :: Name -> a -> Name
-  makeFresh n t = if n `member` allVars t then makeFresh (n <> "'") t else n
+  makeFresh n t = if isFresh n t then makeFresh (n <> "'") t else n
+
+  isFresh :: Name -> a -> Bool
+  isFresh n t = n `notMember` allVars t
 
 instance AllVars Term where
   allVars :: Term -> Set Name
@@ -44,7 +47,7 @@ instance AllVars Formula where
   allVars (Pred _ args) = foldMap allVars args
   allVars (Opr _ fs) = foldMap allVars fs
   allVars (Quantifier _ v f) = one v <> allVars f
-  allVars (FreshVar _) = mempty
+  allVars (FreshVar v) = one v
 
 -- ** Free variables
 

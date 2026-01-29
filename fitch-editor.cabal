@@ -80,7 +80,13 @@ executable fitch-editor-FOL
     base >=4.21.0 && <5,
     containers >=0.7 && <0.9,
     fitch-editor-lib,
+    relude,
     text >=2.1.2 && <2.2,
+
+  mixins:
+    base hiding (Prelude),
+    relude (Relude as Prelude),
+    relude,
 
   main-is:
     FOL.hs
@@ -136,6 +142,7 @@ library fitch-editor-lib
     OverloadedLists
     OverloadedRecordDot
     OverloadedStrings
+    ViewPatterns
 
   build-depends:
     base >=4.21.0 && <5,

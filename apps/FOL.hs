@@ -25,7 +25,7 @@ main = runApp exProof operatorsFOL infixPredsFOL quantifiersFOL rulesFOL
     |Q(d)
     |---
     ||[c]
-    ||P(d)
+    ||P(c)
     ||---
     ||Q(d) (R) 2
     |Q(d) (∃E) 1, 3-5

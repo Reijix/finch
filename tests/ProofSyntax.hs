@@ -189,15 +189,13 @@ lInsertQCTests =
     ]
 
 prop_fromLineNoInverse :: Proof -> Property
-prop_fromLineNoInverse p = forAll (chooseInt (1, pLength p - 1)) $ \n ->
-  isJust (fromLineNo n p)
-    ==> ((`fromNodeAddr` p) <$> fromLineNo n p)
+prop_fromLineNoInverse p = forAll (chooseInt (1, pLength p)) $ \n ->
+  ((`fromNodeAddr` p) <$> fromLineNo n p)
     === Just (Just n)
 
 prop_fromNodeAddrInverse :: Proof -> Property
 prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
-  isJust (fromNodeAddr a p)
-    ==> ((`fromLineNo` p) <$> fromNodeAddr a p)
+  ((`fromLineNo` p) <$> fromNodeAddr a p)
     === Just (Just a)
 
 lineNoQCTests :: TestTree
@@ -212,9 +210,7 @@ prop_compareLineNo :: Proof -> Property
 prop_compareLineNo p =
   forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
     forAll (arbitraryNodeAddrFor p AnyKind) $ \b ->
-      isJust (fromNodeAddr a p)
-        ==> isJust (fromNodeAddr b p)
-        ==> compare a b
+      compare a b
         === compare (fromNodeAddr a p) (fromNodeAddr b p)
 
 compareQCTests :: TestTree
@@ -223,10 +219,22 @@ compareQCTests =
     "testing compare instance of NodeAddr"
     [QC.testProperty "prop_compareLineNo" prop_compareLineNo]
 
+prop_collectVisibleLinesSmaller :: Proof -> Property
+prop_collectVisibleLinesSmaller p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
+  case pCollectVisibleNodes a p of
+    Nothing -> False
+    Just nodes -> maybe False (length nodes <=) (fromNodeAddr a p)
+
+collectVisibleLinesTests :: TestTree
+collectVisibleLinesTests =
+  testGroup
+    "testing collectVisibleLines"
+    [QC.testProperty "prop_collectVisibleLinesSmaller" prop_collectVisibleLinesSmaller]
+
 proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests]
+    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests, collectVisibleLinesTests]
     , testGroup "HUnit" []
     ]

@@ -22,6 +22,10 @@ allCombinations xs = assert (all ((length xs ==) . length)) $ go xs
 
   assert b x = if b x then x else error "allCombinations: assertion violation"
 
+{- TODO implement freshness checking
+by adding a function that returns all formulae visible to a given line.
+-}
+
 {- Phases of proof verification:
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
@@ -51,11 +55,14 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
  where
   verifyRule :: Int -> Derivation -> Derivation
   verifyRule _ d@(Derivation _ (Unparsed{})) = d
-  verifyRule _ d@(Derivation f@(Unparsed{}) r) =
-    Derivation f $ ParsedInvalid (getText r) "Parse error in formula." (fromWrapper r)
-  verifyRule ruleLine (Derivation f r) =
+  verifyRule _ d@(Derivation f@(Unparsed{}) wr) =
+    let (ruleText, ra) = case wr of
+          (ParsedInvalid _ ruleText ra) -> (ruleText, ra)
+          (ParsedValid ruleText ra) -> (ruleText, ra)
+     in Derivation f $ ParsedInvalid ruleText "Parse error in formula." ra
+  verifyRule ruleLine (Derivation wf wr) =
     -- 1. Check that the rule exists.
-    Derivation f $ case checkExistence rules of
+    Derivation wf $ case checkExistence rules of
       Left err -> ParsedInvalid ruleText err ra
       -- 2. Check that the formula matches the rules' conclusion.
       Right spec -> case checkConclusion spec formula of
@@ -71,14 +78,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
               -- Right formMap -> ParsedInvalid ruleText (prettyPrint formMap) ra
               Right formMap -> ParsedValid ruleText ra
    where
-    ---------------------------------------------------
-    -- Unwrap variables
-    formula = fromWrapper f
-    formulaText = getText f
-    ra@(RuleApplication ruleName refs) = fromWrapper r
-    ruleText = getText r
-    ---------------------------------------------------
-
+    (formulaText, formula, ruleText, ra@(RuleApplication ruleName refs)) = case (wf, wr) of
+      (ParsedInvalid _ formulaText f, ParsedInvalid _ ruleText ra) -> (formulaText, f, ruleText, ra)
+      (ParsedValid formulaText f, ParsedInvalid _ ruleText ra) -> (formulaText, f, ruleText, ra)
+      (ParsedInvalid _ formulaText f, ParsedValid ruleText ra) -> (formulaText, f, ruleText, ra)
+      (ParsedValid formulaText f, ParsedValid ruleText ra) -> (formulaText, f, ruleText, ra)
     ---------------------------------------------------
     -- 1. Check that the rule exists.
     checkExistence :: Map Name RuleSpec -> Either Text RuleSpec

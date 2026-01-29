@@ -2,6 +2,7 @@
 module App.Runner (
   runApp,
   initialModel,
+  checkProof,
   tryParse,
   Proof (..),
   FromText (..),
@@ -102,15 +103,16 @@ runApp proof operators infixPreds quantifiers rules =
  where
   m = initialModel proof operators infixPreds quantifiers rules
 
-checkProof :: Effect ROOT Model Action
+checkProof :: forall m. (MonadState Model m) => m Proof
 checkProof = do
   regenerateSymbols
+  checkFreshness
   ruleMap <- use rules
-  proof %= verifyProof ruleMap
+  use proof <&> verifyProof ruleMap
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = checkProof
+updateModel Setup = proof <~ checkProof
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
@@ -171,7 +173,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           )
           targetAddr
           pos
-  checkProof
+  proof <~ checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -202,7 +204,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
       io_ . select . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = checkProof
+updateModel Change = proof <~ checkProof
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine

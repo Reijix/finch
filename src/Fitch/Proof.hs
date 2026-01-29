@@ -21,6 +21,11 @@ instance (PrettyPrint a, PrettyPrint b) => PrettyPrint (Either a b) where
   prettyPrint (Left x) = "Left " <> prettyPrint x
   prettyPrint (Right x) = "Right " <> prettyPrint x
 
+instance (PrettyPrint a) => PrettyPrint (Maybe a) where
+  prettyPrint :: Maybe a -> Text
+  prettyPrint (Just x) = "Just " <> prettyPrint x
+  prettyPrint Nothing = "Nothing"
+
 -- | Wraps data contained in a `Proof` to store further information.
 data Wrapper a where
   -- | Semantically valid parse success
@@ -57,10 +62,10 @@ instance Functor Wrapper where
   fmap _ (Unparsed txt err) = Unparsed txt err
 
 -- | Extract data from a wrapper, fails with an error if no data is present.
-fromWrapper :: Wrapper a -> a
-fromWrapper (ParsedValid _ x) = x
-fromWrapper (ParsedInvalid _ _ x) = x
-fromWrapper (Unparsed{}) = error "fromWrapper called on Unparsed"
+fromWrapper :: Wrapper a -> Maybe a
+fromWrapper (ParsedValid _ x) = Just x
+fromWrapper (ParsedInvalid _ _ x) = Just x
+fromWrapper (Unparsed{}) = Nothing
 
 -- | Extract text value from a wrapper.
 getText :: Wrapper a -> Text
@@ -298,10 +303,19 @@ pSerialize af df (ProofLine d) = [df d]
 pSerialize af df (SubProof fs ps d) = map af fs ++ concatMap (pSerialize af df) ps ++ [df d]
 
 -- | Like `pSerialize` but the current `NodeAddr` is dragged along.
-pSerializeWithAddr :: (Assumption -> NodeAddr -> a) -> (Derivation -> NodeAddr -> a) -> Proof -> [a]
+pSerializeWithAddr ::
+  (Assumption -> NodeAddr -> a) ->
+  (Derivation -> NodeAddr -> a) ->
+  Proof ->
+  [a]
 pSerializeWithAddr = go Nothing
  where
-  go :: Maybe NodeAddr -> (Assumption -> NodeAddr -> a) -> (Derivation -> NodeAddr -> a) -> Proof -> [a]
+  go ::
+    Maybe NodeAddr ->
+    (Assumption -> NodeAddr -> a) ->
+    (Derivation -> NodeAddr -> a) ->
+    Proof ->
+    [a]
   go Nothing af df (ProofLine d) = [df d (NAProof 0 Nothing)]
   go (Just addr) af df (ProofLine d) = [df d addr]
   go mna af df (SubProof fs ps d) = mappedFs ++ concat mappedPs ++ [df d (naAppendConclusion mna)]
@@ -348,6 +362,27 @@ pMapWithLineNo af df = snd . pMapAccumL af' df' 1
   af' n a = (n + 1, af n a)
   df' :: Int -> Derivation -> (Int, Derivation)
   df' n d = (n + 1, df n d)
+
+pMapWithAddr ::
+  (NodeAddr -> Assumption -> Assumption) ->
+  (NodeAddr -> Derivation -> Derivation) ->
+  Proof ->
+  Proof
+pMapWithAddr = go Nothing
+ where
+  go ::
+    Maybe NodeAddr ->
+    (NodeAddr -> Assumption -> Assumption) ->
+    (NodeAddr -> Derivation -> Derivation) ->
+    Proof ->
+    Proof
+  go Nothing af df (ProofLine d) = ProofLine $ df (NAProof 0 Nothing) d
+  go (Just addr) af df (ProofLine d) = ProofLine $ df addr d
+  go mna af df (SubProof fs ps d) = SubProof fs' ps' d'
+   where
+    (_, fs') = mapAccumL (\m frm -> (m + 1, af (naAppendAssumption m mna) frm)) 0 fs
+    (_, ps') = mapAccumL (\m prf -> (m + 1, go (Just $ naAppendProof m mna) af df prf)) 0 ps
+    d' = df (naAppendConclusion mna) d
 
 -- | Like `pMap` but lifted to monadic results.
 pMapM ::
@@ -617,8 +652,27 @@ pIndexProof start end p = do
       Just (Right p) -> Just p
     else Nothing
 
+pCollectVisibleNodes :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
+pCollectVisibleNodes na p = fromMaybe [] . viaNonEmpty init <$> go na p
+ where
+  goLines :: [Proof] -> Maybe [Either Assumption Derivation]
+  goLines (ProofLine d : ps) = (Right d :) <$> goLines ps
+  goLines (SubProof{} : ps) = goLines ps
+  goLines [] = Just mempty
+  go :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
+  go (NAAssumption (-1)) SubProof{} = Just mempty
+  go (NAAssumption n) (SubProof (f : fs) ps c) | n >= 0 = (Left f :) <$> go (NAAssumption $ n - 1) (SubProof fs ps c)
+  go NAConclusion (SubProof fs ps c) = (fmap Left fs <>) . (<> one (Right c)) <$> goLines ps
+  go (NAProof (-1) Nothing) (SubProof fs _ _) = Just $ fmap Left fs
+  go (NAProof n Nothing) (SubProof fs ((ProofLine d) : ps) c) = (Right d :) <$> go (NAProof (n - 1) Nothing) (SubProof fs ps c)
+  go (NAProof n Nothing) (SubProof fs (SubProof{} : ps) c) = go (NAProof (n - 1) Nothing) (SubProof fs ps c)
+  go (NAProof 0 (Just na)) (SubProof fs (p@SubProof{} : ps) c) = go (NAProof (-1) Nothing) (SubProof fs ps c) >>= (\l -> (l <>) <$> go na p)
+  go (NAProof n (Just na)) (SubProof fs (ProofLine d : ps) c) = (Right d :) <$> go (NAProof (n - 1) (Just na)) (SubProof fs ps c)
+  go (NAProof n (Just na)) (SubProof fs (SubProof{} : ps) c) = go (NAProof (n - 1) (Just na)) (SubProof fs ps c)
+  go _ _ = Nothing
+
 -- TODO use Maybe?
-extractFormula :: Either Assumption Derivation -> Formula
+extractFormula :: Either Assumption Derivation -> Maybe Formula
 extractFormula (Left a) = fromWrapper a
 extractFormula (Right (Derivation f _)) = fromWrapper f
 

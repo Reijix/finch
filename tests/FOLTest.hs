@@ -1,5 +1,7 @@
 module FOLTest where
 
+import App.Model
+import App.Runner
 import Fitch.Proof
 import Fitch.Verification (verifyProof)
 import Parser.Formula (parseFormula)
@@ -19,7 +21,7 @@ readProof filePath = do
     Left err ->
       assertFailure . toString $
         "Could not parse file " <> err <> "\n" <> err
-    Right p -> pure $ verifyProof rulesFOL p
+    Right p -> pure $ evalState checkProof (initialModel p operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
 
 assertValid :: Wrapper a -> Assertion
 assertValid (Unparsed _ err) =
@@ -34,27 +36,28 @@ assertInvalid :: Wrapper a -> Assertion
 assertInvalid (Unparsed _ err) =
   assertFailure . toString $
     "Parse error: " <> err
-assertInvalid (ParsedValid txt _) =
+assertInvalid f@(ParsedValid txt _) =
   assertFailure . toString $
     "Expected invalid, but found valid: " <> txt
 assertInvalid _ = pass
 
-assertProofValid :: Proof -> Assertion
-assertProofValid =
+expectValidProof :: Proof -> Assertion
+expectValidProof =
   pFoldM
     (const assertValid)
     (\_ (Derivation f r) -> assertValid f >> assertValid r)
     ()
 
-assertProofInvalidAt :: Int -> Proof -> Assertion
-assertProofInvalidAt n p = case pIndex n p of
+expectInvalidRuleAt :: Int -> Proof -> Assertion
+expectInvalidRuleAt n p = case pIndex n p of
   Just (Right (Derivation _ r)) -> assertInvalid r
-  _ ->
-    assertFailure . toString $
-      "assertProofInvalidAt: indexing line "
-        <> show n
-        <> " went wrong for proof:\n"
-        <> prettyPrint p
+  _ -> assertFailure "expectInvalidRuleAt: pIndex failed or found unexpected assumption!"
+
+expectInvalidFormulaAt :: Int -> Proof -> Assertion
+expectInvalidFormulaAt n p = case pIndex n p of
+  Just (Right (Derivation f _)) -> assertInvalid f
+  Just (Left f) -> assertInvalid f
+  _ -> assertFailure "expectInvalidFormulaAt: internal error, pIndex failed!"
 
 testValidProofs :: TestTree
 testValidProofs =
@@ -62,7 +65,7 @@ testValidProofs =
     mapM_
       ( (\str -> step str >> pure str)
           >=> readProof
-          >=> assertProofValid
+          >=> expectValidProof
       )
       =<< pathsInDir "tests/ValidProofs/"
 
@@ -70,12 +73,15 @@ testInvalidProofs :: TestTree
 testInvalidProofs =
   testCaseSteps "Testing invalid proofs" $ \step ->
     mapM_
-      ( \(fp, n) ->
+      ( \(fp, fun) ->
           step fp
             >> readProof ("tests/InvalidProofs/" <> fp)
-            >>= assertProofInvalidAt n
+            >>= fun
       )
-      [("eqE1.fitch", 3), ("eqE2.fitch", 3)]
+      [ ("eqE1.fitch", expectInvalidRuleAt 3)
+      , ("eqE2.fitch", expectInvalidRuleAt 3)
+      , ("notFresh.fitch", expectInvalidFormulaAt 3)
+      ]
 
 verificationTests :: TestTree
 verificationTests =
