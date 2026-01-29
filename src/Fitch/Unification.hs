@@ -32,7 +32,7 @@ class AllVars a where
   w.r.t. all the variables occuring in the structure.
   -}
   makeFresh :: Name -> a -> Name
-  makeFresh n t = if isFresh n t then makeFresh (n <> "'") t else n
+  makeFresh n t = if not (isFresh n t) then makeFresh (n <> "'") t else n
 
   isFresh :: Name -> a -> Bool
   isFresh n t = n `notMember` allVars t
