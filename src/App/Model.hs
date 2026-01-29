@@ -187,21 +187,31 @@ checkFreshness = do
   proof <~ (use proof >>= \p -> pure (pMapWithAddr (goFormula p) (goLine p) p))
  where
   goFormula :: Proof -> NodeAddr -> Assumption -> Assumption
-  goFormula p _ a@(fromWrapper -> Nothing) = a
-  goFormula p na a@(fromWrapper -> Just f@(FreshVar v)) = case pCollectVisibleNodes na p of
+  goFormula p _ a@(Unparsed{}; ParsedInvalid{}) = a
+  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectVisibleNodes na p of
     Nothing -> ParsedInvalid (getText a) "Could not collect visible nodes..." f
     Just nodes ->
-      if isFreshList v nodes
-        then a
-        -- TODO error message
-        else ParsedInvalid (getText a) ("Failed to verify freshness of " <> v <> "\nGot list:\n" <> prettyPrint nodes) f
+      case isFreshList v nodes of
+        Nothing -> a
+        Just f ->
+          ParsedInvalid
+            (getText a)
+            ( "Could not verify freshness of "
+                <> v
+                <> "\nIt appears in formula:\n"
+                <> prettyPrint f
+            )
+            f
   goFormula p na a@(fromWrapper -> Just _) = a
   goLine :: Proof -> NodeAddr -> Derivation -> Derivation
-  goLine p na (Derivation f r) = Derivation (goFormula p na f) r
-  isFreshList :: Name -> [Either Assumption Derivation] -> Bool
-  isFreshList v [] = True
+  goLine p na d@(Derivation (fromWrapper -> Nothing) r) = d
+  goLine p na (Derivation wf@(fromWrapper -> Just f@(FreshVar v)) r) =
+    Derivation (ParsedInvalid (getText wf) "Fresh variable statement is only allowed in assumptions." f) r
+  goLine p na d@(Derivation (fromWrapper -> Just _) r) = d
+  isFreshList :: Name -> [Either Assumption Derivation] -> Maybe Formula
+  isFreshList v [] = Nothing
   isFreshList v (Left (fromWrapper -> Nothing) : rest) = isFreshList v rest
-  isFreshList v (Left (fromWrapper -> Just f) : rest) = isFresh v f && isFreshList v rest
+  isFreshList v (Left (fromWrapper -> Just f) : rest) = if isFresh v f then isFreshList v rest else Just f
   isFreshList v (Right (Derivation f _) : rest) = isFreshList v (Left f : rest)
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.

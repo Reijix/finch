@@ -103,16 +103,16 @@ runApp proof operators infixPreds quantifiers rules =
  where
   m = initialModel proof operators infixPreds quantifiers rules
 
-checkProof :: forall m. (MonadState Model m) => m Proof
+checkProof :: forall m. (MonadState Model m) => m ()
 checkProof = do
   regenerateSymbols
-  checkFreshness
   ruleMap <- use rules
-  use proof <&> verifyProof ruleMap
+  proof %= verifyProof ruleMap
+  checkFreshness
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = proof <~ checkProof
+updateModel Setup = checkProof
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
   dt <- use dragTarget
@@ -173,7 +173,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           )
           targetAddr
           pos
-  proof <~ checkProof
+  checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
 -- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
@@ -204,7 +204,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
       io_ . select . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = proof <~ checkProof
+updateModel Change = pass
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -250,8 +250,7 @@ updateModel (ProcessInput str start end (Right addr)) = do
           (fromMisoString str) ::
           Wrapper RuleApplication
   proof %= pUpdateRule (const r) addr
-  ruleMap <- use rules
-  proof %= verifyProof ruleMap
+  checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $

@@ -53,7 +53,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
   verifyRule _ d@(Derivation _ (Unparsed{})) = d
   verifyRule _ d@(Derivation f@(Unparsed{}) wr) =
     let (ruleText, ra) = case wr of
-          (ParsedInvalid _ ruleText ra) -> (ruleText, ra)
+          (ParsedInvalid ruleText _ ra) -> (ruleText, ra)
           (ParsedValid ruleText ra) -> (ruleText, ra)
      in Derivation f $ ParsedInvalid ruleText "Parse error in formula." ra
   verifyRule ruleLine (Derivation wf wr) = Derivation wf
@@ -92,7 +92,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
             "Rule cannot be applied to "
               <> formulaText
               <> "\nExpecting a formula of the form "
-              <> show expected
+              <> prettyPrint expected
     ---------------------------------------------------
 
     ---------------------------------------------------
@@ -104,11 +104,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
         else
           Left $
             "Found "
-              <> show f
+              <> prettyPrint f
               <> " at line "
               <> show line
               <> ".\nBut expected a formula of the form "
-              <> show fSpec
+              <> prettyPrint fSpec
               <> "."
     handleAssumption :: Int -> Assumption -> FormulaSpec -> Either Text (Formula, FormulaSpec)
     handleAssumption line fw fSpec = case fw of
@@ -280,11 +280,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                       <> " are the same, found\n"
                       <> v
                       <> "↦"
-                      <> show lastTerm
+                      <> prettyPrint lastTerm
                       <> " and\n"
                       <> v
                       <> "↦"
-                      <> show currTerm
+                      <> prettyPrint currTerm
                       <> "."
           )
           t
@@ -324,8 +324,10 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
        where
         reduceHelper :: Name -> NonEmpty (Either Formula [Formula]) -> Either Text Formula
         reduceHelper n (Left f :| rest) = go n f rest
-        reduceHelper n (Right [] :| rest) = Left "reduceHelper: can't find match!"
-        -- reduceHelper n (Right fs :| rest) = Left $ "reduceHelper: can't find match!" <> show fs)
+        reduceHelper n (Right [] :| rest) = Left "Could not find match for formula."
+        reduceHelper n (Right [f] :| rest) = case go n f rest of
+          Left err -> Left $ "Error, can't find match for " <> prettyPrint f
+          Right f -> Right f
         reduceHelper n (Right (f : fs) :| rest) = case go n f rest of
           Left err -> reduceHelper n (Right fs :| rest)
           Right f -> Right f
@@ -335,11 +337,11 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
           if f == f'
             then
               go n f' rest
-            else Left "reduceFormulae: f/=f'" -- TODO error message
+            else Left $ "Error, formulae:\n" <> prettyPrint f <> "\n" <> prettyPrint f' <> "\nDo not match."
         go n f (Right fs' : rest) = mapFs fs'
          where
           mapFs :: [Formula] -> Either Text Formula
-          mapFs [] = Left $ "reduceFormulae: can't find match for f=" <> show f
+          mapFs [] = Left $ "Error, can't find match for formula:\n" <> prettyPrint f
           mapFs (f' : fs) = if f /= f' then mapFs fs else Right f'
 
       collectMoreFormulae ::
@@ -354,7 +356,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                 Just (Var x') -> x'
                 _ -> "_" <> x
            in case unifyFormulaeOnVariable x' [(phiF, f)] of
-                Nothing -> Left $ "Error unifying " <> show phiF <> " with\n" <> show f
+                Nothing -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
                 -- compare assignment of E
                 Just mgu -> case (mgu !? x', termMap !? t) of
                   ((Nothing, _); (_, Nothing)) ->
