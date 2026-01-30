@@ -20,7 +20,6 @@ import Miso (
   onWithOptions,
   pointerDecoder,
   preventDefault,
-  run,
   startApp,
   text,
  )

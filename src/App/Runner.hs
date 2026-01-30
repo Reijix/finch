@@ -54,7 +54,6 @@ import Miso (
   newEvent,
   preventDefault,
   removeEventListener,
-  run,
   select,
   setSelectionRange,
   startApp,
@@ -95,7 +94,7 @@ runApp ::
   -- | Resulting program
   IO ()
 runApp proof operators infixPreds quantifiers rules =
-  run . startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
+  startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
       , initialAction = Just Setup
