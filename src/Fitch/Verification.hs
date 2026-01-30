@@ -47,7 +47,7 @@ allCombinations xs = assert (all ((length xs ==) . length)) $ go xs
      choosing from the lists.
  -}
 verifyProof :: Map Name RuleSpec -> Proof -> Proof
-verifyProof rules p = pMapWithLineNo (const id) verifyRule p
+verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
  where
   verifyRule :: Int -> Derivation -> Derivation
   verifyRule _ d@(Derivation _ (Unparsed{})) = d
@@ -152,7 +152,7 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                   <> "-"
                   <> show end
                   <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
-            (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr refAddr of
+            (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr (Right refAddr) of
               Nothing -> Right ()
               Just err -> Left err
           fs <- handleProof (start, end) prf pSpec
@@ -176,9 +176,6 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
                   (zip fs fSpecs)
             (c', cSpec') <- handleAssumption end c cSpec
             pure (zip (fs' ++ [c']) (fSpecs' ++ [cSpec']))
-      handleProof _ (ProofLine{}) _ =
-        Left
-          "handleProof found ProofLine -- SHOULD NOT HAPPEN - INTERNAL ERROR."
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
         "Rule ("
@@ -418,13 +415,14 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
     ---------------------------------------------------
 
     -- helpers
-    refIsVisible :: Int -> NodeAddr -> NodeAddr -> Maybe Text
-    refIsVisible line ruleAddr refAddr
+    refIsVisible :: Int -> NodeAddr -> Either NodeAddr ProofAddr -> Maybe Text
+    refIsVisible line ruleAddr (Left refAddr)
       | ruleAddr <= refAddr = Just "Can only reference lines that appear before this line!"
-    refIsVisible line (NAProof n (Just na1)) (NAProof m (Just na2))
-      | n == m = refIsVisible line na1 na2
-    refIsVisible line rua ra@(NAProof _ (Just _)) =
+    refIsVisible line (NAProof n na1) (Left (NAProof m na2))
+      | n == m = refIsVisible line na1 (Left na2)
+    refIsVisible line rua ra@(Left (NAProof _ _)) =
       Just "Line cannot be referenced because it is located inside of a subproof."
+    -- TODO adjust for ProofAddr!!
     refIsVisible _ _ _ = Nothing
 
     lookupReference :: Int -> Proof -> Either Text Formula
@@ -456,4 +454,4 @@ verifyProof rules p = pMapWithLineNo (const id) verifyRule p
               Just _ -> Left $ "Parse error in line: " <> show refLine
           )
           Left
-          (refIsVisible refLine ruleAddr refAddr)
+          (refIsVisible refLine ruleAddr (Left refAddr))

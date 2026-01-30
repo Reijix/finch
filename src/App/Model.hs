@@ -183,11 +183,11 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 checkFreshness :: forall m. (MonadState Model m) => m ()
 checkFreshness = do
-  proof <~ (use proof >>= \p -> pure (pMapWithAddr (goFormula p) (goLine p) p))
+  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goFormula p) (goLine p) p))
  where
   goFormula :: Proof -> NodeAddr -> Assumption -> Assumption
   goFormula p _ a@(Unparsed{}; ParsedInvalid{}) = a
-  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectVisibleNodes na p of
+  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectVisibleLines na p of
     Nothing -> ParsedInvalid (getText a) "Could not collect visible nodes..." f
     Just nodes ->
       case isFreshList v nodes of
@@ -222,7 +222,7 @@ regenerateSymbols :: forall m. (MonadState Model m) => m ()
 regenerateSymbols = do
   functionSymbols .= mempty
   predicateSymbols .= mempty
-  proof <~ (use proof >>= pMapMAccumL goFormula goLine 1 <&> snd)
+  proof <~ (use proof >>= pMapLinesMAccumL goFormula goLine 1 <&> snd)
  where
   -- collect symbols inside a formula
   goFormula :: Int -> Assumption -> m (Int, Assumption)

@@ -1,5 +1,6 @@
 module Parser.Proof where
 
+import Data.List.NonEmpty (some1)
 import Fitch.Proof (
   Assumption,
   Derivation (..),
@@ -15,6 +16,7 @@ import Text.Megaparsec (
   PosState (..),
   SourcePos (..),
   defaultTabWidth,
+  eitherP,
   eof,
   errorBundlePretty,
   manyTill,
@@ -37,9 +39,6 @@ pDerivation =
     pAssumption
     (match (lexeme pRule) <&> uncurry ParsedValid)
 
-pProofLine :: (FormulaParser m) => m Proof
-pProofLine = ProofLine <$> pDerivation
-
 pFormulaSep :: (Parser m) => Int -> m ()
 pFormulaSep ind = void . withIndent ind $ symbol "---"
 
@@ -50,18 +49,16 @@ withIndent n p = symbol "|" *> withIndent (n - 1) p
 pSubProof :: (FormulaParser m) => Int -> m Proof
 pSubProof ind = do
   fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
-  proofs <- some . try $ lexeme (pProof ind)
+  proofs <- some1 . try $ lexeme (eitherP (withIndent ind pDerivation) (pProof ind))
 
-  case viaNonEmpty (\l -> (init l, last l)) proofs of
-    Nothing -> error "pSubProof: unsnoc found empty list after application of `some` combinator! (SHOULD NOT HAPPEN)"
-    Just (ps, ProofLine d) -> pure $ SubProof fs ps d
-    Just _ -> unexpected (Label $ fromList "subproof")
+  case last proofs of
+    Left d -> pure $ SubProof fs (init proofs) d
+    Right _ -> unexpected (Label $ fromList "subproof")
 
 pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
-  try (withIndent ind pProofLine)
-    <|> pSubProof (ind + 1)
-    <?> "subproof or proofline"
+  pSubProof (ind + 1)
+    <?> "subproof"
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
 parseLine operators infixPreds quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of

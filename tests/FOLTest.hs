@@ -11,6 +11,8 @@ import System.Directory (listDirectory)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 
+import Miso.Lens ((^.))
+
 pathsInDir :: FilePath -> IO [FilePath]
 pathsInDir fp = map (fp <>) <$> listDirectory fp
 
@@ -21,7 +23,7 @@ readProof filePath = do
     Left err ->
       assertFailure . toString $
         "Could not parse file " <> err <> "\n" <> err
-    Right p -> pure $ evalState checkProof (initialModel p operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
+    Right p -> pure . (^. proof) $ execState checkProof (initialModel p operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
 
 assertValid :: Wrapper a -> Assertion
 assertValid (Unparsed _ err) =
@@ -43,7 +45,7 @@ assertInvalid _ = pass
 
 expectValidProof :: Proof -> Assertion
 expectValidProof =
-  pFoldM
+  pFoldLinesM
     (const assertValid)
     (\_ (Derivation f r) -> assertValid f >> assertValid r)
     ()

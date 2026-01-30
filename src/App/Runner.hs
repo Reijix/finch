@@ -125,20 +125,20 @@ updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
     Nothing -> pass
-    Just addr -> proof %= pRemove addr
+    Just addr -> proof %= naRemove addr
   clearDrag
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
-    Just sourceAddr -> proof %= pMove targetAddr pos sourceAddr
+    Just sourceAddr -> proof %= naMove targetAddr pos sourceAddr
   use spawnType >>= \case
     Nothing -> pass
     -- TODO adjust linenos
     Just SpawnLine ->
       proof
-        %=? pInsert
-          ( Right . ProofLine $
+        %=? naInsert
+          ( Right . Left $
               Derivation
                 (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Formula")
                 (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
@@ -147,8 +147,8 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           pos
     Just SpawnProof ->
       proof
-        %=? pInsert
-          ( Right $
+        %=? naInsert
+          ( Right . Right $
               SubProof
                 [ tryParse
                     m
@@ -168,7 +168,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           pos
     Just SpawnAssumption ->
       proof
-        %=? pInsert
+        %=? naInsert
           ( Left
               ( tryParse
                   m
@@ -230,7 +230,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
           (lineNoOr999 addr (m ^. proof))
           (fromMisoString str) ::
           Wrapper Formula
-  proof %= pUpdateFormula (const p) addr
+  proof %= naUpdateFormula (const p) addr
   checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ p)
   -- restore selectionStart and selectionEnd (delta-adjusted)
@@ -253,7 +253,7 @@ updateModel (ProcessInput str start end (Right addr)) = do
           (lineNoOr999 addr (m ^. proof))
           (fromMisoString str) ::
           Wrapper RuleApplication
-  proof %= pUpdateRule (const r) addr
+  proof %= naUpdateRule (const r) addr
   checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
@@ -270,9 +270,9 @@ updateModel (ProcessParens eaddr start end) = do
   p <- use proof
   case eaddr of
     Left addr ->
-      proof %= pUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
+      proof %= naUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
-      proof %= pUpdateRule (\r -> fromRight r $ update m (getText r)) addr
+      proof %= naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
  where
   update :: Model -> Text -> Either (Wrapper Formula) (Wrapper RuleApplication)
   update m txt =
