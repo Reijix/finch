@@ -109,6 +109,14 @@ checkProof = do
   proof %= verifyProof ruleMap
   checkFreshness
 
+clearDrag :: Effect ROOT Model Action
+clearDrag = do
+  currentLineAfter .= Nothing
+  currentLineBefore .= Nothing
+  dragging .= False
+  dragTarget .= Nothing
+  spawnType .= Nothing
+
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 updateModel Setup = checkProof
@@ -118,6 +126,7 @@ updateModel (Drop LocationBin) = do
   case dt of
     Nothing -> pass
     Just addr -> proof %= pRemove addr
+  clearDrag
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
@@ -172,6 +181,7 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
           )
           targetAddr
           pos
+  clearDrag
   checkProof
 updateModel (DragEnter a Before) = currentLineBefore .= Just a
 updateModel (DragEnter a After) = currentLineAfter .= Just a
@@ -184,12 +194,7 @@ updateModel (SpawnStart st) = do
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   dragging .= True
-updateModel DragEnd = do
-  currentLineAfter .= Nothing
-  currentLineBefore .= Nothing
-  dragging .= False
-  dragTarget .= Nothing
-  spawnType .= Nothing
+updateModel DragEnd = clearDrag
 ------------------------------------
 -- Input related events
 updateModel (DoubleClick ea) = do

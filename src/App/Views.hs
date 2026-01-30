@@ -60,7 +60,7 @@ viewSpawnNode tp str =
         ]
     , HP.draggable_ True
     , onDragStartWithOptions stopPropagation $ SpawnStart tp
-    , onDragEndWithOptions stopPropagation DragEnd
+    , onDragEndWithOptions defaultOptions DragEnd
     ]
     [H.p_ [] [text $ ms str]]
 
@@ -76,11 +76,14 @@ viewLine model addr isLastAssumption e =
         ]
     , HP.hidden_ False
     , onDragStartWithOptions stopPropagation $ DragStart addr
-    , onDragEndWithOptions stopPropagation DragEnd
+    , onDragEndWithOptions defaultOptions DragEnd
     ]
     [ H.div_
         [ HP.class_ "upper-hover-zone"
-        , HP.classList_ [("insert-before", model ^. currentLineBefore == Just addr), ("no-pointer-events", not (model ^. dragging))]
+        , HP.classList_
+            [ ("insert-before", model ^. currentLineBefore == Just addr)
+            , ("no-pointer-events", not (model ^. dragging))
+            ]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ model ^. focusedLine == Just (Left addr)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
@@ -91,7 +94,10 @@ viewLine model addr isLastAssumption e =
         []
     , H.div_
         [ HP.class_ "lower-hover-zone"
-        , HP.classList_ [("insert-after", model ^. currentLineAfter == Just addr), ("no-pointer-events", not (model ^. dragging))]
+        , HP.classList_
+            [ ("insert-after", model ^. currentLineAfter == Just addr)
+            , ("no-pointer-events", not (model ^. dragging))
+            ]
         , -- hide while focused, so that the input field is clickable for mouse movement
           HP.hidden_ $ model ^. focusedLine == Just (Left addr)
         , onDragOverWithOptions (preventDefault <> stopPropagation) Nop
@@ -151,7 +157,10 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       H.div_
         [ onDoubleClick $ DoubleClick (Right addr)
         , HP.class_ "rule-container"
-        , HP.classList_ [("non-selectable", Just (Right addr) /= model ^. focusedLine), ("has-error", not parseSuccess || not semanticSuccess)]
+        , HP.classList_
+            [ ("non-selectable", Just (Right addr) /= model ^. focusedLine)
+            , ("has-error", not parseSuccess || not semanticSuccess)
+            ]
         ]
         [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
         , H.input_
@@ -186,7 +195,11 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
     ProofLine _ -> error "Tried calling viewProof on a ProofLine"
     SubProof fs ps d -> H.div_ [HP.class_ "outer-subproof"] (viewAssumptions ++ viewProofs ++ [viewConclusion])
      where
-      (_, viewAssumptions) = L.mapAccumL (\n f -> (n + 1, viewLine model (NAAssumption n) (n == length fs - 1) (Left f))) 0 fs
+      (_, viewAssumptions) =
+        L.mapAccumL
+          (\n f -> (n + 1, viewLine model (NAAssumption n) (n == length fs - 1) (Left f)))
+          0
+          fs
       (n, viewProofs) = L.mapAccumL (\n p -> (n + 1, _viewProof n Nothing p)) 0 ps
       viewConclusion = viewLine model NAConclusion False (Right d)
   _viewProof :: Int -> Maybe NodeAddr -> Proof -> View Model Action
@@ -197,12 +210,24 @@ viewProof model = H.div_ [HP.class_ "proof-container"] [lineNos, proofView, rule
       , HP.draggable_ True
       , HP.hidden_ False
       , onDragStartWithOptions stopPropagation $ DragStart a
-      , onDragEndWithOptions stopPropagation DragEnd
+      , onDragEndWithOptions defaultOptions DragEnd
       ]
       (viewAssumptions ++ viewProofs ++ [viewConclusion])
    where
     a = naAppendProof n ma
-    (_, viewAssumptions) = L.mapAccumL (\m f -> (m + 1, viewLine model (naAppendAssumption m (Just $ naAppendProof n ma)) (m == length fs - 1) (Left f))) 0 fs
+    (_, viewAssumptions) =
+      L.mapAccumL
+        ( \m f ->
+            ( m + 1
+            , viewLine
+                model
+                (naAppendAssumption m (Just $ naAppendProof n ma))
+                (m == length fs - 1)
+                (Left f)
+            )
+        )
+        0
+        fs
     (m, viewProofs) = L.mapAccumL (\m p -> (m + 1, _viewProof m (Just a) p)) 0 ps
     viewConclusion = viewLine model (naAppendConclusion $ Just a) False (Right d)
 
