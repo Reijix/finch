@@ -13,6 +13,9 @@ import Text.Show qualified
 
 newtype PrettyProof = PrettyProof Proof
 
+fromPretty :: PrettyProof -> Proof
+fromPretty (PrettyProof p) = p
+
 instance Show PrettyProof where
   show :: PrettyProof -> String
   show (PrettyProof p) = toString $ prettyPrint p

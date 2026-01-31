@@ -46,18 +46,15 @@ withIndent :: (Parser m) => Int -> m a -> m a
 withIndent 0 p = p
 withIndent n p = symbol "|" *> withIndent (n - 1) p
 
-pSubProof :: (FormulaParser m) => Int -> m Proof
-pSubProof ind = do
-  fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
-  proofs <- some1 . try $ lexeme (eitherP (withIndent ind pDerivation) (pProof ind))
-
-  case last proofs of
-    Left d -> pure $ SubProof fs (init proofs) d
-    Right _ -> unexpected (Label $ fromList "subproof")
-
 pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
-  pSubProof (ind + 1)
+  do
+    fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
+    proofs <- some1 . try $ lexeme (eitherP (try $ withIndent ind pDerivation) (pProof (ind + 1)))
+
+    case last proofs of
+      Left d -> pure $ SubProof fs (init proofs) d
+      Right _ -> unexpected (Label $ fromList "subproof")
     <?> "subproof"
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
@@ -87,7 +84,7 @@ parseLine operators infixPreds quantifiers input = case evalState (runParserT' (
       }
 
 parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
-parseProof operators infixPreds quantifiers input = case evalState (runParserT' (pProof 0 <* eof) initialParserState) initialState of
+parseProof operators infixPreds quantifiers input = case evalState (runParserT' (pProof 1 <* eof) initialParserState) initialState of
   (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right p) -> Right p
  where

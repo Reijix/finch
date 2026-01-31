@@ -256,7 +256,7 @@ instance PrettyPrint Proof where
         mapAccumL
           ( \ln' e ->
               ( ln' + either (const 1) pLength e
-              , either (withLine line . withLevel (level + 1) . prettyPrint) (pretty' ln' (level + 1)) e
+              , either (withLine ln' . withLevel (level + 1) . prettyPrint) (pretty' ln' (level + 1)) e
               )
           )
           line'
@@ -476,7 +476,8 @@ fromLineNo n (SubProof [] ps _) = helper n 0 ps
   helper :: Int -> Int -> [Either Derivation Proof] -> Maybe NodeAddr
   helper 1 _ [] = Just NAConclusion
   helper n _ [] = Nothing
-  helper n m (Left d : ps) = Just $ NALine m
+  helper 1 m (Left d : ps) = Just $ NALine m
+  helper n m (Left d : ps) = helper (n - 1) (m + 1) ps
   helper n m (Right p : ps) | (n - 1) < pLength p = do
     addr <- fromLineNo n p
     pure $ NAProof m addr
@@ -600,7 +601,9 @@ naLookup (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = naLookup na
 naLookup _ _ = Nothing
 
 paLookup :: ProofAddr -> Proof -> Maybe Proof
-paLookup = undefined
+paLookup (PANested n pa) (SubProof _ ((!!? n) -> Just (Right p)) _) = paLookup pa p
+paLookup (PAProof n) (SubProof _ ((!!? n) -> Just (Right p)) _) = Just p
+paLookup _ _ = Nothing
 
 pIndex :: Int -> Proof -> Maybe (Either Assumption Derivation)
 pIndex n p = case fromLineNo n p of
@@ -626,8 +629,8 @@ pCollectVisibleLines :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation
 pCollectVisibleLines na p = fromMaybe [] . viaNonEmpty init <$> go na p
  where
   goPs :: [Either Derivation Proof] -> Maybe [Either Assumption Derivation]
-  goLines (Left d : ps) = (Right d :) <$> goLines ps
-  goPs (Right SubProof{} : ps) = goLines ps
+  goPs (Left d : ps) = (Right d :) <$> goPs ps
+  goPs (Right SubProof{} : ps) = goPs ps
   goPs [] = Just mempty
   go :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
   go (NAAssumption (-1)) SubProof{} = Just mempty
