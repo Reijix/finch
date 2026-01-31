@@ -4,57 +4,67 @@ import Fitch.Proof
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck as QC
+import Text.Show qualified
 
 --------------------------------------------
 -- UNIT TESTS
 
 -- Definitions for unit testing:
 
-formula :: Int -> Wrapper Formula
-formula n = ParsedValid "" $ Pred (show n) []
+newtype PrettyProof = PrettyProof Proof
+
+instance Show PrettyProof where
+  show :: PrettyProof -> String
+  show (PrettyProof p) = toString $ prettyPrint p
+
+assumption :: Int -> Assumption
+assumption n = ParsedValid (show n) $ Pred (show n) []
 
 rule :: Int -> [Reference] -> Wrapper RuleApplication
-rule str ref = ParsedValid "" (RuleApplication "Rule" ref)
+rule n ref = ParsedValid (show n) (RuleApplication "Rule" ref)
 
 derivation :: Int -> Derivation
-derivation n = Derivation (formula n) (rule n [])
+derivation n = Derivation (assumption n) (rule n [])
 
 line :: Int -> Either Derivation Proof
 line n = Left (derivation n)
 
 -- example proof for removing a line
-exProof0 :: Proof
+exProof0 :: PrettyProof
 exProof0 =
-  SubProof
-    [formula 0, formula 1]
-    [ Right $ SubProof [formula 2] [line 3] (derivation 4)
-    ]
-    (derivation 5)
+  PrettyProof $
+    SubProof
+      [assumption 0, assumption 1]
+      [ Right $ SubProof [assumption 2] [line 3] (derivation 4)
+      ]
+      (derivation 5)
 
 -- example proof that triggered an edge case
-exProof1 :: Proof
+exProof1 :: PrettyProof
 exProof1 =
-  SubProof
-    [formula 0]
-    [line 1, Right $ SubProof [formula 2, formula 3] [line 4, line 5] (derivation 6)]
-    (derivation 7)
+  PrettyProof $
+    SubProof
+      [assumption 0]
+      [line 1, Right $ SubProof [assumption 2, assumption 3] [line 4, line 5] (derivation 6)]
+      (derivation 7)
 
 -- example proof that triggered another edge case
-exProof2 :: Proof
+exProof2 :: PrettyProof
 exProof2 =
-  SubProof
-    []
-    [ Right $ SubProof [] [line 0, line 1] $ derivation 2
-    , Right $
-        SubProof
-          [formula 3, formula 4]
-          [line 5, line 6, line 7]
-          (derivation 8)
-    ]
-    (derivation 9)
+  PrettyProof $
+    SubProof
+      []
+      [ Right $ SubProof [] [line 0, line 1] $ derivation 2
+      , Right $
+          SubProof
+            [assumption 3, assumption 4]
+            [line 5, line 6, line 7]
+            (derivation 8)
+      ]
+      (derivation 9)
 
-exProof3 :: Proof
-exProof3 = SubProof [] [Right $ SubProof [formula 0] [line 1] (derivation 2), line 3] (derivation 4)
+exProof3 :: PrettyProof
+exProof3 = PrettyProof $ SubProof [] [Right $ SubProof [assumption 0] [line 1] (derivation 2), line 3] (derivation 4)
 
 --------------------------------------------
 -- PROPERTIES
@@ -78,9 +88,9 @@ instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication
   arbitrary = liftA2 RuleApplication arbitrary (pure [])
 
-instance (Arbitrary a) => Arbitrary (Wrapper a) where
+instance (Arbitrary a, PrettyPrint a) => Arbitrary (Wrapper a) where
   arbitrary :: Gen (Wrapper a)
-  arbitrary = fmap (ParsedValid "") arbitrary
+  arbitrary = (arbitrary :: Gen a) >>= \a -> pure (ParsedValid (prettyPrint a) a)
 
 instance Arbitrary Derivation where
   arbitrary :: Gen Derivation
@@ -98,6 +108,10 @@ instance Arbitrary Proof where
       ps = do
         l <- chooseInt (1, 8)
         vectorOf l (resize (n `div` 2) arbitrary)
+
+instance Arbitrary PrettyProof where
+  arbitrary :: Gen PrettyProof
+  arbitrary = fmap PrettyProof arbitrary
 
 data AddrKind = AssumptionKind | LineKind | ProofKind | ConclusionKind | AnyKind
 
@@ -123,13 +137,13 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
         _ -> discard
       _ -> discard
 
-prop_lRemoveMinus1 :: Proof -> Property
-prop_lRemoveMinus1 p@(SubProof{}) =
+prop_lRemoveMinus1 :: PrettyProof -> Property
+prop_lRemoveMinus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     pLength (naRemove a p) === pLength p - 1
 
-prop_lRemoveShift :: Proof -> Property
-prop_lRemoveShift p =
+prop_lRemoveShift :: PrettyProof -> Property
+prop_lRemoveShift (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     case (`pIsLine` p) <$> incrementNodeAddr a of
       Nothing -> discard
@@ -146,33 +160,33 @@ lRemoveQCTests =
     ]
 
 -- TESTING naInsert
-prop_lInsertBeforeFormulaPlus1 :: Proof -> Property
-prop_lInsertBeforeFormulaPlus1 p@(SubProof{}) =
+prop_lInsertBeforeFormulaPlus1 :: PrettyProof -> Property
+prop_lInsertBeforeFormulaPlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (pLength <$> naInsert (Left $ formula 0) a Before p) === Just (pLength p + 1)
+    (pLength <$> naInsert (Left $ assumption 0) a Before p) === Just (pLength p + 1)
 
-prop_lInsertAfterFormulaPlus1 :: Proof -> Property
-prop_lInsertAfterFormulaPlus1 p =
+prop_lInsertAfterFormulaPlus1 :: PrettyProof -> Property
+prop_lInsertAfterFormulaPlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (pLength <$> naInsert (Left $ formula 0) a After p) === Just (pLength p + 1)
+    (pLength <$> naInsert (Left $ assumption 0) a After p) === Just (pLength p + 1)
 
-prop_lInsertlLookupFormulaBefore :: Proof -> Property
-prop_lInsertlLookupFormulaBefore p =
+prop_lInsertlLookupFormulaBefore :: PrettyProof -> Property
+prop_lInsertlLookupFormulaBefore (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (naLookup a <$> naInsert (Left $ formula 0) a Before p) === (Just . Just . Left $ formula 0)
+    (naLookup a <$> naInsert (Left $ assumption 0) a Before p) === (Just . Just . Left $ assumption 0)
 
-prop_lInsertlLookupFormulaAfter :: Proof -> Property
-prop_lInsertlLookupFormulaAfter p =
+prop_lInsertlLookupFormulaAfter :: PrettyProof -> Property
+prop_lInsertlLookupFormulaAfter (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    ((naLookup <$> incrementNodeAddr a) <*> naInsert (Left $ formula 0) a After p) === (Just . Just . Left $ formula 0)
+    ((naLookup <$> incrementNodeAddr a) <*> naInsert (Left $ assumption 0) a After p) === (Just . Just . Left $ assumption 0)
 
-prop_lInsertBeforeLinePlus1 :: Proof -> Property
-prop_lInsertBeforeLinePlus1 p =
+prop_lInsertBeforeLinePlus1 :: PrettyProof -> Property
+prop_lInsertBeforeLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     (pLength <$> naInsert (Right . Left $ derivation 0) a Before p) === Just (pLength p + 1)
 
-prop_lInsertAfterLinePlus1 :: Proof -> Property
-prop_lInsertAfterLinePlus1 p =
+prop_lInsertAfterLinePlus1 :: PrettyProof -> Property
+prop_lInsertAfterLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
     (pLength <$> naInsert (Right . Left $ derivation 0) a After p) === Just (pLength p + 1)
 
@@ -188,13 +202,13 @@ lInsertQCTests =
     , QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
     ]
 
-prop_fromLineNoInverse :: Proof -> Property
-prop_fromLineNoInverse p = forAll (chooseInt (1, pLength p)) $ \n ->
+prop_fromLineNoInverse :: PrettyProof -> Property
+prop_fromLineNoInverse (PrettyProof p) = forAll (chooseInt (1, pLength p)) $ \n ->
   ((`fromNodeAddr` p) <$> fromLineNo n p)
     === Just (Just n)
 
-prop_fromNodeAddrInverse :: Proof -> Property
-prop_fromNodeAddrInverse p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
+prop_fromNodeAddrInverse :: PrettyProof -> Property
+prop_fromNodeAddrInverse (PrettyProof p) = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
   ((`fromLineNo` p) <$> fromNodeAddr a p)
     === Just (Just a)
 
@@ -206,8 +220,8 @@ lineNoQCTests =
     , QC.testProperty "prop_fromNodeAddrInverse" prop_fromNodeAddrInverse
     ]
 
-prop_compareLineNo :: Proof -> Property
-prop_compareLineNo p =
+prop_compareLineNo :: PrettyProof -> Property
+prop_compareLineNo (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
     forAll (arbitraryNodeAddrFor p AnyKind) $ \b ->
       compare a b
@@ -219,8 +233,8 @@ compareQCTests =
     "testing compare instance of NodeAddr"
     [QC.testProperty "prop_compareLineNo" prop_compareLineNo]
 
-prop_collectVisibleLinesSmaller :: Proof -> Property
-prop_collectVisibleLinesSmaller p = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
+prop_collectVisibleLinesSmaller :: PrettyProof -> Property
+prop_collectVisibleLinesSmaller (PrettyProof p) = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
   case pCollectVisibleLines a p of
     Nothing -> False
     Just nodes -> maybe False (length nodes <=) (fromNodeAddr a p)

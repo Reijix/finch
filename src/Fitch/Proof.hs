@@ -236,7 +236,7 @@ instance PrettyPrint Proof where
     lineNoLen :: Int
     lineNoLen = T.length . show $ pLength p
     withLevel :: Int -> Text -> Text
-    withLevel level t = T.replicate level "|" <> t
+    withLevel level t = T.replicate level "|" <> t <> "\n"
     withLine :: Int -> Text -> Text
     withLine line t = lineNo <> padding <> " " <> t
      where
@@ -247,7 +247,7 @@ instance PrettyPrint Proof where
     pretty' :: Int -> Int -> Proof -> Text
     pretty' line level (SubProof fs ps c) =
       T.concat fsShow
-        <> withoutLine (withLevel (level + 1) "---\n")
+        <> withoutLine (withLevel (level + 1) "---")
         <> T.concat psShow
         <> cShow
      where
@@ -256,7 +256,7 @@ instance PrettyPrint Proof where
         mapAccumL
           ( \ln' e ->
               ( ln' + either (const 1) pLength e
-              , either (withLine line . withLevel level . prettyPrint) (pretty' ln' (level + 1)) e
+              , either (withLine line . withLevel (level + 1) . prettyPrint) (pretty' ln' (level + 1)) e
               )
           )
           line'
@@ -513,7 +513,6 @@ fromNodeAddr :: NodeAddr -> Proof -> Maybe Int
 fromNodeAddr = go 1
  where
   go :: Int -> NodeAddr -> Proof -> Maybe Int
-  -- go 1 (NAProof 0 Nothing) (ProofLine{}) = Just 1
   go n (NAAssumption m) (SubProof fs _ _) | m < length fs = pure $ n + m
   go n (NAAssumption m) (SubProof fs _ _) = Nothing
   go 1 (NALine 0) (SubProof [] [] _) = Just 1
