@@ -55,7 +55,7 @@ data Action where
   DragEnter :: NodeAddr -> InsertPosition -> Action
   DragLeave :: InsertPosition -> Action
   DragOver :: Action
-  DragStart :: NodeAddr -> Action
+  DragStart :: Either NodeAddr ProofAddr -> Action
   SpawnStart :: SpawnType -> Action
   DragEnd :: Action
   Drag :: Action
@@ -73,7 +73,7 @@ data Model = Model
   -- ^ the line that is currently focused
   , _proof :: Proof
   -- ^ the current proof
-  , _dragTarget :: Maybe NodeAddr
+  , _dragTarget :: Maybe (Either NodeAddr ProofAddr)
   -- ^ the element that is currently being dragged
   , _spawnType :: Maybe SpawnType
   -- ^ the type of element that is currently being spawned
@@ -146,7 +146,7 @@ focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
 proof :: Lens Model Proof
 proof = lens (._proof) $ \model p -> model{_proof = p}
 
-dragTarget :: Lens Model (Maybe NodeAddr)
+dragTarget :: Lens Model (Maybe (Either NodeAddr ProofAddr))
 dragTarget = lens (._dragTarget) $ \model dt -> model{_dragTarget = dt}
 
 spawnType :: Lens Model (Maybe SpawnType)

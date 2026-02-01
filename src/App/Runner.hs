@@ -19,7 +19,7 @@ import Fitch.Verification (verifyProof)
 import Miso (
   App,
   CSS (Href),
-  Component (initialAction, styles, subs),
+  Component (..),
   ComponentInfo,
   DOMRef,
   Effect,
@@ -97,7 +97,7 @@ runApp proof operators infixPreds quantifiers rules =
   startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
-      , initialAction = Just Setup
+      , mount = Just Setup
       }
  where
   m = initialModel proof operators infixPreds quantifiers rules
@@ -125,13 +125,15 @@ updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
     Nothing -> pass
-    Just addr -> proof %= naRemove addr
+    Just (Left na) -> proof %= naRemove na
+    Just (Right pa) -> proof %= paRemove pa
   clearDrag
 updateModel (Drop (LocationAddr targetAddr pos)) = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
-    Just sourceAddr -> proof %= naMove targetAddr pos sourceAddr
+    Just (Left na) -> proof %= naMove targetAddr pos na
+    Just (Right pa) -> proof %= paMove targetAddr pos pa
   use spawnType >>= \case
     Nothing -> pass
     -- TODO adjust linenos

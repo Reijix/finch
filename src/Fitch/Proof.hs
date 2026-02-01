@@ -290,20 +290,32 @@ pFoldLinesM af df s (SubProof fs ps d) = do
   result2 <- foldlM (\s' -> either (df s') (pFoldLinesM af df s')) result1 ps
   df result2 d
 
--- -- | `pSerialize` @af@ @df@ @p@ serializes the proof @p@ by applying a function for each line in the proof and storing the results in a list.
-pSerialize :: (Assumption -> a) -> (Derivation -> a) -> Proof -> [a]
-pSerialize af df (SubProof fs ps d) =
+pSerialize ::
+  (Assumption -> a) ->
+  (Derivation -> a) ->
+  ([a] -> a) ->
+  (Derivation -> a) ->
+  Proof ->
+  [a]
+pSerialize af df pf cf (SubProof fs ps c) =
   map af fs
-    <> concatMap (either (one . df) (pSerialize af df)) ps
+    <> map (either df (pf . pSerialize af df pf cf)) ps
+    <> one (cf c)
+
+-- | `pSerializeLines` @af@ @df@ @p@ serializes the proof @p@ by applying a function for each line in the proof and storing the results in a list.
+pSerializeLines :: (Assumption -> a) -> (Derivation -> a) -> Proof -> [a]
+pSerializeLines af df (SubProof fs ps d) =
+  map af fs
+    <> concatMap (either (one . df) (pSerializeLines af df)) ps
     <> one (df d)
 
--- | Like `pSerialize` but the current `NodeAddr` is dragged along.
-pSerializeWithAddr ::
+-- | Like `pSerializeLines` but the current `NodeAddr` is dragged along.
+pSerializeLinesWithAddr ::
   (NodeAddr -> Assumption -> a) ->
   (NodeAddr -> Derivation -> a) ->
   Proof ->
   [a]
-pSerializeWithAddr = go id
+pSerializeLinesWithAddr = go id
  where
   go ::
     (NodeAddr -> NodeAddr) ->
@@ -323,14 +335,6 @@ pMapLines ::
   Proof ->
   Proof
 pMapLines af df (SubProof fs ps d) = SubProof (map af fs) (map (bimap df (pMapLines af df)) ps) (df d)
-
--- pMapAllAccumL ::
---   (s -> Assumption -> (s, Assumption)) ->
---   (s -> Proof -> (s, Proof)) ->
---   (s -> Derivation -> (s, Derivation)) ->
---   s ->
---   Proof ->
---   (s, Proof)
 
 pMapLinesAccumL ::
   (s -> Assumption -> (s, Assumption)) ->
@@ -447,6 +451,10 @@ data ProofAddr
   | PANested Int ProofAddr
   deriving (Show, Eq)
 
+paProofToNested :: ProofAddr -> (ProofAddr -> ProofAddr)
+paProofToNested (PAProof n) = PANested n
+paProofToNested (PANested n pa) = PANested n
+
 instance Ord NodeAddr where
   compare :: NodeAddr -> NodeAddr -> Ordering
   compare (NAAssumption n) (NAAssumption m) = compare n m
@@ -462,6 +470,15 @@ instance Ord NodeAddr where
   compare NAConclusion NAConclusion = EQ
   compare NAConclusion a = GT
   compare a NAConclusion = LT
+
+compareNaPa :: NodeAddr -> ProofAddr -> Ordering
+compareNaPa (NAAssumption n) _ = LT
+compareNaPa (NALine n) (PAProof m) = compare n m
+compareNaPa (NALine n) (PANested m pa) = compare n m
+compareNaPa NAConclusion _ = GT
+compareNaPa (NAProof n na) (PAProof m) = compare n m
+compareNaPa (NAProof n na) (PANested m pa) | n == m = compareNaPa na pa
+compareNaPa (NAProof n _) (PANested m _) = compare n m
 
 -- ** Conversion between line numbers and `NodeAddr`
 
@@ -493,12 +510,12 @@ fromLineRange start end p = go start end 0 p
   go 1 end n p = do
     first <- fromLineNo 1 p
     last <- fromLineNo end p
-    let na1 = paFromNA first
-        na2 = paFromNA last
+    pa1 <- paFromNA first
+    pa2 <- paFromNA last
     if pIsFirstFormula first p
       && pIsConclusion last p
-      && na1 == na2
-      then Just na1
+      && pa1 == pa2
+      then Just pa1
       else Nothing
   go start end n (SubProof [] (Left d : ps) c) = go (start - 1) (end - 1) (n + 1) (SubProof [] ps c)
   go start end n (SubProof [] (Right p : ps) c)
@@ -538,11 +555,12 @@ incrementNodeAddr (NALine n) = Just $ NALine (n + 1)
 incrementNodeAddr (NAProof n na) = NAProof n <$> incrementNodeAddr na
 incrementNodeAddr NAConclusion = Nothing
 
-paFromNA :: NodeAddr -> ProofAddr
-paFromNA (NAProof n (NAAssumption{})) = PAProof n
-paFromNA (NAProof n (NALine{})) = PAProof n
-paFromNA (NAProof n NAConclusion) = PAProof n
-paFromNA (NAProof n na) = PANested n $ paFromNA na
+paFromNA :: NodeAddr -> Maybe ProofAddr
+paFromNA (NAProof n (NAAssumption{})) = Just $ PAProof n
+paFromNA (NAProof n (NALine{})) = Just $ PAProof n
+paFromNA (NAProof n NAConclusion) = Just $ PAProof n
+paFromNA (NAProof n na) = PANested n <$> paFromNA na
+paFromNA _ = Nothing
 
 -- * Querying proofs
 
@@ -617,8 +635,8 @@ pIndexProof :: Int -> Int -> Proof -> Maybe Proof
 pIndexProof start end p = do
   startA <- fromLineNo start p
   endA <- fromLineNo end p
-  let pa1 = paFromNA startA
-      pa2 = paFromNA endA
+  pa1 <- paFromNA startA
+  pa2 <- paFromNA endA
   if pIsFirstFormula startA p
     && pIsConclusion endA p
     && pa1 == pa2
@@ -709,10 +727,14 @@ naUpdateRule f (NAProof n na) (SubProof fs ps l) =
 Otherwise @proof@ is returned.
 -}
 naRemove :: NodeAddr -> Proof -> Proof
-naRemove (NAAssumption n) (SubProof fs ps l) = SubProof (removeAt n fs) ps l
-naRemove (NALine n) (SubProof fs ps l) | holdsAt isLeft ps n = SubProof fs (removeAt n ps) l
-naRemove (NAProof n na) (SubProof fs ps l) = SubProof fs (updateAt n (fmap (naRemove na)) ps) l
+naRemove (NAAssumption n) (SubProof fs ps c) = SubProof (removeAt n fs) ps c
+naRemove (NALine n) (SubProof fs ps c) | holdsAt isLeft ps n = SubProof fs (removeAt n ps) c
+naRemove (NAProof n na) (SubProof fs ps c) = SubProof fs (updateAt n (fmap (naRemove na)) ps) c
 naRemove _ p = p
+
+paRemove :: ProofAddr -> Proof -> Proof
+paRemove (PAProof n) (SubProof fs ps c) | holdsAt isRight ps n = SubProof fs (removeAt n ps) c
+paRemove (PANested n pa) (SubProof fs ps c) = SubProof fs (updateAt n (fmap (paRemove pa)) ps) c
 
 -- | Enumeration for specifying where to insert an element into a proof.
 data InsertPosition
@@ -754,9 +776,18 @@ either before or after the target line (depending on @pos@).
 -}
 naMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof -> Proof
 naMove targetAddr pos sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
-  (LT, Just node) | not (pIsConclusion sourceAddr p) -> let p' = naRemove sourceAddr p in fromMaybe p $ naInsert (fmap Left node) targetAddr pos p'
-  (GT, Just node) | not (pIsConclusion sourceAddr p) -> maybe p (naRemove sourceAddr) $ naInsert (fmap Left node) targetAddr pos p
+  (LT, Just node)
+    | not (pIsConclusion sourceAddr p) ->
+        let p' = naRemove sourceAddr p in fromMaybe p $ naInsert (fmap Left node) targetAddr pos p'
+  (GT, Just node)
+    | not (pIsConclusion sourceAddr p) ->
+        maybe p (naRemove sourceAddr) $ naInsert (fmap Left node) targetAddr pos p
   _ -> p
+
+paMove :: NodeAddr -> InsertPosition -> ProofAddr -> Proof -> Proof
+paMove targetAddr pos sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
+  (LT, Just prf) -> let p' = paRemove sourceAddr p in fromMaybe p $ naInsert (Right $ Right prf) targetAddr pos p'
+  (GT, Just prf) -> maybe p (paRemove sourceAddr) $ naInsert (Right $ Right prf) targetAddr pos p
 
 -- * Utilities that are not exported!
 
