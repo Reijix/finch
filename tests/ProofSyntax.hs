@@ -243,22 +243,23 @@ compareQCTests =
     "testing compare instance of NodeAddr"
     [QC.testProperty "prop_compareLineNo" prop_compareLineNo]
 
-prop_collectVisibleLinesSmaller :: PrettyProof -> Property
-prop_collectVisibleLinesSmaller (PrettyProof p) = forAll (arbitraryNodeAddrFor p AnyKind) $ \a ->
-  case pCollectVisibleLines a p of
-    Nothing -> False
-    Just nodes -> maybe False (length nodes <=) (fromNodeAddr a p)
+-- TODO unit tests for pCollectFreshnessNodes
+-- prop_collectVisibleLinesSmaller :: PrettyProof -> Property
+-- prop_collectVisibleLinesSmaller (PrettyProof p) = forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
+--   case pCollectVisibleLines a p of
+--     Nothing -> False
+--     Just nodes -> maybe False (length nodes <=) (fromNodeAddr a p)
 
-collectVisibleLinesTests :: TestTree
-collectVisibleLinesTests =
-  testGroup
-    "testing collectVisibleLines"
-    [QC.testProperty "prop_collectVisibleLinesSmaller" prop_collectVisibleLinesSmaller]
+-- collectVisibleLinesTests :: TestTree
+-- collectVisibleLinesTests =
+--   testGroup
+--     "testing collectVisibleLines"
+--     [QC.testProperty "prop_collectVisibleLinesSmaller" prop_collectVisibleLinesSmaller]
 
 proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests, collectVisibleLinesTests]
+    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests] -- ,collectVisibleLinesTests]
     , testGroup "HUnit" []
     ]

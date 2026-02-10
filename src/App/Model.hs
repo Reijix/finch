@@ -188,26 +188,28 @@ checkFreshness = do
  where
   goFormula :: Proof -> NodeAddr -> Formula -> Formula
   goFormula _ _ a@(Unparsed{}; ParsedInvalid{}) = a
-  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectVisibleLines na p of
-    Nothing -> ParsedInvalid (getText a) "Could not collect visible nodes..." f
-    Just nodes ->
+  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectFreshnessNodes na p of
+    Left err -> ParsedInvalid (getText a) err f
+    Right nodes ->
       case isFreshList v nodes of
         Nothing -> a
-        Just f' ->
+        Just (naf', f') ->
           ParsedInvalid
             (getText a)
             ( "Could not verify freshness of "
                 <> v
                 <> "\nIt appears in formula:\n"
+                <> show (lineNoOr999 naf' p)
+                <> "|"
                 <> prettyPrint f'
             )
             f
   goFormula _ _ a@(fromWrapper -> Just _) = a
-  isFreshList :: Name -> [Either Assumption Derivation] -> Maybe RawFormula
+  isFreshList :: Name -> [(NodeAddr, Either Assumption Derivation)] -> Maybe (NodeAddr, RawFormula)
   isFreshList v [] = Nothing
-  isFreshList v (Left (fromWrapper -> Nothing) : rest) = isFreshList v rest
-  isFreshList v (Left (fromWrapper -> Just f) : rest) = if isFresh v f then isFreshList v rest else Just (un f)
-  isFreshList v (Right (Derivation f _) : rest) = isFreshList v (Left (un f) : rest)
+  isFreshList v ((na, Left (fromWrapper -> Nothing)) : rest) = isFreshList v rest
+  isFreshList v ((na, Left (fromWrapper -> Just f)) : rest) = if isFresh v f then isFreshList v rest else Just (na, un f)
+  isFreshList v ((na, Right (Derivation f _)) : rest) = isFreshList v ((na, Left (un f)) : rest)
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
 

@@ -178,7 +178,7 @@ instance PrettyPrint RawFormula where
       | null fs = op
       | length fs == 2 = T.intercalate op (map (go True) fs)
       | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
-    go False (Quantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
+    go False (Quantifier q v f) = q <> v <> "." <> prettyPrint f
     go False (FreshVar v) = "[" <> v <> "]"
 
 -- | A reference to a line (either `Formula` or `ProofLine` or a `SubProof`).
@@ -667,36 +667,27 @@ pIndexProof start end p = do
     then paLookup pa1 p
     else Nothing
 
--- TODO drag along linenos for error messages
-pCollectVisibleLines :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
-pCollectVisibleLines na p@(SubProof fs ps c) = do
-  fst <- fromMaybe [] . viaNonEmpty init <$> go na p
-  snd <- others
-  pure $ fst <> snd
- where
-  others :: Maybe [Either Assumption Derivation]
-  others = do
-    case naLevelup2 na of
-      Nothing -> Just []
-      Just na' -> do
-        let ps' = mapMaybe (\n -> naLookup (na' (NALine n)) p) (take (length ps) [0 ..])
-        c' <- naLookup (na' NAConclusion) p
-        pure $ ps' <> [c']
-  goPs :: [Either Derivation Proof] -> Maybe [Either Assumption Derivation]
-  goPs (Left d : ps) = (Right d :) <$> goPs ps
-  goPs (Right SubProof{} : ps) = goPs ps
-  goPs [] = Just mempty
-  go :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
-  go (NAAssumption (-1)) SubProof{} = Just mempty
-  go (NAAssumption n) (SubProof (f : fs) ps c) | n >= 0 = (Left f :) <$> go (NAAssumption $ n - 1) (SubProof fs ps c)
-  go NAConclusion (SubProof fs ps c) = (fmap Left fs <>) . (<> one (Right c)) <$> goPs ps
-  go (NALine (-1)) (SubProof fs _ _) = Just $ fmap Left fs
-  go (NALine n) (SubProof fs ((Left d) : ps) c) = (Right d :) <$> go (NALine (n - 1)) (SubProof fs ps c)
-  go (NALine n) (SubProof fs (Right SubProof{} : ps) c) = go (NALine (n - 1)) (SubProof fs ps c)
-  go (NAProof 0 na) (SubProof fs (Right p@SubProof{} : ps) c) = go (NALine (-1)) (SubProof fs ps c) >>= (\l -> (l <>) <$> go na p)
-  go (NAProof n na) (SubProof fs (Left d : ps) c) = (Right d :) <$> go (NAProof (n - 1) na) (SubProof fs ps c)
-  go (NAProof n na) (SubProof fs (Right SubProof{} : ps) c) = go (NAProof (n - 1) na) (SubProof fs ps c)
-  go _ _ = Nothing
+pCollectAllNodeAddrs :: Proof -> [NodeAddr]
+pCollectAllNodeAddrs = pSerializeLinesWithAddr const const
+
+-- | naAffectsFreshness viewer viewee expresses whether viewee is relevant for checking freshness of viewer.
+naAffectsFreshness :: NodeAddr -> NodeAddr -> Bool
+naAffectsFreshness (NAProof n na1) (NAProof m na2)
+  | n > m = True
+  | n == m = naAffectsFreshness na1 na2
+  | n < m = False
+naAffectsFreshness (NAProof _ (NAAssumption{}; NALine{}; NAConclusion)) (NAAssumption{}; NALine{}; NAConclusion) = True
+naAffectsFreshness (NAProof{}) (NAAssumption{}) = False
+naAffectsFreshness (NAProof n _) (NALine m) = m < n
+naAffectsFreshness (NAProof{}) _ = False
+naAffectsFreshness (NAAssumption n) (NAAssumption m) = m < n
+naAffectsFreshness (NAAssumption _) (NALine{}; NAConclusion) = False
+naAffectsFreshness _ _ = False
+
+pCollectFreshnessNodes :: NodeAddr -> Proof -> Either Text [(NodeAddr, Either Assumption Derivation)]
+pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $ filter (naAffectsFreshness na) (pCollectAllNodeAddrs p) of
+  Nothing -> Left "Internal error on pCollectFreshnessNodes, should not happen!"
+  Just l -> Right l
 
 extractFormula :: Either Assumption Derivation -> Maybe RawFormula
 extractFormula (Left a) = un $ fromWrapper a
