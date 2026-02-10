@@ -454,6 +454,11 @@ data NodeAddr
   | NAProof Int NodeAddr
   deriving (Show, Eq)
 
+isNAAssumption :: NodeAddr -> Bool
+isNAAssumption (NAProof _ na) = isNAAssumption na
+isNAAssumption (NAAssumption _) = True
+isNAAssumption _ = False
+
 -- TODO comment
 data ProofAddr
   = PAProof Int
@@ -571,6 +576,16 @@ paFromNA (NAProof n NAConclusion) = Just $ PAProof n
 paFromNA (NAProof n na) = PANested n <$> paFromNA na
 paFromNA _ = Nothing
 
+naLevelup2 :: NodeAddr -> Maybe (NodeAddr -> NodeAddr)
+naLevelup2 = go id
+ where
+  go :: (NodeAddr -> NodeAddr) -> NodeAddr -> Maybe (NodeAddr -> NodeAddr)
+  go na (NAProof _ NAConclusion) = Just na
+  go na (NAProof _ (NAAssumption _)) = Just na
+  go na (NAProof _ (NALine _)) = Just na
+  go na (NAProof m na') = go (na . NAProof m) na'
+  go _ _ = Nothing
+
 -- * Querying proofs
 
 holdsAt :: (a -> Bool) -> [a] -> Int -> Bool
@@ -652,9 +667,21 @@ pIndexProof start end p = do
     then paLookup pa1 p
     else Nothing
 
+-- TODO drag along linenos for error messages
 pCollectVisibleLines :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
-pCollectVisibleLines na p@(SubProof fs ps c) = fromMaybe [] . viaNonEmpty init <$> go na p
+pCollectVisibleLines na p@(SubProof fs ps c) = do
+  fst <- fromMaybe [] . viaNonEmpty init <$> go na p
+  snd <- others
+  pure $ fst <> snd
  where
+  others :: Maybe [Either Assumption Derivation]
+  others = do
+    case naLevelup2 na of
+      Nothing -> Just []
+      Just na' -> do
+        let ps' = mapMaybe (\n -> naLookup (na' (NALine n)) p) (take (length ps) [0 ..])
+        c' <- naLookup (na' NAConclusion) p
+        pure $ ps' <> [c']
   goPs :: [Either Derivation Proof] -> Maybe [Either Assumption Derivation]
   goPs (Left d : ps) = (Right d :) <$> goPs ps
   goPs (Right SubProof{} : ps) = goPs ps
@@ -685,9 +712,9 @@ extractText (Right (Derivation f _)) = getText f
 
 Fails silently
 -}
-naUpdateFormula :: (Formula -> Formula) -> NodeAddr -> Proof -> Proof
-naUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (under f) fs) ps l
-naUpdateFormula f (NALine n) (SubProof fs ps l) =
+naUpdateFormula :: Either (Assumption -> Assumption) (Formula -> Formula) -> NodeAddr -> Proof -> Proof
+naUpdateFormula (Left f) (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
+naUpdateFormula (Right f) (NALine n) (SubProof fs ps l) =
   SubProof
     fs
     ( updateAt
@@ -701,10 +728,11 @@ naUpdateFormula f (NALine n) (SubProof fs ps l) =
         ps
     )
     l
-naUpdateFormula f NAConclusion (SubProof fs ps (Derivation formula rule)) =
+naUpdateFormula (Right f) NAConclusion (SubProof fs ps (Derivation formula rule)) =
   SubProof fs ps (Derivation (f formula) rule)
 naUpdateFormula f (NAProof n na) (SubProof fs ps l) =
   SubProof fs (updateAt n (fmap (naUpdateFormula f na)) ps) l
+naUpdateFormula _ _ p = p
 
 {- | `naUpdateRule` @f@ @addr@ @proof@ replaces the rule at @addr@ in @proof@ using @f@.
 

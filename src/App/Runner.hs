@@ -70,6 +70,7 @@ import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (parseFormula)
 import Parser.Rule (parseRuleApplication)
+import Relude.Extra.Newtype
 
 -----------------------------------------------------------------------------
 
@@ -224,18 +225,35 @@ updateModel (Input str ref) = do
   checkProof
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  let p =
-        tryParse
-          m
-          (m ^. operators)
-          (m ^. infixPreds)
-          (m ^. quantifiers)
-          (lineNoOr999 addr (m ^. proof))
-          (fromMisoString str) ::
-          Formula
-  proof %= naUpdateFormula (const p) addr
+  f <-
+    if isNAAssumption addr
+      then do
+        let a =
+              tryParse
+                m
+                (m ^. operators)
+                (m ^. infixPreds)
+                (m ^. quantifiers)
+                (lineNoOr999 addr (m ^. proof))
+                (fromMisoString str) ::
+                Assumption
+        proof %= naUpdateFormula (Left $ const a) addr
+        pure $ un a
+      else do
+        let f =
+              tryParse
+                m
+                (m ^. operators)
+                (m ^. infixPreds)
+                (m ^. quantifiers)
+                (lineNoOr999 addr (m ^. proof))
+                (fromMisoString str) ::
+                Formula
+        proof %= naUpdateFormula (Right $ const f) addr
+        pure f
+
   checkProof
-  let delta = T.length (fromMisoString str) - (T.length . getText $ p)
+  let delta = T.length (fromMisoString str) - (T.length . getText $ f)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
     setSelectionRange
@@ -273,7 +291,7 @@ updateModel (ProcessParens eaddr start end) = do
   p <- use proof
   case eaddr of
     Left addr ->
-      proof %= naUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
+      proof %= naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
       proof %= naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
   checkProof
