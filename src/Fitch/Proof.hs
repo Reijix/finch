@@ -2,6 +2,7 @@ module Fitch.Proof where
 
 import Data.Text qualified as T
 import Relude.Extra.Map (toPairs)
+import Relude.Extra.Newtype
 
 -- * Definitions
 
@@ -151,24 +152,24 @@ instance PrettyPrint FormulaSpec where
     go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
 
 -- | A formula for first-order logic (can be instantiated to 0th order, by using `Pred` without the list of `Term`.
-data Formula
+data RawFormula
   = -- | A `Pred` applied to terms.
     Pred Name [Term]
   | -- | A `Pred` applied to terms, written in infix notation.
     InfixPredicate Name Term Term
   | -- | A n-ary operator, like @->@ for implication, or @~@ for negation.
-    Opr Text [Formula]
+    Opr Text [RawFormula]
   | -- | A quantifier, like @∀@ for universal quantification.
-    Quantifier Name Name Formula
+    Quantifier Name Name RawFormula
   | -- | A fresh variable of a subproof, written like @[c]@
     FreshVar Name
   deriving (Eq, Ord, Show)
 
-instance PrettyPrint Formula where
-  prettyPrint :: Formula -> Text
+instance PrettyPrint RawFormula where
+  prettyPrint :: RawFormula -> Text
   prettyPrint f = go False f
    where
-    go :: Bool -> Formula -> Text
+    go :: Bool -> RawFormula -> Text
     go _ (Pred p []) = p
     go _ (Pred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go True f = "(" <> go False f <> ")"
@@ -180,7 +181,7 @@ instance PrettyPrint Formula where
     go False (Quantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
     go False (FreshVar v) = "[" <> v <> "]"
 
--- | A reference to a line (either `Assumption` or `ProofLine` or a `SubProof`).
+-- | A reference to a line (either `Formula` or `ProofLine` or a `SubProof`).
 data Reference where
   -- | Referencing a single line
   LineReference :: Int -> Reference
@@ -194,7 +195,15 @@ instance PrettyPrint Reference where
   prettyPrint (ProofReference start end) = show start <> "-" <> show end
 
 -- | Assumptions are formulae wrapped with parsing and semantic information.
-type Assumption = Wrapper Formula
+type Formula = Wrapper RawFormula
+
+newtype RawAssumption = RawAssumption RawFormula deriving (Eq, Show)
+
+type Assumption = Wrapper RawAssumption
+
+instance PrettyPrint RawAssumption where
+  prettyPrint :: RawAssumption -> Text
+  prettyPrint (RawAssumption f) = prettyPrint f
 
 -- | Application of a rule
 data RuleApplication
@@ -216,7 +225,7 @@ data Derivation
   = {- | A derivation inside a proof, i.e. a single line consisting of a formula
     and a ruleapplication that justifies how the formula was derived.
     -}
-    Derivation Assumption (Wrapper RuleApplication)
+    Derivation Formula (Wrapper RuleApplication)
   deriving (Show, Eq)
 
 instance PrettyPrint Derivation where
@@ -644,7 +653,7 @@ pIndexProof start end p = do
     else Nothing
 
 pCollectVisibleLines :: NodeAddr -> Proof -> Maybe [Either Assumption Derivation]
-pCollectVisibleLines na p = fromMaybe [] . viaNonEmpty init <$> go na p
+pCollectVisibleLines na p@(SubProof fs ps c) = fromMaybe [] . viaNonEmpty init <$> go na p
  where
   goPs :: [Either Derivation Proof] -> Maybe [Either Assumption Derivation]
   goPs (Left d : ps) = (Right d :) <$> goPs ps
@@ -662,8 +671,8 @@ pCollectVisibleLines na p = fromMaybe [] . viaNonEmpty init <$> go na p
   go (NAProof n na) (SubProof fs (Right SubProof{} : ps) c) = go (NAProof (n - 1) na) (SubProof fs ps c)
   go _ _ = Nothing
 
-extractFormula :: Either Assumption Derivation -> Maybe Formula
-extractFormula (Left a) = fromWrapper a
+extractFormula :: Either Assumption Derivation -> Maybe RawFormula
+extractFormula (Left a) = un $ fromWrapper a
 extractFormula (Right (Derivation f _)) = fromWrapper f
 
 extractText :: Either Assumption Derivation -> Text
@@ -676,8 +685,8 @@ extractText (Right (Derivation f _)) = getText f
 
 Fails silently
 -}
-naUpdateFormula :: (Wrapper Formula -> Wrapper Formula) -> NodeAddr -> Proof -> Proof
-naUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n f fs) ps l
+naUpdateFormula :: (Formula -> Formula) -> NodeAddr -> Proof -> Proof
+naUpdateFormula f (NAAssumption n) (SubProof fs ps l) = SubProof (updateAt n (under f) fs) ps l
 naUpdateFormula f (NALine n) (SubProof fs ps l) =
   SubProof
     fs

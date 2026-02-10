@@ -2,7 +2,6 @@ module Fitch.Unification where
 
 import Data.Set qualified as Set
 import Fitch.Proof (
-  Formula (FreshVar, Opr, Pred, Quantifier),
   FormulaSpec (
     FFreshVar,
     FOpr,
@@ -12,6 +11,8 @@ import Fitch.Proof (
     FSubst
   ),
   Name,
+  RawAssumption (..),
+  RawFormula (FreshVar, Opr, Pred, Quantifier),
   Subst (..),
   Term (..),
   TermSpec (..),
@@ -42,12 +43,16 @@ instance AllVars Term where
   allVars (Var x) = one x
   allVars (Fun _ ts) = foldMap allVars ts
 
-instance AllVars Formula where
-  allVars :: Formula -> Set Name
+instance AllVars RawFormula where
+  allVars :: RawFormula -> Set Name
   allVars (Pred _ args) = foldMap allVars args
   allVars (Opr _ fs) = foldMap allVars fs
   allVars (Quantifier _ v f) = one v <> allVars f
   allVars (FreshVar v) = one v
+
+instance AllVars RawAssumption where
+  allVars :: RawAssumption -> Set Name
+  allVars (RawAssumption f) = allVars f
 
 -- ** Free variables
 
@@ -61,8 +66,8 @@ instance FreeVars Term where
   freeVars (Var x) = one x
   freeVars (Fun _ ts) = foldMap freeVars ts
 
-instance FreeVars Formula where
-  freeVars :: Formula -> Set Name
+instance FreeVars RawFormula where
+  freeVars :: RawFormula -> Set Name
   freeVars (Pred _ args) = foldMap freeVars args
   freeVars (Opr _ fs) = foldMap freeVars fs
   freeVars (Quantifier _ v f) = Set.delete v $ freeVars f
@@ -83,8 +88,8 @@ instance Substitute Term Term where
   subst (Subst y s) t@(Var x) = if x == y then s else t
   subst sub (Fun f ts) = Fun f $ map (subst sub) ts
 
-instance Substitute Formula Term where
-  subst :: Subst Term -> Formula -> Formula
+instance Substitute RawFormula Term where
+  subst :: Subst Term -> RawFormula -> RawFormula
   subst sub (Pred name args) = Pred name (map (subst sub) args)
   subst sub (Opr op fs) = Opr op (map (subst sub) fs)
   subst s@(Subst x t) (Quantifier q v f)
@@ -172,10 +177,10 @@ unifyTermsOnVariable n ts = do
   makeUnificator _ = Nothing
 
 -- | Lifts `unifyTermsOnVariable` to formulae.
-unifyFormulaeOnVariable :: Name -> [(Formula, Formula)] -> Maybe (Map Name Term)
+unifyFormulaeOnVariable :: Name -> [(RawFormula, RawFormula)] -> Maybe (Map Name Term)
 unifyFormulaeOnVariable n = fmap fromList . go
  where
-  go :: [(Formula, Formula)] -> Maybe [(Name, Term)]
+  go :: [(RawFormula, RawFormula)] -> Maybe [(Name, Term)]
   go [] = Just []
   go ((Pred p ts, Pred q ss) : rest) | p == q && length ts == length ss = do
     mapping <- go rest
@@ -199,7 +204,7 @@ termMatchesSpec [] = True
 termMatchesSpec _ = False
 
 -- | Unify formula with formula specification.
-formulaMatchesSpec :: Formula -> FormulaSpec -> Bool
+formulaMatchesSpec :: RawFormula -> FormulaSpec -> Bool
 formulaMatchesSpec f@(FreshVar v) fs@(FFreshVar v') = True
 formulaMatchesSpec (FreshVar{}) _ = False
 formulaMatchesSpec f@(Pred p ts) fs@(FPred p' ts')

@@ -105,9 +105,9 @@ runApp proof operators infixPreds quantifiers rules =
 checkProof :: forall m. (MonadState Model m) => m ()
 checkProof = do
   regenerateSymbols
+  checkFreshness
   ruleMap <- use rules
   proof %= verifyProof ruleMap
-  checkFreshness
 
 clearDrag :: Effect ROOT Model Action
 clearDrag = do
@@ -210,7 +210,7 @@ updateModel (DoubleClick ea) = do
       io_ . focus . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
       io_ . select . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = pass
+updateModel Change = checkProof
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -221,6 +221,7 @@ updateModel (Input str ref) = do
       Just (start :: Int) <- castJSVal =<< getProperty ref "selectionStart"
       Just (end :: Int) <- castJSVal =<< getProperty ref "selectionEnd"
       pure $ ProcessInput str start end addr
+  checkProof
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   let p =
@@ -231,7 +232,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
           (m ^. quantifiers)
           (lineNoOr999 addr (m ^. proof))
           (fromMisoString str) ::
-          Wrapper Formula
+          Formula
   proof %= naUpdateFormula (const p) addr
   checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ p)
@@ -275,8 +276,9 @@ updateModel (ProcessParens eaddr start end) = do
       proof %= naUpdateFormula (\p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
       proof %= naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
+  checkProof
  where
-  update :: Model -> Text -> Either (Wrapper Formula) (Wrapper RuleApplication)
+  update :: Model -> Text -> Either Formula (Wrapper RuleApplication)
   update m txt =
     let (first, rest) = T.splitAt start txt
         (second, third) = T.splitAt (end - start) rest
@@ -374,13 +376,13 @@ class FromText a where
   -}
   fromText :: Model -> Int -> Text -> Either Text a
 
--- instance FromText RuleSpec where
---   fromText :: Model -> Int -> Text -> Either Text RuleSpec
---   fromText _ _ _ = Right $ RuleSpec [] [] (FPred "" [])
+instance FromText RawFormula where
+  fromText :: Model -> Int -> Text -> Either Text RawFormula
+  fromText m = parseFormula False (m ^. operators) (m ^. infixPreds) (m ^. quantifiers)
 
-instance FromText Formula where
-  fromText :: Model -> Int -> Text -> Either Text Formula
-  fromText m = parseFormula (m ^. operators) (m ^. infixPreds) (m ^. quantifiers)
+instance FromText RawAssumption where
+  fromText :: Model -> Int -> Text -> Either Text RawAssumption
+  fromText m n = fmap RawAssumption . parseFormula True (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) n
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication

@@ -28,6 +28,7 @@ import Miso.Lens (Lens, lens, use, (%=), (.=), (<~))
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 import Relude.Extra.Map (DynamicMap (insert), (!?))
+import Relude.Extra.Newtype
 
 -----------------------------------------------------------------------------
 
@@ -183,35 +184,30 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 checkFreshness :: forall m. (MonadState Model m) => m ()
 checkFreshness = do
-  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goFormula p) (goLine p) p))
+  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (under . goFormula p) (const id) p))
  where
-  goFormula :: Proof -> NodeAddr -> Assumption -> Assumption
-  goFormula p _ a@(Unparsed{}; ParsedInvalid{}) = a
+  goFormula :: Proof -> NodeAddr -> Formula -> Formula
+  goFormula _ _ a@(Unparsed{}; ParsedInvalid{}) = a
   goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectVisibleLines na p of
     Nothing -> ParsedInvalid (getText a) "Could not collect visible nodes..." f
     Just nodes ->
       case isFreshList v nodes of
         Nothing -> a
-        Just f ->
+        Just f' ->
           ParsedInvalid
             (getText a)
             ( "Could not verify freshness of "
                 <> v
                 <> "\nIt appears in formula:\n"
-                <> prettyPrint f
+                <> prettyPrint f'
             )
             f
-  goFormula p na a@(fromWrapper -> Just _) = a
-  goLine :: Proof -> NodeAddr -> Derivation -> Derivation
-  goLine p na d@(Derivation (fromWrapper -> Nothing) r) = d
-  goLine p na (Derivation wf@(fromWrapper -> Just f@(FreshVar v)) r) =
-    Derivation (ParsedInvalid (getText wf) "Fresh variable statement is only allowed in assumptions." f) r
-  goLine p na d@(Derivation (fromWrapper -> Just _) r) = d
-  isFreshList :: Name -> [Either Assumption Derivation] -> Maybe Formula
+  goFormula _ _ a@(fromWrapper -> Just _) = a
+  isFreshList :: Name -> [Either Assumption Derivation] -> Maybe RawFormula
   isFreshList v [] = Nothing
   isFreshList v (Left (fromWrapper -> Nothing) : rest) = isFreshList v rest
-  isFreshList v (Left (fromWrapper -> Just f) : rest) = if isFresh v f then isFreshList v rest else Just f
-  isFreshList v (Right (Derivation f _) : rest) = isFreshList v (Left f : rest)
+  isFreshList v (Left (fromWrapper -> Just f) : rest) = if isFresh v f then isFreshList v rest else Just (un f)
+  isFreshList v (Right (Derivation f _) : rest) = isFreshList v (Left (un f) : rest)
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
 
@@ -222,10 +218,14 @@ regenerateSymbols :: forall m. (MonadState Model m) => m ()
 regenerateSymbols = do
   functionSymbols .= mempty
   predicateSymbols .= mempty
-  proof <~ (use proof >>= pMapLinesMAccumL goFormula goLine 1 <&> snd)
+  proof <~ (use proof >>= pMapLinesMAccumL goAssumption goLine 1 <&> snd)
  where
+  goAssumption :: Int -> Assumption -> m (Int, Assumption)
+  goAssumption n a@(Unparsed{}) = pure (n + 1, a)
+  goAssumption n a@(ParsedInvalid txt err (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedInvalid txt err f)
+  goAssumption n a@(ParsedValid txt (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedValid txt f)
   -- collect symbols inside a formula
-  goFormula :: Int -> Assumption -> m (Int, Assumption)
+  goFormula :: Int -> Formula -> m (Int, Formula)
   -- skip unparsed formulae
   goFormula n a@(Unparsed{}) = pure (n + 1, a)
   goFormula n a =
@@ -271,7 +271,7 @@ regenerateSymbols = do
                           <> show expLen
                           <> " arguments."
     -- proccesses a single formula.
-    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> Formula -> m Assumption
+    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> RawFormula -> m Formula
     go n fsyms psyms txt formula@(Pred name args) = do
       -- first check function symbols
       mTermError <- goArgs n fsyms args
@@ -304,7 +304,7 @@ regenerateSymbols = do
                       formula
     go n fsyms psyms txt form@(Opr name fs) = foldlM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
      where
-      combineWrappers :: Wrapper Formula -> Wrapper Formula -> Wrapper Formula
+      combineWrappers :: Wrapper RawFormula -> Wrapper RawFormula -> Wrapper RawFormula
       combineWrappers (Unparsed _ err) _ = Unparsed txt err
       combineWrappers (ParsedInvalid{}) (Unparsed _ err) = Unparsed txt err
       combineWrappers (ParsedInvalid _ err _) (ParsedInvalid{}) = ParsedInvalid txt err form

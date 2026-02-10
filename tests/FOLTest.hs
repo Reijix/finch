@@ -1,3 +1,5 @@
+{-# LANGUAGE MultilineStrings #-}
+
 module FOLTest where
 
 import App.Model
@@ -12,6 +14,21 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 
 import Miso.Lens ((^.))
+
+exProof :: Proof
+exProof = case parseProof operatorsFOL infixPredsFOL quantifiersFOL proofText of
+  Left err -> error "Could not parse initial proof!"
+  Right p -> p
+proofText :: Text
+proofText =
+  """
+  |Q(c)
+  |---
+  ||[c]
+  ||---
+  ||c = c (=I)
+  |∀x.x=x (∀I) 2-3
+  """
 
 pathsInDir :: FilePath -> IO [FilePath]
 pathsInDir fp = map (fp <>) <$> listDirectory fp
@@ -71,22 +88,42 @@ testValidProofs =
       )
       =<< pathsInDir "tests/ValidProofs/"
 
-testInvalidProofs :: TestTree
-testInvalidProofs =
+testInvalidRules :: TestTree
+testInvalidRules =
   testCaseSteps "Testing invalid proofs" $ \step ->
     mapM_
-      ( \(fp, fun) ->
-          step fp
-            >> readProof ("tests/InvalidProofs/" <> fp)
-            >>= fun
+      ( \str ->
+          do
+            let rem = dropWhile (/= '%') str
+                lineNo = filter (/= '%') $ takeWhile (/= '.') rem
+            step (str <> " at line " <> lineNo) >> pure (str, lineNo)
+            p <- readProof str
+            no :: Int <- case reads lineNo of
+              [] -> fail $ "'reads' failed extracting a number from lineNo=" <> lineNo
+              (n, _) : _ -> pure n
+            expectInvalidRuleAt no p
       )
-      [ ("eqE1.fitch", expectInvalidRuleAt 3)
-      , ("eqE2.fitch", expectInvalidRuleAt 3)
-      , ("notFresh.fitch", expectInvalidFormulaAt 3)
-      ]
+      =<< pathsInDir "tests/InvalidRules/"
+
+testInvalidFormulae :: TestTree
+testInvalidFormulae =
+  testCaseSteps "Testing invalid proofs" $ \step ->
+    mapM_
+      ( \str ->
+          do
+            let rem = dropWhile (/= '%') str
+                lineNo = filter (/= '%') $ takeWhile (/= '.') rem
+            step (str <> " at line " <> lineNo) >> pure (str, lineNo)
+            p <- readProof str
+            no :: Int <- case reads lineNo of
+              [] -> fail $ "'reads' failed extracting a number from lineNo=" <> lineNo
+              (n, _) : _ -> pure n
+            expectInvalidFormulaAt no p
+      )
+      =<< pathsInDir "tests/InvalidFormulae/"
 
 verificationTests :: TestTree
 verificationTests =
   testGroup
     "Testing proof verification"
-    [testValidProofs, testInvalidProofs]
+    [testValidProofs, testInvalidRules]

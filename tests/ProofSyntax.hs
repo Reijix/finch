@@ -20,14 +20,17 @@ instance Show PrettyProof where
   show :: PrettyProof -> String
   show (PrettyProof p) = toString $ prettyPrint p
 
+formula :: Int -> Formula
+formula n = ParsedValid (show n) $ Pred (show n) []
+
 assumption :: Int -> Assumption
-assumption n = ParsedValid (show n) $ Pred (show n) []
+assumption n = ParsedValid (show n) $ RawAssumption $ Pred (show n) []
 
 rule :: Int -> [Reference] -> Wrapper RuleApplication
 rule n ref = ParsedValid (show n) (RuleApplication "Rule" ref)
 
 derivation :: Int -> Derivation
-derivation n = Derivation (assumption n) (rule n [])
+derivation n = Derivation (formula n) (rule n [])
 
 line :: Int -> Either Derivation Proof
 line n = Left (derivation n)
@@ -75,17 +78,21 @@ instance Arbitrary Name where
   arbitrary :: Gen Name
   arbitrary = pure "Rule"
 
-instance Arbitrary Formula where
-  arbitrary :: Gen Formula
-  arbitrary = pure $ Pred "Formula" []
+instance Arbitrary RawFormula where
+  arbitrary :: Gen RawFormula
+  arbitrary = pure $ Pred "RawFormula" []
+
+instance Arbitrary RawAssumption where
+  arbitrary :: Gen RawAssumption
+  arbitrary = RawAssumption <$> arbitrary
 
 instance Arbitrary FormulaSpec where
   arbitrary :: Gen FormulaSpec
-  arbitrary = pure $ FPred "Formula" []
+  arbitrary = pure $ FPred "RawFormula" []
 
 instance Arbitrary RuleSpec where
   arbitrary :: Gen RuleSpec
-  arbitrary = fmap (RuleSpec [] []) arbitrary
+  arbitrary = RuleSpec [] [] <$> arbitrary
 
 instance Arbitrary RuleApplication where
   arbitrary :: Gen RuleApplication

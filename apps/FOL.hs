@@ -22,13 +22,12 @@ main = runApp exProof operatorsFOL infixPredsFOL quantifiersFOL rulesFOL
   proofText =
     """
     |∃x.P(x)
-    |Q(d)
     |---
     ||[c]
     ||P(c)
     ||---
-    ||Q(d) (R) 2
-    |Q(d) (∃E) 1, 3-5
+    ||P(c) (R) 3
+    |P(c) (∃E) 1, 2-4
     """
 
 -- """
