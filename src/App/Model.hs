@@ -293,8 +293,8 @@ regenerateSymbols = do
                   else
                     ParsedInvalid
                       txt
-                      ( "Pred symbol "
-                          <> show name
+                      ( "Predicate symbol "
+                          <> name
                           <> " has "
                           <> show (length args)
                           <> " arguments,\nbut in line "

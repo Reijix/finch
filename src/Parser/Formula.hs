@@ -7,7 +7,8 @@ import Parser.Prelude (
   brackets,
   comma,
   lexeme,
-  pName,
+  pLowerName,
+  pUpperName,
   parens,
   prefix,
   symbol,
@@ -38,22 +39,22 @@ type FormulaParser m = (MonadParsec Void Text m, MonadState FormulaParserState m
 -- The parser cant distinguish between function constants and variables.
 -- This does not matter for our application. => constants are treated as variables!
 pFun :: (FormulaParser m) => m Term
-pFun = lexeme (liftA2 Fun pName (parens (pTerm `sepBy` comma)) <?> "function")
+pFun = lexeme (liftA2 Fun pLowerName (parens (pTerm `sepBy` comma)) <?> "function symbol")
 
 pVar :: (FormulaParser m) => m Term
-pVar = lexeme (Var <$> pName <?> "variable")
+pVar = lexeme (Var <$> pLowerName <?> "variable")
 
 pTerm :: (FormulaParser m) => m Term
 pTerm = try pFun <|> pVar <?> "term"
 
 pFreshVariable :: (FormulaParser m) => m RawFormula
-pFreshVariable = lexeme $ FreshVar <$> brackets pName
+pFreshVariable = lexeme $ FreshVar <$> brackets pLowerName
 
 pPredicate :: (FormulaParser m) => m RawFormula
-pPredicate = lexeme $ liftA2 Pred pName $ parens (pTerm `sepBy` comma) <|> pure []
+pPredicate = lexeme (liftA2 Pred pUpperName (parens (pTerm `sepBy` comma) <|> pure []) <?> "predicate symbol")
 
 pPropAtom :: (FormulaParser m) => m RawFormula
-pPropAtom = lexeme $ (`Pred` []) <$> pName
+pPropAtom = lexeme $ (`Pred` []) <$> pUpperName
 
 pQuantifierName :: (FormulaParser m) => m Name
 pQuantifierName = do
@@ -67,7 +68,7 @@ pConstant = do
   lexeme . pure $ Opr op []
 
 pQuantifier :: (FormulaParser m) => m RawFormula
-pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pName <?> "variable")) (lexeme (symbol ".") >> lexeme pRawFormula)
+pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pLowerName <?> "variable")) (lexeme (symbol ".") >> lexeme pRawFormula)
 
 pInfixPredName :: (FormulaParser m) => m Name
 pInfixPredName = do

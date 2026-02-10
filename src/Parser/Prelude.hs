@@ -3,9 +3,9 @@ module Parser.Prelude where
 import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),
  )
-import Data.Char (isLetter)
+import Data.Char (isLetter, isLowerCase, isUpperCase)
 import Text.Megaparsec (
-  MonadParsec (hidden, takeWhile1P),
+  MonadParsec (hidden, takeWhile1P, takeWhileP),
   between,
   (<?>),
  )
@@ -27,8 +27,19 @@ lexeme = L.lexeme sc
 symbol :: (Parser m) => Text -> m Text
 symbol = L.symbol sc
 
-pName :: (Parser m) => m Text
-pName = takeWhile1P (Just "letter") isLetter <?> "name"
+pUpperName :: (Parser m) => m Text
+pUpperName =
+  do
+    start <- takeWhile1P (Just "uppercase") isUpperCase
+    end <- takeWhileP (Just "letter") isLetter
+    pure (start <> end)
+
+pLowerName :: (Parser m) => m Text
+pLowerName =
+  do
+    start <- takeWhile1P (Just "lowercase") isLowerCase
+    end <- takeWhileP (Just "letter") isLetter
+    pure (start <> end)
 
 pSymbolicName :: (Parser m) => m Text
 pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ("()" :: String)) <?> "name"
