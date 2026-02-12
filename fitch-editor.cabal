@@ -130,6 +130,7 @@ library fitch-editor-lib
     Parser.Rule
     Specification.FOL
     Specification.Prop
+    Util
 
   mixins:
     base hiding (Prelude),

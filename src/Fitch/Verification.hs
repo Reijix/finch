@@ -7,21 +7,7 @@ import Fitch.Proof
 import Fitch.Unification
 import Relude.Extra.Map
 import Relude.Extra.Newtype
-
-{- | Returns all combinations of a list of list.
-Taken from package 'liquid-fixpoint' and adjusted to use `NonEmpty`.
-
-Satisfies:
-@allCombinations :: xss:[[a]] -> [{v:[a]| len v == len xss}]@
--}
-allCombinations :: [NonEmpty a] -> NonEmpty [a]
-allCombinations xs = assert (all ((length xs ==) . length)) $ go xs
- where
-  go [] = [[]]
-  go ((x :| []) : ys) = (x :) <$> go ys
-  go ((x :| (x' : xs')) : ys) = ((x :) <$> go ys) <> go ((x' :| xs') : ys)
-
-  assert b x = if b x then x else error "allCombinations: assertion violation"
+import Util (allCombinations)
 
 {- Phases of proof verification:
   1. Check that the rule exists

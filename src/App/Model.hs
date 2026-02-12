@@ -35,7 +35,7 @@ import Relude.Extra.Newtype
 -- * Types
 
 data DropLocation where
-  LocationAddr :: NodeAddr -> InsertPosition -> DropLocation
+  LocationAddr :: NodeAddr -> DropLocation
   LocationBin :: DropLocation
   deriving (Show, Eq)
 
@@ -53,8 +53,8 @@ data Action where
   ProcessInput :: MisoString -> Int -> Int -> Either NodeAddr NodeAddr -> Action
   DoubleClick :: Either NodeAddr NodeAddr -> Action
   Drop :: DropLocation -> Action
-  DragEnter :: NodeAddr -> InsertPosition -> Action
-  DragLeave :: InsertPosition -> Action
+  DragEnter :: NodeAddr -> Action
+  DragLeave :: Action
   DragOver :: Action
   DragStart :: Either NodeAddr ProofAddr -> Action
   SpawnStart :: SpawnType -> Action
@@ -78,10 +78,8 @@ data Model = Model
   -- ^ the element that is currently being dragged
   , _spawnType :: Maybe SpawnType
   -- ^ the type of element that is currently being spawned
-  , _currentLineBefore :: Maybe NodeAddr
+  , _currentHoverLine :: Maybe NodeAddr
   -- ^ the line before which the user currently hovers
-  , _currentLineAfter :: Maybe NodeAddr
-  -- ^ the line after which the user currently hovers
   , _dragging :: Bool
   -- ^ denotes whether the user is currently dragging an element
   , _operators :: [(Text, Text, Int)]
@@ -129,8 +127,7 @@ initialModel p operators infixPreds quantifiers rules =
     , _proof = p
     , _dragTarget = Nothing
     , _spawnType = Nothing
-    , _currentLineBefore = Nothing
-    , _currentLineAfter = Nothing
+    , _currentHoverLine = Nothing
     , _dragging = False
     , _operators = operators
     , _infixPreds = infixPreds
@@ -153,11 +150,8 @@ dragTarget = lens (._dragTarget) $ \model dt -> model{_dragTarget = dt}
 spawnType :: Lens Model (Maybe SpawnType)
 spawnType = lens (._spawnType) $ \model st -> model{_spawnType = st}
 
-currentLineBefore :: Lens Model (Maybe NodeAddr)
-currentLineBefore = lens (._currentLineBefore) $ \model dt -> model{_currentLineBefore = dt}
-
-currentLineAfter :: Lens Model (Maybe NodeAddr)
-currentLineAfter = lens (._currentLineAfter) $ \model dt -> model{_currentLineAfter = dt}
+currentHoverLine :: Lens Model (Maybe NodeAddr)
+currentHoverLine = lens (._currentHoverLine) $ \model dt -> model{_currentHoverLine = dt}
 
 dragging :: Lens Model Bool
 dragging = lens (._dragging) $ \model d -> model{_dragging = d}

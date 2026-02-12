@@ -112,8 +112,7 @@ checkProof = do
 
 clearDrag :: Effect ROOT Model Action
 clearDrag = do
-  currentLineAfter .= Nothing
-  currentLineBefore .= Nothing
+  currentHoverLine .= Nothing
   dragging .= False
   dragTarget .= Nothing
   spawnType .= Nothing
@@ -129,28 +128,34 @@ updateModel (Drop LocationBin) = do
     Just (Left na) -> proof %= naRemove na
     Just (Right pa) -> proof %= paRemove pa
   clearDrag
-updateModel (Drop (LocationAddr targetAddr pos)) = do
+updateModel (Drop (LocationAddr targetAddr)) = do
+  use dragTarget >>= \dt ->
+    io_ $
+      consoleLog $
+        "dropped in "
+          <> show targetAddr
+          <> "\nwith dragTarget "
+          <> show dt
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
-    Just (Left na) -> proof %= naMove targetAddr pos na
-    Just (Right pa) -> proof %= paMove targetAddr pos pa
+    Just (Left na) -> proof %= naMove targetAddr na
+    Just (Right pa) -> proof %= paMove targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
     -- TODO adjust linenos
     Just SpawnLine ->
       proof
-        %=? naInsert
+        %=? naInsertBefore
           ( Right . Left $
               Derivation
                 (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Formula")
                 (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
           )
           targetAddr
-          pos
     Just SpawnProof ->
       proof
-        %=? naInsert
+        %=? naInsertBefore
           ( Right . Right $
               SubProof
                 [ tryParse
@@ -168,10 +173,9 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
                 )
           )
           targetAddr
-          pos
     Just SpawnAssumption ->
       proof
-        %=? naInsert
+        %=? naInsertBefore
           ( Left
               ( tryParse
                   m
@@ -183,18 +187,16 @@ updateModel (Drop (LocationAddr targetAddr pos)) = do
               )
           )
           targetAddr
-          pos
+
   clearDrag
   checkProof
-updateModel (DragEnter a Before) = currentLineBefore .= Just a
-updateModel (DragEnter a After) = currentLineAfter .= Just a
--- NOTE: the check for `Before` and `After` is actually needed, because processing order of events is not guaranteed.
-updateModel (DragLeave Before) = currentLineBefore .= Nothing
-updateModel (DragLeave After) = currentLineAfter .= Nothing
+updateModel (DragEnter a) = currentHoverLine .= Just a
+updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
   spawnType .= Just st
   dragging .= True
 updateModel (DragStart dt) = do
+  io_ $ consoleLog $ "dragStart with dt=" <> show dt
   dragTarget .= Just dt
   dragging .= True
 updateModel DragEnd = clearDrag
@@ -369,7 +371,7 @@ onKeyDownSub addr domRef = createSub acquire (const pass)
         let (first, rest) = T.splitAt start value
             (second, third) = T.splitAt (end - start) rest
             newTxt = T.concat [first, "(", second, ")", third]
-        -- select all text, replace it with the new text, and adjust cursor position
+        -- select all text, replace it with the new text, and adjust cursorition
         doc <- jsg "document"
         domRef # "select" $ ()
         -- NOTE: execCommand is deprecated, however its use is still recommended

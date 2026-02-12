@@ -1,103 +1,18 @@
-.draggable {
-  cursor: move;
-  /* fallback if grab cursor is unsupported */
-  cursor: grab;
-  cursor: -webkit-grab;
+/* 
+--------------------------------------------------
+Variables
+--------------------------------------------------
+*/
+:root {
+  --line-height: 1.3rem;
 }
 
-.non-selectable {
-  cursor: pointer;
-}
 
-.proof-container {
-  display: flex;
-  flex-direction: row;
-  height: fit-content;
-}
-
-.line-nos-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.line-no {
-  padding: 0;
-  margin: 0;
-  margin-top: 2px;
-  height: 1.3rem;
-}
-
-.empty-rule {
-  padding: 0;
-  margin: 0;
-  margin-top: 2px;
-  height: 1.3rem;
-}
-
-.empty-assumption-rule {
-  padding: 0;
-  margin: 0;
-  margin-top: 2px;
-  height: 0.5rem;
-}
-
-.formula-input {
-  border: none;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-.formula-container {
-  display: flex;
-  flex-direction: row;
-  position: relative;
-  height: 100%;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-.rule-input {
-  border: none;
-  width: 100%;
-  padding: 0;
-  margin: 0;
-}
-
-.rule-container {
-  width: 5rem;
-  padding: 0;
-  margin: 0;
-  height: 1.3rem;
-  margin-top: 2px;
-  position: relative;
-}
-
-.fitch-container {
-  display: inline-flex;
-}
-
-.proof-line {
-  position: relative;
-  max-width: 15rem;
-  height: 1.3rem;
-  box-sizing: border-box;
-  margin-top: 2px;
-}
-
-.no-pointer-events {
-  pointer-events: none;
-}
-
-.can-hover:hover>*:not(.formula-container) {
-  /* TODO translateX hides the absolute child. */
-  /* transform: translateX(2px); */
-  /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
-  background-color: cyan;
-  opacity: 0.1;
-}
-
+/* 
+--------------------------------------------------
+Button containers
+--------------------------------------------------
+*/
 .button-container {
   display: flex;
   flex-direction: column;
@@ -121,29 +36,65 @@
   background-color: orange;
 }
 
-.upper-hover-zone {
-  position: absolute;
-  height: 50%;
-  width: 100%;
-  z-index: 101;
+/* 
+--------------------------------------------------
+Line number containers
+--------------------------------------------------
+*/
+.line-nos-container {
+  display: flex;
+  flex-direction: column;
 }
 
-.lower-hover-zone {
-  position: absolute;
-  top: 50%;
-  height: 50%;
-  width: 100%;
-  z-index: 101;
+.empty-line-no {
+  height: 2px;
+  margin: 0px;
+  margin-bottom: 2px;
 }
 
-.insert-before {
-  border-top: 2px solid red;
+/* 
+--------------------------------------------------
+Proof containers
+--------------------------------------------------
+*/
+.fitch-container {
+  display: inline-flex;
+}
+
+.proof-container {
+  display: flex;
+  flex-direction: row;
+  height: fit-content;
+}
+
+.proof-line {
+  position: relative;
+  max-width: 15rem;
+  height: var(--line-height);
   box-sizing: border-box;
 }
 
-.insert-after {
-  border-bottom: 2px solid red;
-  box-sizing: border-box;
+.line-no {
+  padding: 0;
+  margin: 0;
+  height: var(--line-height);
+}
+
+.formula-input {
+  border: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.formula-container {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .formulae-container {
@@ -153,53 +104,13 @@
   margin-left: 5px;
 }
 
-.empty-line-no {
-  height: 0.5rem;
-  margin: 0px;
-  margin-bottom: 4px;
+.can-hover:hover>*:not(.formula-container) {
+  /* TODO translateX hides the absolute child. */
+  /* transform: translateX(2px); */
+  /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
+  background-color: cyan;
+  opacity: 0.1;
 }
-
-.empty-assumptions {
-  height: 0.5rem;
-  border-bottom: 2px solid black;
-  margin: 0px;
-  margin-bottom: 2px;
-}
-
-.subproof {
-  position: relative;
-  box-sizing: border-box;
-  border-left: 2px solid black;
-  margin-left: 5px;
-}
-
-.subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
-  border-left: 3px solid black;
-  transition: .1s linear;
-  cursor: move;
-  /* fallback if grab cursor is unsupported */
-  cursor: grab;
-  cursor: -webkit-grab;
-}
-
-.last-assumption {
-  border-bottom: 2px solid black;
-  margin-bottom: 2px;
-}
-
-.proof-view {
-  display: grid;
-}
-
-.parse-success {
-  color: green;
-}
-
-.parse-fail {
-  color: red;
-}
-
-/* TODO when dragging dont show hover */
 
 .error {
   visibility: hidden;
@@ -221,4 +132,98 @@
 .has-error:hover .error {
   visibility: visible;
   opacity: 1;
+}
+
+.empty-assumptions {
+  height: 2px;
+  margin: 0px;
+}
+
+.subproof {
+  position: relative;
+  box-sizing: border-box;
+  border-left: 2px solid black;
+  margin-left: 5px;
+}
+
+.subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
+  border-left: 3px solid black;
+  transition: .1s linear;
+  cursor: move;
+  /* fallback if grab cursor is unsupported */
+  cursor: grab;
+  cursor: -webkit-grab;
+}
+
+.last-assumption {
+  border-bottom: 2px solid black;
+}
+
+.empty-last-assumption {
+  margin-bottom: 2px;
+}
+
+.proof-view {
+  display: grid;
+}
+
+.parse-fail {
+  color: red;
+}
+
+/* 
+--------------------------------------------------
+Rule containers
+--------------------------------------------------
+*/
+.empty-rule {
+  padding: 0;
+  margin: 0;
+  height: var(--line-height);
+}
+
+.empty-assumption-rule {
+  padding: 0;
+  margin: 0;
+  height: 2px;
+}
+
+.rule-input {
+  border: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.rule-container {
+  width: 5rem;
+  padding: 0;
+  margin: 0;
+  height: var(--line-height);
+  position: relative;
+}
+
+/* 
+--------------------------------------------------
+Drag and drop related
+--------------------------------------------------
+*/
+.draggable {
+  cursor: move;
+  /* fallback if grab cursor is unsupported */
+  cursor: grab;
+  cursor: -webkit-grab;
+}
+
+.non-selectable {
+  cursor: pointer;
+}
+
+.drop-zone {
+  height: 5px;
+  transition: height 0.1s linear;
+}
+
+.expanded-drop-zone {
+  height: var(--line-height);
 }

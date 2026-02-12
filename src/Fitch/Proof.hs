@@ -764,58 +764,38 @@ paRemove :: ProofAddr -> Proof -> Proof
 paRemove (PAProof n) (SubProof fs ps c) | holdsAt isRight ps n = SubProof fs (removeAt n ps) c
 paRemove (PANested n pa) (SubProof fs ps c) = SubProof fs (updateAt n (fmap (paRemove pa)) ps) c
 
--- | Enumeration for specifying where to insert an element into a proof.
-data InsertPosition
-  = -- | Insert `Before` the specified address.
-    Before
-  | -- | Insert `After` the specified address.
-    After
-  deriving (Show, Eq)
+{- | `naInsertBefore` (`Left` @f@) @addr@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
 
-{- | `naInsert` (`Left` @f@) @addr@ @pos@ @proof@ inserts the given formula @f@ at the specified address @addr@ in @proof@.
+`naInsertBefore` (`Right` @d@) @addr@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
 
-`naInsert` (`Right` @d@) @addr@ @pos@ @proof@ inserts the given derivation @d@ at the specified address @addr@ in @proof@.
-
-Both formulae and derivations are either inserted `Before` or `After` the specified address.
+Both formulae and derivations are inserted before the specified address.
 -}
-naInsert :: Either Assumption (Either Derivation Proof) -> NodeAddr -> InsertPosition -> Proof -> Maybe Proof
-naInsert (Left f) (NAAssumption n) pos (SubProof fs ps l)
-  | n < length fs = case pos of
-      Before -> Just $ SubProof (insertAt f n fs) ps l
-      After -> Just $ SubProof (insertAt f (n + 1) fs) ps l
-naInsert (Left f) (NALine 0) Before (SubProof fs ps l) = Just $ SubProof (insertAt f (length fs) fs) ps l
-naInsert (Left f) NAConclusion Before (SubProof fs [] l) = Just $ SubProof (insertAt f (length fs) fs) [] l
-naInsert (Right p) (NALine n) pos (SubProof fs ps l)
-  | n < length ps = case pos of
-      Before -> Just $ SubProof fs (insertAt p n ps) l
-      After -> Just $ SubProof fs (insertAt p (n + 1) ps) l
-naInsert (Right p) NAConclusion Before (SubProof fs ps l) = Just $ SubProof fs (insertAt p (length ps) ps) l
-naInsert (Right p) (NAAssumption n) After p'@(SubProof fs _ _)
-  | n == length fs - 1 = naInsert (Right p) (NALine 0) Before p'
-naInsert (Right p) (NAProof n (NAAssumption 0)) Before p' = naInsert (Right p) (NALine n) Before p'
-naInsert (Right p) (NAProof n NAConclusion) After p' = naInsert (Right p) (NALine n) After p'
-naInsert e (NAProof n a) pos (SubProof fs ps l) = case ps !!? n of
-  Just (Right p) -> naInsert e a pos p >>= (\p' -> pure $ SubProof fs (updateAt n (const $ Right p') ps) l)
+naInsertBefore :: Either Assumption (Either Derivation Proof) -> NodeAddr -> Proof -> Maybe Proof
+naInsertBefore (Left f) (NAAssumption n) (SubProof fs ps l) = Just $ SubProof (insertAt f n fs) ps l
+naInsertBefore (Right p) (NALine n) (SubProof fs ps l) = Just $ SubProof fs (insertAt p n ps) l
+naInsertBefore e (NAProof n a) (SubProof fs ps l) = case ps !!? n of
+  Just (Right p) -> naInsertBefore e a p >>= (\p' -> pure $ SubProof fs (updateAt n (const $ Right p') ps) l)
   _ -> Nothing
-naInsert _ _ _ p = Nothing
+naInsertBefore _ _ p = Nothing
 
-{- | `naMove` @target@ @pos@ @source@ @p@ moves the line at the source address
-either before or after the target line (depending on @pos@).
+{- | `naMove` @target@ @source@ @p@ moves the line at the source address
+either before the target line.
 -}
-naMove :: NodeAddr -> InsertPosition -> NodeAddr -> Proof -> Proof
-naMove targetAddr pos sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
+naMove :: NodeAddr -> NodeAddr -> Proof -> Proof
+naMove targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
   (LT, Just node)
     | not (pIsConclusion sourceAddr p) ->
-        let p' = naRemove sourceAddr p in fromMaybe p $ naInsert (fmap Left node) targetAddr pos p'
+        let p' = naRemove sourceAddr p in fromMaybe p $ naInsertBefore (fmap Left node) targetAddr p'
   (GT, Just node)
     | not (pIsConclusion sourceAddr p) ->
-        maybe p (naRemove sourceAddr) $ naInsert (fmap Left node) targetAddr pos p
+        maybe p (naRemove sourceAddr) $ naInsertBefore (fmap Left node) targetAddr p
   _ -> p
 
-paMove :: NodeAddr -> InsertPosition -> ProofAddr -> Proof -> Proof
-paMove targetAddr pos sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
-  (LT, Just prf) -> let p' = paRemove sourceAddr p in fromMaybe p $ naInsert (Right $ Right prf) targetAddr pos p'
-  (GT, Just prf) -> maybe p (paRemove sourceAddr) $ naInsert (Right $ Right prf) targetAddr pos p
+paMove :: NodeAddr -> ProofAddr -> Proof -> Proof
+paMove targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
+  (LT, Just prf) -> let p' = paRemove sourceAddr p in fromMaybe p $ naInsertBefore (Right $ Right prf) targetAddr p'
+  (GT, Just prf) -> maybe p (paRemove sourceAddr) $ naInsertBefore (Right $ Right prf) targetAddr p
+  _ -> p
 
 -- * Utilities that are not exported!
 
@@ -825,7 +805,7 @@ Fails for @n < 0@, returns @xs@ for @n > length xs@.
 -}
 insertAt :: a -> Int -> [a] -> [a]
 insertAt x 0 xs = x : xs
-insertAt x n [] = []
+insertAt x n [] = [x]
 insertAt x n (y : ys) = y : insertAt x (n - 1) ys
 
 {- | `removeAt` @n@ @xs@ removes the element at index @n@.

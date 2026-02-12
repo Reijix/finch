@@ -169,45 +169,39 @@ lRemoveQCTests =
     , QC.testProperty "prop_lRemoveShift" prop_lRemoveShift
     ]
 
--- TESTING naInsert
+-- TESTING naInsertBefore
 prop_lInsertBeforeFormulaPlus1 :: PrettyProof -> Property
 prop_lInsertBeforeFormulaPlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (pLength <$> naInsert (Left $ assumption 0) a Before p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore (Left $ assumption 0) a p) === Just (pLength p + 1)
 
 prop_lInsertAfterFormulaPlus1 :: PrettyProof -> Property
 prop_lInsertAfterFormulaPlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (pLength <$> naInsert (Left $ assumption 0) a After p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore (Left $ assumption 0) a p) === Just (pLength p + 1)
 
 prop_lInsertlLookupFormulaBefore :: PrettyProof -> Property
 prop_lInsertlLookupFormulaBefore (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (naLookup a <$> naInsert (Left $ assumption 0) a Before p) === (Just . Just . Left $ assumption 0)
-
-prop_lInsertlLookupFormulaAfter :: PrettyProof -> Property
-prop_lInsertlLookupFormulaAfter (PrettyProof p) =
-  forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    ((naLookup <$> incrementNodeAddr a) <*> naInsert (Left $ assumption 0) a After p) === (Just . Just . Left $ assumption 0)
+    (naLookup a <$> naInsertBefore (Left $ assumption 0) a p) === (Just . Just . Left $ assumption 0)
 
 prop_lInsertBeforeLinePlus1 :: PrettyProof -> Property
 prop_lInsertBeforeLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    (pLength <$> naInsert (Right . Left $ derivation 0) a Before p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore (Right . Left $ derivation 0) a p) === Just (pLength p + 1)
 
 prop_lInsertAfterLinePlus1 :: PrettyProof -> Property
 prop_lInsertAfterLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    (pLength <$> naInsert (Right . Left $ derivation 0) a After p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore (Right . Left $ derivation 0) a p) === Just (pLength p + 1)
 
 lInsertQCTests :: TestTree
 lInsertQCTests =
   testGroup
-    "Testing naInsert"
+    "Testing naInsertBefore"
     [ QC.testProperty "prop_lInsertBeforeFormulaPlus1" prop_lInsertBeforeFormulaPlus1
     , QC.testProperty "prop_lInsertAfterFormulaPlus1" prop_lInsertAfterFormulaPlus1
     , QC.testProperty "prop_lInsertlLookupFormulaBefore" prop_lInsertlLookupFormulaBefore
-    , QC.testProperty "prop_lInsertlLookupFormulaAfter" prop_lInsertlLookupFormulaAfter
     , QC.testProperty "prop_lInsertBeforeLinePlus1" prop_lInsertBeforeLinePlus1
     , QC.testProperty "prop_lInsertAfterLinePlus1" prop_lInsertAfterLinePlus1
     ]
