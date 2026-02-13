@@ -18,6 +18,7 @@ import Miso (
   onBeforeDestroyed,
   onCreatedWith,
   onWithOptions,
+  optionalAttrs,
   pointerDecoder,
   preventDefault,
   stopPropagation,
@@ -90,14 +91,17 @@ viewSpawnNode tp str =
 -- VIEWS
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
-  H.div_
+  optionalAttrs
+    H.div_
     [ HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
     , HP.classList_
         [ ("proof-line", True)
         , ("draggable", (model ^. focusedLine) /= Just (Left na))
         , ("can-hover", not (model ^. dragging))
         ]
-    , onDragStartWithOptions stopPropagation $ DragStart (Left na)
+    ]
+    (not $ isNAConclusion na)
+    [ onDragStartWithOptions stopPropagation $ DragStart (Left na)
     , onDragEndWithOptions defaultOptions DragEnd
     ]
     [ H.div_

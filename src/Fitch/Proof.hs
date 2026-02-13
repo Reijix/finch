@@ -469,6 +469,11 @@ isNAAssumption (NAProof _ na) = isNAAssumption na
 isNAAssumption (NAAssumption _) = True
 isNAAssumption _ = False
 
+isNAConclusion :: NodeAddr -> Bool
+isNAConclusion (NAProof _ na) = isNAConclusion na
+isNAConclusion NAConclusion = True
+isNAConclusion _ = False
+
 -- TODO comment
 data ProofAddr
   = PAProof Int
