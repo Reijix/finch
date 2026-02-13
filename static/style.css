@@ -61,6 +61,10 @@ Proof containers
   display: inline-flex;
 }
 
+.proof-container-border {
+  padding: 5px;
+}
+
 .proof-container {
   display: flex;
   flex-direction: row;

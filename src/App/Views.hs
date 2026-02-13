@@ -224,7 +224,13 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       (Unparsed str err) -> (False, False, ms str, ms err)
 
 viewProof :: Model -> View Model Action
-viewProof model = H.div_ [HP.class_ "proof-container"] [viewLineNos model, proofView, viewRules model]
+viewProof model =
+  H.div_
+    [ HP.class_ "proof-container-border"
+    , onDragEnterWithOptions preventDefault DragLeave
+    ]
+    . one
+    $ H.div_ [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop] [viewLineNos model, proofView, viewRules model]
  where
   proofView =
     H.div_

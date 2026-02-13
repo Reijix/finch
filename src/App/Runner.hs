@@ -117,31 +117,8 @@ clearDrag = do
   dragTarget .= Nothing
   spawnType .= Nothing
 
-setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
-setFocus ea = do
-  focusedLine .= Just ea
-  p <- use proof
-  case ea of
-    Left a -> selectFocus ("proof-line" <> show (lineNoOr999 a p))
-    Right a -> selectFocus ("proof-line-rule" <> show (lineNoOr999 a p))
- where
-  selectFocus :: MisoString -> Effect ROOT Model Action
-  selectFocus str = do
-    io_ $ focus str
-    io_ $ select str
-
--- | Main execution loop of the application.
-updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = checkProof
--- Drag n Drop events
-updateModel (Drop LocationBin) = do
-  dt <- use dragTarget
-  case dt of
-    Nothing -> pass
-    Just (Left na) -> proof %= naRemove na
-    Just (Right pa) -> proof %= paRemove pa
-  clearDrag
-updateModel (Drop (LocationAddr targetAddr)) = do
+dropInto :: NodeAddr -> Effect ROOT Model Action
+dropInto targetAddr = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
@@ -176,6 +153,33 @@ updateModel (Drop (LocationAddr targetAddr)) = do
         _ -> pass
   clearDrag
   checkProof
+
+setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
+setFocus ea = do
+  focusedLine .= Just ea
+  p <- use proof
+  case ea of
+    Left a -> selectFocus ("proof-line" <> show (lineNoOr999 a p))
+    Right a -> selectFocus ("proof-line-rule" <> show (lineNoOr999 a p))
+ where
+  selectFocus :: MisoString -> Effect ROOT Model Action
+  selectFocus str = do
+    io_ $ focus str
+    io_ $ select str
+
+-- | Main execution loop of the application.
+updateModel :: Action -> Effect ROOT Model Action
+updateModel Setup = checkProof
+------------------------------------
+-- Drag n Drop events
+updateModel (Drop LocationBin) = do
+  dt <- use dragTarget
+  case dt of
+    Nothing -> pass
+    Just (Left na) -> proof %= naRemove na
+    Just (Right pa) -> proof %= paRemove pa
+  clearDrag
+updateModel (Drop (LocationAddr targetAddr)) = dropInto targetAddr
 updateModel (DragEnter a) = currentHoverLine .= Just a
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
@@ -184,7 +188,9 @@ updateModel (SpawnStart st) = do
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   dragging .= True
-updateModel DragEnd = clearDrag
+updateModel DragEnd = do
+  chl <- use currentHoverLine
+  maybe clearDrag dropInto chl
 ------------------------------------
 -- Input related events
 updateModel (DoubleClick ea) = setFocus ea
