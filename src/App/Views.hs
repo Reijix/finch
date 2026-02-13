@@ -103,7 +103,7 @@ viewLine model na e =
     [ H.div_
         [ onDoubleClick $ DoubleClick (Left na)
         , HP.class_ "formula-container"
-        , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess)]
+        , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess), ("can-hover", not (model ^. dragging))]
         ]
         [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
         , H.input_
@@ -197,6 +197,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       , HP.classList_
           [ ("non-selectable", Just (Right na) /= model ^. focusedLine)
           , ("has-error", not parseSuccess || not semanticSuccess)
+          , ("can-hover", not (model ^. dragging))
           ]
       ]
       [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]

@@ -42,7 +42,6 @@ data DropLocation where
 data SpawnType where
   SpawnLine :: SpawnType
   SpawnProof :: SpawnType
-  SpawnAssumption :: SpawnType
   deriving (Show, Eq)
 
 data Action where

@@ -201,6 +201,16 @@ newtype RawAssumption = RawAssumption RawFormula deriving (Eq, Show)
 
 type Assumption = Wrapper RawAssumption
 
+toAssumption :: Formula -> Assumption
+toAssumption (Unparsed txt err) = Unparsed txt err
+toAssumption (ParsedInvalid txt err f) = ParsedInvalid txt err (RawAssumption f)
+toAssumption (ParsedValid txt f) = ParsedValid txt (RawAssumption f)
+
+toFormula :: Assumption -> Formula
+toFormula (Unparsed txt err) = Unparsed txt err
+toFormula (ParsedInvalid txt err (RawAssumption f)) = ParsedInvalid txt err f
+toFormula (ParsedValid txt (RawAssumption f)) = ParsedValid txt f
+
 instance PrettyPrint RawAssumption where
   prettyPrint :: RawAssumption -> Text
   prettyPrint (RawAssumption f) = prettyPrint f
@@ -576,6 +586,10 @@ paFromNA (NAProof n NAConclusion) = Just $ PAProof n
 paFromNA (NAProof n na) = PANested n <$> paFromNA na
 paFromNA _ = Nothing
 
+naFromPA :: ProofAddr -> (NodeAddr -> NodeAddr)
+naFromPA (PAProof n) = NAProof n
+naFromPA (PANested n pa) = NAProof n . naFromPA pa
+
 naLevelup2 :: NodeAddr -> Maybe (NodeAddr -> NodeAddr)
 naLevelup2 = go id
  where
@@ -770,13 +784,46 @@ paRemove (PANested n pa) (SubProof fs ps c) = SubProof fs (updateAt n (fmap (paR
 
 Both formulae and derivations are inserted before the specified address.
 -}
-naInsertBefore :: Either Assumption (Either Derivation Proof) -> NodeAddr -> Proof -> Maybe Proof
-naInsertBefore (Left f) (NAAssumption n) (SubProof fs ps l) = Just $ SubProof (insertAt f n fs) ps l
-naInsertBefore (Right p) (NALine n) (SubProof fs ps l) = Just $ SubProof fs (insertAt p n ps) l
-naInsertBefore e (NAProof n a) (SubProof fs ps l) = case ps !!? n of
-  Just (Right p) -> naInsertBefore e a p >>= (\p' -> pure $ SubProof fs (updateAt n (const $ Right p') ps) l)
+naInsertBefore ::
+  Either Assumption (Either Derivation Proof) ->
+  NodeAddr ->
+  Proof ->
+  Maybe (Either NodeAddr ProofAddr, Proof)
+naInsertBefore (Left a) (NAAssumption n) (SubProof fs ps c) =
+  Just (Left $ NAAssumption n, SubProof (insertAt a n fs) ps c)
+naInsertBefore (Right (Left (Derivation f _))) (NAAssumption n) (SubProof fs ps c) =
+  Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
+naInsertBefore (Left a) (NALine n) (SubProof fs ps c) =
+  Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
+ where
+  d = Left $ Derivation (toFormula a) (Unparsed "(?)" "")
+naInsertBefore (Right (Left d)) (NALine n) (SubProof fs ps c) =
+  Just (Left $ NALine n, SubProof fs (insertAt (Left d) n ps) c)
+naInsertBefore (Right (Right p)) (NALine n) (SubProof fs ps c) =
+  Just (Right $ PAProof n, SubProof fs (insertAt (Right p) n ps) c)
+naInsertBefore e (NAProof n na) (SubProof fs ps c) = case ps !!? n of
+  Just (Right p) ->
+    naInsertBefore e na p
+      >>= ( \(addr, p') -> case addr of
+              Left na ->
+                pure (Left $ NAProof n na, SubProof fs (updateAt n (const $ Right p') ps) c)
+              Right pa ->
+                pure (Right $ PANested n pa, SubProof fs (updateAt n (const $ Right p') ps) c)
+          )
   _ -> Nothing
-naInsertBefore _ _ p = Nothing
+naInsertBefore _ _ _ = Nothing
+
+-- naInsertBefore :: Either Assumption (Either Derivation Proof) -> NodeAddr -> Proof -> Maybe Proof
+-- naInsertBefore (Left f) (NAAssumption n) (SubProof fs ps c) = Just $ SubProof (insertAt f n fs) ps c
+-- naInsertBefore (Right p) (NALine n) (SubProof fs ps c) = Just $ SubProof fs (insertAt p n ps) c
+-- naInsertBefore e (NAProof n a) (SubProof fs ps c) = case ps !!? n of
+--   Just (Right p) ->
+--     naInsertBefore e a p
+--       >>= ( \p' ->
+--               pure $ SubProof fs (updateAt n (const $ Right p') ps) c
+--           )
+--   _ -> Nothing
+-- naInsertBefore _ _ _ = Nothing
 
 {- | `naMove` @target@ @source@ @p@ moves the line at the source address
 either before the target line.
@@ -785,16 +832,27 @@ naMove :: NodeAddr -> NodeAddr -> Proof -> Proof
 naMove targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
   (LT, Just node)
     | not (pIsConclusion sourceAddr p) ->
-        let p' = naRemove sourceAddr p in fromMaybe p $ naInsertBefore (fmap Left node) targetAddr p'
+        let p' = naRemove sourceAddr p
+         in case naInsertBefore (fmap Left node) targetAddr p' of
+              Just (_, p') -> p'
+              _ -> p
   (GT, Just node)
     | not (pIsConclusion sourceAddr p) ->
-        maybe p (naRemove sourceAddr) $ naInsertBefore (fmap Left node) targetAddr p
+        maybe p (naRemove sourceAddr) $ case naInsertBefore (fmap Left node) targetAddr p of
+          Just (_, p') -> Just p'
+          _ -> Nothing
   _ -> p
 
 paMove :: NodeAddr -> ProofAddr -> Proof -> Proof
 paMove targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
-  (LT, Just prf) -> let p' = paRemove sourceAddr p in fromMaybe p $ naInsertBefore (Right $ Right prf) targetAddr p'
-  (GT, Just prf) -> maybe p (paRemove sourceAddr) $ naInsertBefore (Right $ Right prf) targetAddr p
+  (LT, Just prf) ->
+    let p' = paRemove sourceAddr p
+     in case naInsertBefore (Right $ Right prf) targetAddr p' of
+          Just (_, p') -> p'
+          _ -> p
+  (GT, Just prf) -> maybe p (paRemove sourceAddr) $ case naInsertBefore (Right $ Right prf) targetAddr p of
+    Just (_, p') -> Just p'
+    _ -> Nothing
   _ -> p
 
 -- * Utilities that are not exported!

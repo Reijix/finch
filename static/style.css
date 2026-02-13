@@ -67,6 +67,11 @@ Proof containers
   height: fit-content;
 }
 
+.proof.line.can-hover:hover {
+  background-color: cyan;
+  opacity: 0.1;
+}
+
 .proof-line {
   position: relative;
   max-width: 15rem;
@@ -104,14 +109,6 @@ Proof containers
   margin-left: 5px;
 }
 
-.can-hover:hover>*:not(.formula-container) {
-  /* TODO translateX hides the absolute child. */
-  /* transform: translateX(2px); */
-  /* box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12); */
-  background-color: cyan;
-  opacity: 0.1;
-}
-
 .error {
   visibility: hidden;
   opacity: 0;
@@ -129,7 +126,7 @@ Proof containers
   transition: visibility 0s, opacity .5s;
 }
 
-.has-error:hover .error {
+.has-error.can-hover:hover .error {
   visibility: visible;
   opacity: 1;
 }

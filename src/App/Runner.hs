@@ -117,6 +117,19 @@ clearDrag = do
   dragTarget .= Nothing
   spawnType .= Nothing
 
+setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
+setFocus ea = do
+  focusedLine .= Just ea
+  p <- use proof
+  case ea of
+    Left a -> selectFocus ("proof-line" <> show (lineNoOr999 a p))
+    Right a -> selectFocus ("proof-line-rule" <> show (lineNoOr999 a p))
+ where
+  selectFocus :: MisoString -> Effect ROOT Model Action
+  selectFocus str = do
+    io_ $ focus str
+    io_ $ select str
+
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 updateModel Setup = checkProof
@@ -129,13 +142,6 @@ updateModel (Drop LocationBin) = do
     Just (Right pa) -> proof %= paRemove pa
   clearDrag
 updateModel (Drop (LocationAddr targetAddr)) = do
-  use dragTarget >>= \dt ->
-    io_ $
-      consoleLog $
-        "dropped in "
-          <> show targetAddr
-          <> "\nwith dragTarget "
-          <> show dt
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
@@ -144,50 +150,30 @@ updateModel (Drop (LocationAddr targetAddr)) = do
   use spawnType >>= \case
     Nothing -> pass
     -- TODO adjust linenos
-    Just SpawnLine ->
-      proof
-        %=? naInsertBefore
-          ( Right . Left $
-              Derivation
-                (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Formula")
-                (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
-          )
+    Just SpawnLine -> do
+      mp <-
+        naInsertBefore
+          (Right . Left $ Derivation (tryParse m 999 "") (tryParse m 999 "(?)"))
           targetAddr
-    Just SpawnProof ->
-      proof
-        %=? naInsertBefore
+          <$> use proof
+      case mp of
+        Just (Left na, p) -> do
+          proof .= p
+          setFocus (Left targetAddr)
+        _ -> pass
+    Just SpawnProof -> do
+      mp <-
+        naInsertBefore
           ( Right . Right $
-              SubProof
-                [ tryParse
-                    m
-                    []
-                    []
-                    []
-                    (lineNoOr999 targetAddr (m ^. proof))
-                    "Formula"
-                ]
-                []
-                ( Derivation
-                    (tryParse m [] [] [] 1 "Formula")
-                    (tryParse m [] [] [] (lineNoOr999 targetAddr (m ^. proof)) "Rule")
-                )
+              SubProof [] [] (Derivation (tryParse m 999 "") (tryParse m 999 "(?)"))
           )
           targetAddr
-    Just SpawnAssumption ->
-      proof
-        %=? naInsertBefore
-          ( Left
-              ( tryParse
-                  m
-                  []
-                  []
-                  []
-                  (lineNoOr999 targetAddr (m ^. proof))
-                  "Formula"
-              )
-          )
-          targetAddr
-
+          <$> use proof
+      case mp of
+        Just (Right pa, p) -> do
+          proof .= p
+          setFocus (Left $ naFromPA pa NAConclusion)
+        _ -> pass
   clearDrag
   checkProof
 updateModel (DragEnter a) = currentHoverLine .= Just a
@@ -196,22 +182,12 @@ updateModel (SpawnStart st) = do
   spawnType .= Just st
   dragging .= True
 updateModel (DragStart dt) = do
-  io_ $ consoleLog $ "dragStart with dt=" <> show dt
   dragTarget .= Just dt
   dragging .= True
 updateModel DragEnd = clearDrag
 ------------------------------------
 -- Input related events
-updateModel (DoubleClick ea) = do
-  focusedLine .= Just ea
-  p <- use proof
-  case ea of
-    Left a -> do
-      io_ . focus . ms $ "proof-line" ++ show (lineNoOr999 a p)
-      io_ . select . ms $ "proof-line" ++ show (lineNoOr999 a p)
-    Right a -> do
-      io_ . focus . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
-      io_ . select . ms $ "proof-line-rule" ++ show (lineNoOr999 a p)
+updateModel (DoubleClick ea) = setFocus ea
 updateModel Blur = focusedLine .= Nothing
 updateModel Change = checkProof
 updateModel (Input str ref) = do
@@ -233,9 +209,6 @@ updateModel (ProcessInput str start end (Left addr)) = do
         let a =
               tryParse
                 m
-                (m ^. operators)
-                (m ^. infixPreds)
-                (m ^. quantifiers)
                 (lineNoOr999 addr (m ^. proof))
                 (fromMisoString str) ::
                 Assumption
@@ -245,9 +218,6 @@ updateModel (ProcessInput str start end (Left addr)) = do
         let f =
               tryParse
                 m
-                (m ^. operators)
-                (m ^. infixPreds)
-                (m ^. quantifiers)
                 (lineNoOr999 addr (m ^. proof))
                 (fromMisoString str) ::
                 Formula
@@ -270,9 +240,6 @@ updateModel (ProcessInput str start end (Right addr)) = do
   let r =
         tryParse
           m
-          (m ^. operators)
-          (m ^. infixPreds)
-          (m ^. quantifiers)
           (lineNoOr999 addr (m ^. proof))
           (fromMisoString str) ::
           Wrapper RuleApplication
@@ -308,18 +275,12 @@ updateModel (ProcessParens eaddr start end) = do
             Left $
               tryParse
                 m
-                (m ^. operators)
-                (m ^. infixPreds)
-                (m ^. quantifiers)
                 (lineNoOr999 addr (m ^. proof))
                 newTxt
           Right addr ->
             Right $
               tryParse
                 m
-                (m ^. operators)
-                (m ^. infixPreds)
-                (m ^. quantifiers)
                 (lineNoOr999 addr (m ^. proof))
                 newTxt
 updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
@@ -336,7 +297,6 @@ viewModel model =
         [HP.class_ "button-container"]
         [ viewBin
         , viewSpawnNode SpawnLine "+Line"
-        , viewSpawnNode SpawnAssumption "+Assumption"
         , viewSpawnNode SpawnProof "+Proof"
         ]
     , viewProof model
@@ -414,13 +374,13 @@ tries to replace these aliases in the `Text`
 tryParse ::
   forall a.
   (FromText a) =>
-  Model -> [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Wrapper a
-tryParse m ops infixPreds quantifiers n txt = case fromText m n replacedTxt :: Either Text a of
+  Model -> Int -> Text -> Wrapper a
+tryParse m n txt = case fromText m n replacedTxt :: Either Text a of
   Left err -> Unparsed replacedTxt err
   Right result -> ParsedValid replacedTxt result
  where
   replacedTxt =
     foldr
       (\(alias, name) t -> T.replace alias name t)
-      (foldr (\(alias, name, _) t -> T.replace alias name t) txt ops)
-      quantifiers
+      (foldr (\(alias, name, _) t -> T.replace alias name t) txt (m ^. operators))
+      (m ^. quantifiers)
