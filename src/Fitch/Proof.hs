@@ -466,13 +466,18 @@ data NodeAddr
 
 isNAAssumption :: NodeAddr -> Bool
 isNAAssumption (NAProof _ na) = isNAAssumption na
-isNAAssumption (NAAssumption _) = True
+isNAAssumption NAAssumption{} = True
 isNAAssumption _ = False
 
 isNAConclusion :: NodeAddr -> Bool
 isNAConclusion (NAProof _ na) = isNAConclusion na
 isNAConclusion NAConclusion = True
 isNAConclusion _ = False
+
+isNALine :: NodeAddr -> Bool
+isNALine (NAProof _ na) = isNALine na
+isNALine NALine{} = True
+isNALine _ = False
 
 -- TODO comment
 data ProofAddr
@@ -818,23 +823,11 @@ naInsertBefore e (NAProof n na) (SubProof fs ps c) = case ps !!? n of
   _ -> Nothing
 naInsertBefore _ _ _ = Nothing
 
--- naInsertBefore :: Either Assumption (Either Derivation Proof) -> NodeAddr -> Proof -> Maybe Proof
--- naInsertBefore (Left f) (NAAssumption n) (SubProof fs ps c) = Just $ SubProof (insertAt f n fs) ps c
--- naInsertBefore (Right p) (NALine n) (SubProof fs ps c) = Just $ SubProof fs (insertAt p n ps) c
--- naInsertBefore e (NAProof n a) (SubProof fs ps c) = case ps !!? n of
---   Just (Right p) ->
---     naInsertBefore e a p
---       >>= ( \p' ->
---               pure $ SubProof fs (updateAt n (const $ Right p') ps) c
---           )
---   _ -> Nothing
--- naInsertBefore _ _ _ = Nothing
-
-{- | `naMove` @target@ @source@ @p@ moves the line at the source address
-either before the target line.
+{- | `naMoveBefore` @target@ @source@ @p@ moves the line at the source address
+before the target line.
 -}
-naMove :: NodeAddr -> NodeAddr -> Proof -> Proof
-naMove targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
+naMoveBefore :: NodeAddr -> NodeAddr -> Proof -> Proof
+naMoveBefore targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
   (LT, Just node)
     | not (pIsConclusion sourceAddr p) ->
         let p' = naRemove sourceAddr p
@@ -848,8 +841,42 @@ naMove targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup s
           _ -> Nothing
   _ -> p
 
-paMove :: NodeAddr -> ProofAddr -> Proof -> Proof
-paMove targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
+{- | `naCompatible` @target@ @source@ returns `True`
+if @source@ and @target@ target are compatible, which means
+that they are roughly of the same type.
+i.e. assumptions can be moved before assumptions, proofs can be moved before lines etc.
+
+Note that this does not exactly return if something can be moved somewhere, because
+this function also returns true, when comparing a proof with its contents.
+-}
+naCompatible :: NodeAddr -> Either NodeAddr ProofAddr -> Bool
+naCompatible (NAProof _ na) e = naCompatible na e
+naCompatible (NAAssumption{}) (Left na) | isNAAssumption na = True
+naCompatible (NALine{}; NAConclusion) (Left na) | isNALine na = True
+naCompatible (NALine{}; NAConclusion) (Right pa) = True
+naCompatible _ _ = False
+
+naContainedIn :: NodeAddr -> ProofAddr -> Bool
+naContainedIn (NAProof n na) (PAProof m) = n == m
+naContainedIn (NAProof n na) (PANested m pa) = n == m && naContainedIn na pa
+naContainedIn _ _ = False
+
+naSameOrNext :: NodeAddr -> Either NodeAddr ProofAddr -> Bool
+naSameOrNext (NAProof n na) (Left (NAProof m na')) | n == m = naSameOrNext na (Left na')
+naSameOrNext (NAProof n na) (Right (PANested m pa)) | n == m = naSameOrNext na (Right pa)
+naSameOrNext (NAAssumption n) (Left (NAAssumption m)) = n == m || n == m + 1
+naSameOrNext (NALine n) (Left (NALine m)) = n == m || n == m + 1
+naSameOrNext (NALine n) (Right (PAProof m)) = n == m || n == m + 1
+naSameOrNext _ _ = False
+
+naCanMoveBefore :: NodeAddr -> Either NodeAddr ProofAddr -> Bool
+naCanMoveBefore na e =
+  naCompatible na e && not (naSameOrNext na e) && case e of
+    Left _ -> True
+    Right pa -> not $ naContainedIn na pa
+
+paMoveBefore :: NodeAddr -> ProofAddr -> Proof -> Proof
+paMoveBefore targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
   (LT, Just prf) ->
     let p' = paRemove sourceAddr p
      in case naInsertBefore (Right $ Right prf) targetAddr p' of

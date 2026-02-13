@@ -314,3 +314,9 @@ regenerateSymbols = do
   goLine n (Derivation f r) = do
     (n', f') <- goFormula n f
     pure (n', Derivation f' r)
+
+canSpawnIn :: NodeAddr -> SpawnType -> Bool
+canSpawnIn (NAProof n na) st = canSpawnIn na st
+canSpawnIn (NALine{}; NAAssumption{}; NAConclusion) SpawnLine = True
+canSpawnIn (NALine{}; NAConclusion) SpawnProof = True
+canSpawnIn _ _ = False

@@ -56,8 +56,7 @@ interleaveWithDropZones model mclass na views = interleave dropzones views
             , HP.draggable_ False
             , onDragOverWithOptions preventDefault Nop
             , onDragEnterWithOptions preventDefault (DragEnter (na n))
-            , -- , onDragLeaveWithOptions preventDefault DragLeave
-              onDropWithOptions defaultOptions (Drop (LocationAddr (na n)))
+            , onDropWithOptions defaultOptions (Drop (LocationAddr (na n)))
             ]
             []
       )
@@ -93,11 +92,12 @@ viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Acti
 viewLine model na e =
   optionalAttrs
     H.div_
-    [ HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
+    [ HP.draggable_ $ na /= NAConclusion && (model ^. focusedLine) /= Just (Left na)
     , HP.classList_
         [ ("proof-line", True)
-        , ("draggable", (model ^. focusedLine) /= Just (Left na))
+        , ("draggable", na /= NAConclusion && (model ^. focusedLine) /= Just (Left na))
         , ("can-hover", not (model ^. dragging))
+        , ("non-selectable", na == NAConclusion)
         ]
     ]
     (not $ isNAConclusion na)
@@ -234,7 +234,9 @@ viewProof model =
     , onDragEnterWithOptions preventDefault DragLeave
     ]
     . one
-    $ H.div_ [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop] [viewLineNos model, proofView, viewRules model]
+    $ H.div_
+      [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
+      [viewLineNos model, proofView, viewRules model]
  where
   proofView =
     H.div_

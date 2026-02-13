@@ -122,8 +122,8 @@ dropInto targetAddr = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
-    Just (Left na) -> proof %= naMove targetAddr na
-    Just (Right pa) -> proof %= paMove targetAddr pa
+    Just (Left na) -> proof %= naMoveBefore targetAddr na
+    Just (Right pa) -> proof %= paMoveBefore targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
     -- TODO adjust linenos
@@ -180,7 +180,18 @@ updateModel (Drop LocationBin) = do
     Just (Right pa) -> proof %= paRemove pa
   clearDrag
 updateModel (Drop (LocationAddr targetAddr)) = dropInto targetAddr
-updateModel (DragEnter a) = currentHoverLine .= Just a
+updateModel (DragEnter na) = do
+  p <- use proof
+  use spawnType
+    >>= \case
+      Just (canSpawnIn na -> True) ->
+        currentHoverLine .= Just na
+      Just (canSpawnIn na -> False) ->
+        currentHoverLine .= Nothing
+      Nothing ->
+        use dragTarget >>= \case
+          Just (naCanMoveBefore na -> True) -> currentHoverLine .= Just na
+          _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
   spawnType .= Just st
