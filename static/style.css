@@ -62,13 +62,14 @@ Proof containers
 }
 
 .proof-container-border {
-  padding: 5px;
+  padding: 3px;
 }
 
 .proof-container {
   display: flex;
   flex-direction: row;
   height: fit-content;
+  padding-top: 10px
 }
 
 .proof.line.can-hover:hover {
