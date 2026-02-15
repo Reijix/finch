@@ -179,6 +179,7 @@ updateModel (Drop LocationBin) = do
     Just (Left na) -> proof %= naRemove na
     Just (Right pa) -> proof %= paRemove pa
   clearDrag
+  checkProof
 updateModel (Drop (LocationAddr targetAddr)) = dropInto targetAddr
 updateModel (DragEnter na) = do
   p <- use proof
