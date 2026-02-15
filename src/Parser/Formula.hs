@@ -1,7 +1,7 @@
 module Parser.Formula where
 
 import Control.Monad.Combinators.Expr (makeExprParser)
-import Fitch.Proof (Name, RawFormula (..), Term (..))
+import Fitch.Proof (Name, RawAssumption (..), RawFormula (..), Term (..))
 import Parser.Prelude (
   binary,
   brackets,
@@ -47,7 +47,7 @@ pVar = lexeme (Var <$> pLowerName <?> "variable")
 pTerm :: (FormulaParser m) => m Term
 pTerm = try pFun <|> pVar <?> "term"
 
-pFreshVariable :: (FormulaParser m) => m RawFormula
+pFreshVariable :: (FormulaParser m) => m RawAssumption
 pFreshVariable = lexeme $ FreshVar <$> brackets pLowerName
 
 pPredicate :: (FormulaParser m) => m RawFormula
@@ -94,31 +94,37 @@ pRawFormula = do
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
-parseFormula :: Bool -> [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Int -> Text -> Either Text RawFormula
-parseFormula isAssumption operators infixPreds quantifiers lineNo input =
+pRawAssumption :: (FormulaParser m) => m RawAssumption
+pRawAssumption = (pFreshVariable <|> (RawAssumption <$> pRawFormula)) <?> "assumption"
+
+initialParserState :: Int -> Text -> Text.Megaparsec.State Text e
+initialParserState lineNo input =
+  State
+    { stateInput = input
+    , stateOffset = 0
+    , statePosState =
+        PosState
+          { pstateInput = input
+          , pstateOffset = 0
+          , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
+          , pstateTabWidth = defaultTabWidth
+          , pstateLinePrefix = ""
+          }
+    , stateParseErrors = []
+    }
+
+parseFormula :: FormulaParserState -> Int -> Text -> Either Text RawFormula
+parseFormula initialState lineNo input =
   case evalState
-    (runParserT' ((if isAssumption then pFreshVariable else empty) <|> pRawFormula <* eof) initialParserState)
+    (runParserT' (pRawFormula <* eof) (initialParserState lineNo input))
     initialState of
     (_, Left e) -> Left . toText $ errorBundlePretty e
     (_, Right f) -> Right f
- where
-  initialParserState =
-    State
-      { stateInput = input
-      , stateOffset = 0
-      , statePosState =
-          PosState
-            { pstateInput = input
-            , pstateOffset = 0
-            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
-            , pstateTabWidth = defaultTabWidth
-            , pstateLinePrefix = ""
-            }
-      , stateParseErrors = []
-      }
-  initialState =
-    FormulaParserState
-      { operators
-      , infixPreds
-      , quantifiers
-      }
+
+parseAssumption :: FormulaParserState -> Int -> Text -> Either Text RawAssumption
+parseAssumption initialState lineNo input =
+  case evalState
+    (runParserT' (pRawAssumption <* eof) (initialParserState lineNo input))
+    initialState of
+    (_, Left e) -> Left . toText $ errorBundlePretty e
+    (_, Right a) -> Right a

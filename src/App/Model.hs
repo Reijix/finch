@@ -10,7 +10,6 @@ import Miso (
   KeyCode,
   KeyInfo,
   MisoString,
-  PointerEvent (client),
   ROOT,
   View,
   consoleLog,
@@ -177,18 +176,21 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 checkFreshness :: forall m. (MonadState Model m) => m ()
 checkFreshness = do
-  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (under . goFormula p) (const id) p))
+  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goAssumption p) (const id) p))
  where
-  goFormula :: Proof -> NodeAddr -> Formula -> Formula
-  goFormula _ _ a@(Unparsed{}; ParsedInvalid{}) = a
-  goFormula p na a@(ParsedValid txt f@(FreshVar v)) = case pCollectFreshnessNodes na p of
-    Left err -> ParsedInvalid (getText a) err f
+  goAssumption :: Proof -> NodeAddr -> Assumption -> Assumption
+  goAssumption _ _ a@(Unparsed{}) = a
+  goAssumption p na a@(ParsedInvalid txt _ ra) = goRawAssumption p na txt ra
+  goAssumption p na a@(ParsedValid txt ra) = goRawAssumption p na txt ra
+  goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Assumption
+  goRawAssumption p na txt ra@(FreshVar v) = case pCollectFreshnessNodes na p of
+    Left err -> ParsedInvalid txt err ra
     Right nodes ->
       case isFreshList v nodes of
-        Nothing -> a
+        Nothing -> ParsedValid txt ra
         Just (naf', f') ->
           ParsedInvalid
-            (getText a)
+            txt
             ( "Could not verify freshness of "
                 <> v
                 <> "\nIt appears in formula:\n"
@@ -196,13 +198,14 @@ checkFreshness = do
                 <> "|"
                 <> prettyPrint f'
             )
-            f
-  goFormula _ _ a@(fromWrapper -> Just _) = a
-  isFreshList :: Name -> [(NodeAddr, Either Assumption Derivation)] -> Maybe (NodeAddr, RawFormula)
+            ra
+  goRawAssumption _ _ txt ra = ParsedValid txt ra
+  isFreshList :: Name -> [(NodeAddr, Either Assumption Derivation)] -> Maybe (NodeAddr, Either RawAssumption RawFormula)
   isFreshList v [] = Nothing
   isFreshList v ((na, Left (fromWrapper -> Nothing)) : rest) = isFreshList v rest
-  isFreshList v ((na, Left (fromWrapper -> Just f)) : rest) = if isFresh v f then isFreshList v rest else Just (na, un f)
-  isFreshList v ((na, Right (Derivation f _)) : rest) = isFreshList v ((na, Left (un f)) : rest)
+  isFreshList v ((na, Left (fromWrapper -> Just a)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)
+  isFreshList v ((na, Right (Derivation (fromWrapper -> Nothing) _)) : rest) = isFreshList v rest
+  isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
 
@@ -218,7 +221,10 @@ regenerateSymbols = do
   goAssumption :: Int -> Assumption -> m (Int, Assumption)
   goAssumption n a@(Unparsed{}) = pure (n + 1, a)
   goAssumption n a@(ParsedInvalid txt err (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedInvalid txt err f)
+  goAssumption n a@(ParsedInvalid txt err (FreshVar{})) = pure (n + 1, a)
   goAssumption n a@(ParsedValid txt (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedValid txt f)
+  goAssumption n a@(ParsedValid txt (FreshVar{})) = pure (n + 1, a)
+
   -- collect symbols inside a formula
   goFormula :: Int -> Formula -> m (Int, Formula)
   -- skip unparsed formulae
@@ -294,7 +300,7 @@ regenerateSymbols = do
                           <> show pos
                           <> " it appears with "
                           <> show expLen
-                          <> " arguments."
+                          <> " argument(s)."
                       )
                       formula
     go n fsyms psyms txt form@(Opr name fs) = foldlM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
@@ -308,7 +314,6 @@ regenerateSymbols = do
       combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
       combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
     go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
-    go _ _ _ txt (FreshVar var) = pure $ ParsedValid txt $ FreshVar var
   -- proccesses a single line, by proccessing its formula.
   goLine :: Int -> Derivation -> m (Int, Derivation)
   goLine n (Derivation f r) = do

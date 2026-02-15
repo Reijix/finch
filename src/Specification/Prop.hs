@@ -1,6 +1,7 @@
 module Specification.Prop where
 
 import Fitch.Proof (
+  AssumptionSpec (..),
   FormulaSpec (FOpr, FPlaceholder),
   RuleSpec (..),
  )
@@ -13,15 +14,15 @@ rulesProp =
   [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
   , ("∧E1", RuleSpec [phi ∧ psi] [] phi)
   , ("∧E2", RuleSpec [phi ∧ psi] [] psi)
-  , ("→I", RuleSpec [] [([phi], psi)] (phi ↝ psi))
+  , ("→I", RuleSpec [] [([AssumptionSpec phi], psi)] (phi ↝ psi))
   , ("→E", RuleSpec [phi, phi ↝ psi] [] psi)
-  , ("¬I", RuleSpec [] [([phi], bot)] (neg phi))
+  , ("¬I", RuleSpec [] [([AssumptionSpec phi], bot)] (neg phi))
   , ("¬E", RuleSpec [phi, neg phi] [] bot)
   , ("¬¬E", RuleSpec [neg $ neg phi] [] phi)
   , ("R", RuleSpec [phi] [] phi)
   , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
   , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
-  , ("∨E", RuleSpec [phi ∨ psi] [([phi], chi), ([psi], chi)] chi)
+  , ("∨E", RuleSpec [phi ∨ psi] [([AssumptionSpec phi], chi), ([AssumptionSpec psi], chi)] chi)
   , ("⊤I", RuleSpec [] [] (FOpr "⊤" []))
   , ("⊥E", RuleSpec [FOpr "⊥" []] [] phi)
   ]

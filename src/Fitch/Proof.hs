@@ -3,6 +3,7 @@ module Fitch.Proof where
 import Data.Text qualified as T
 import Relude.Extra.Map (toPairs)
 import Relude.Extra.Newtype
+import Util
 
 -- * Definitions
 
@@ -74,7 +75,7 @@ getText (ParsedValid txt _) = txt
 getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
-type ProofSpec = ([FormulaSpec], FormulaSpec)
+type ProofSpec = ([AssumptionSpec], FormulaSpec)
 
 -- | The type of a fitch rule.
 data RuleSpec
@@ -130,6 +131,10 @@ data FormulaSpec
   | FInfixPredicate Name TermSpec TermSpec
   | FOpr Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
+  deriving (Eq, Show)
+
+data AssumptionSpec
+  = AssumptionSpec FormulaSpec
   | FFreshVar Name
   deriving (Eq, Show)
 
@@ -141,7 +146,6 @@ instance PrettyPrint FormulaSpec where
     go _ (FPred p []) = p
     go _ (FPred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go _ (FPlaceholder n) = n
-    go _ (FFreshVar n) = "[" <> n <> "]"
     go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> t <> "]"
     go True f = "(" <> go False f <> ")"
     go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
@@ -150,6 +154,11 @@ instance PrettyPrint FormulaSpec where
       | length fs == 2 = T.intercalate (" " <> op <> " ") (map (go True) fs)
       | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
+
+instance PrettyPrint AssumptionSpec where
+  prettyPrint :: AssumptionSpec -> Text
+  prettyPrint (AssumptionSpec fSpec) = prettyPrint fSpec
+  prettyPrint (FFreshVar n) = "[" <> n <> "]"
 
 -- | A formula for first-order logic (can be instantiated to 0th order, by using `Pred` without the list of `Term`.
 data RawFormula
@@ -161,8 +170,6 @@ data RawFormula
     Opr Text [RawFormula]
   | -- | A quantifier, like @∀@ for universal quantification.
     Quantifier Name Name RawFormula
-  | -- | A fresh variable of a subproof, written like @[c]@
-    FreshVar Name
   deriving (Eq, Ord, Show)
 
 instance PrettyPrint RawFormula where
@@ -179,7 +186,8 @@ instance PrettyPrint RawFormula where
       | length fs == 2 = T.intercalate op (map (go True) fs)
       | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (Quantifier q v f) = q <> v <> "." <> prettyPrint f
-    go False (FreshVar v) = "[" <> v <> "]"
+
+-- go False (FreshVar v) = "[" <> v <> "]"
 
 -- | A reference to a line (either `Formula` or `ProofLine` or a `SubProof`).
 data Reference where
@@ -197,23 +205,30 @@ instance PrettyPrint Reference where
 -- | Assumptions are formulae wrapped with parsing and semantic information.
 type Formula = Wrapper RawFormula
 
-newtype RawAssumption = RawAssumption RawFormula deriving (Eq, Show)
+data RawAssumption
+  = -- | A fresh variable of a subproof, written like @[c]@
+    FreshVar Name
+  | RawAssumption RawFormula
+  deriving (Eq, Show)
 
 type Assumption = Wrapper RawAssumption
 
-toAssumption :: Formula -> Assumption
-toAssumption (Unparsed txt err) = Unparsed txt err
-toAssumption (ParsedInvalid txt err f) = ParsedInvalid txt err (RawAssumption f)
-toAssumption (ParsedValid txt f) = ParsedValid txt (RawAssumption f)
+-- toAssumption :: Formula -> Assumption
+-- toAssumption (Unparsed txt err) = Unparsed txt err
+-- toAssumption (ParsedInvalid txt err f) = ParsedInvalid txt err (RawAssumption f)
+-- toAssumption (ParsedValid txt f) = ParsedValid txt (RawAssumption f)
 
-toFormula :: Assumption -> Formula
-toFormula (Unparsed txt err) = Unparsed txt err
-toFormula (ParsedInvalid txt err (RawAssumption f)) = ParsedInvalid txt err f
-toFormula (ParsedValid txt (RawAssumption f)) = ParsedValid txt f
+-- toFormula :: Assumption -> Formula
+-- toFormula (Unparsed txt err) = Unparsed txt err
+-- toFormula (ParsedInvalid txt err (RawAssumption f)) = ParsedInvalid txt err f
+-- toFormula (ParsedInvalid txt err a@(FreshVar v)) = Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)
+-- toFormula (ParsedValid txt (RawAssumption f)) = ParsedValid txt f
+-- toFormula (ParsedValid txt a@(FreshVar v)) = Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)
 
 instance PrettyPrint RawAssumption where
   prettyPrint :: RawAssumption -> Text
   prettyPrint (RawAssumption f) = prettyPrint f
+  prettyPrint (FreshVar v) = "[" <> v <> "]"
 
 -- | Application of a rule
 data RuleApplication
@@ -713,9 +728,9 @@ pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $ filte
   Nothing -> Left "Internal error on pCollectFreshnessNodes, should not happen!"
   Just l -> Right l
 
-extractFormula :: Either Assumption Derivation -> Maybe RawFormula
-extractFormula (Left a) = un $ fromWrapper a
-extractFormula (Right (Derivation f _)) = fromWrapper f
+-- extractFormula :: Either Assumption Derivation -> Maybe RawFormula
+-- extractFormula (Left a) = un $ fromWrapper a
+-- extractFormula (Right (Derivation f _)) = fromWrapper f
 
 extractText :: Either Assumption Derivation -> Text
 extractText (Left a) = getText a
@@ -801,12 +816,12 @@ naInsertBefore ::
   Maybe (Either NodeAddr ProofAddr, Proof)
 naInsertBefore (Left a) (NAAssumption n) (SubProof fs ps c) =
   Just (Left $ NAAssumption n, SubProof (insertAt a n fs) ps c)
-naInsertBefore (Right (Left (Derivation f _))) (NAAssumption n) (SubProof fs ps c) =
-  Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
-naInsertBefore (Left a) (NALine n) (SubProof fs ps c) =
-  Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
- where
-  d = Left $ Derivation (toFormula a) (Unparsed "(?)" "")
+-- naInsertBefore (Right (Left (Derivation f _))) (NAAssumption n) (SubProof fs ps c) =
+--   Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
+-- naInsertBefore (Left a) (NALine n) (SubProof fs ps c) =
+--   Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
+--  where
+--   d = Left $ Derivation (toFormula a) (Unparsed "(?)" "")
 naInsertBefore (Right (Left d)) (NALine n) (SubProof fs ps c) =
   Just (Left $ NALine n, SubProof fs (insertAt (Left d) n ps) c)
 naInsertBefore (Right (Right p)) (NALine n) (SubProof fs ps c) =
@@ -886,36 +901,3 @@ paMoveBefore targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, 
     Just (_, p') -> Just p'
     _ -> Nothing
   _ -> p
-
--- * Utilities that are not exported!
-
-{- | `insertAt` @x@ @n@ @xs@ inserts @x@ at index @n@ into @xs@.
-
-Fails for @n < 0@, returns @xs@ for @n > length xs@.
--}
-insertAt :: a -> Int -> [a] -> [a]
-insertAt x 0 xs = x : xs
-insertAt x n [] = [x]
-insertAt x n (y : ys) = y : insertAt x (n - 1) ys
-
-{- | `removeAt` @n@ @xs@ removes the element at index @n@.
-
-Returns @xs@ for invalid indices.
--}
-removeAt :: Int -> [a] -> [a]
-removeAt n [] = []
-removeAt n (x : xs)
-  | n < 0 = x : xs
-  | n == 0 = xs
-  | n > 0 = x : removeAt (n - 1) xs
-
-{- | Update nth element of a list, if it exists.
-  @O(min index n)@.
-
-  Precondition: the index is >= 0.
-  (Copied from Agda.Utils.List)
--}
-updateAt :: Int -> (a -> a) -> [a] -> [a]
-updateAt _ _ [] = []
-updateAt 0 f (a : as) = f a : as
-updateAt n f (a : as) = a : updateAt (n - 1) f as

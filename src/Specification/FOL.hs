@@ -1,14 +1,8 @@
 module Specification.FOL where
 
 import Fitch.Proof (
-  FormulaSpec (
-    FFreshVar,
-    FOpr,
-    FPlaceholder,
-    FPred,
-    FQuantifier,
-    FSubst
-  ),
+  AssumptionSpec (..),
+  FormulaSpec (..),
   RuleSpec (..),
   TermSpec (TPlaceholder, TVar),
   (~>),
@@ -46,7 +40,7 @@ rulesFOL =
              (FQuantifier "∀" "x" phi)
          )
        , ("∃I", RuleSpec [FSubst "φ" ("x" ~> "E")] [] (FQuantifier "∃" "x" phi))
-       , ("∃E", RuleSpec [FQuantifier "∃" "x" phi] [([FFreshVar "c", FSubst "φ" ("x" ~> "c")], psi)] psi)
+       , ("∃E", RuleSpec [FQuantifier "∃" "x" phi] [([FFreshVar "c", AssumptionSpec $ FSubst "φ" ("x" ~> "c")], psi)] psi)
        ]
  where
   phi = FPlaceholder "φ"

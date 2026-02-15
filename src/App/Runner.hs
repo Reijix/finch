@@ -68,7 +68,7 @@ import Miso.Html.Property qualified as HP
 import Miso.Lens
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
-import Parser.Formula (parseFormula)
+import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
 import Parser.Rule (parseRuleApplication)
 import Relude.Extra.Newtype
 
@@ -220,7 +220,7 @@ updateModel (Input str ref) = do
   checkProof
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
-  f <-
+  fLen <-
     if isNAAssumption addr
       then do
         let a =
@@ -230,7 +230,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
                 (fromMisoString str) ::
                 Assumption
         proof %= naUpdateFormula (Left $ const a) addr
-        pure $ un a
+        pure $ T.length . getText $ a
       else do
         let f =
               tryParse
@@ -239,10 +239,10 @@ updateModel (ProcessInput str start end (Left addr)) = do
                 (fromMisoString str) ::
                 Formula
         proof %= naUpdateFormula (Right $ const f) addr
-        pure f
+        pure $ T.length . getText $ f
 
   checkProof
-  let delta = T.length (fromMisoString str) - (T.length . getText $ f)
+  let delta = T.length (fromMisoString str) - fLen
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
     setSelectionRange
@@ -375,11 +375,11 @@ class FromText a where
 
 instance FromText RawFormula where
   fromText :: Model -> Int -> Text -> Either Text RawFormula
-  fromText m = parseFormula False (m ^. operators) (m ^. infixPreds) (m ^. quantifiers)
+  fromText m = parseFormula (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
 
 instance FromText RawAssumption where
   fromText :: Model -> Int -> Text -> Either Text RawAssumption
-  fromText m n = fmap RawAssumption . parseFormula True (m ^. operators) (m ^. infixPreds) (m ^. quantifiers) n
+  fromText m = parseAssumption (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication

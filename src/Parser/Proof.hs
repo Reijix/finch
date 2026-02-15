@@ -10,7 +10,7 @@ import Fitch.Proof (
   RawFormula,
   Wrapper (ParsedValid),
  )
-import Parser.Formula (FormulaParser, FormulaParserState (..), pFreshVariable, pRawFormula)
+import Parser.Formula (FormulaParser, FormulaParserState (..), pFreshVariable, pRawAssumption, pRawFormula)
 import Parser.Prelude (Parser, lexeme, symbol)
 import Parser.Rule (pRule)
 import Text.Megaparsec (
@@ -35,7 +35,7 @@ pFormula :: (FormulaParser m) => m Formula
 pFormula = match (lexeme pRawFormula) <&> uncurry ParsedValid
 
 pAssumption :: (FormulaParser m) => m Assumption
-pAssumption = second RawAssumption <$> match (lexeme (pFreshVariable <|> pRawFormula)) <&> uncurry ParsedValid
+pAssumption = match (lexeme pRawAssumption) <&> uncurry ParsedValid
 
 pDerivation :: (FormulaParser m) => m Derivation
 pDerivation =

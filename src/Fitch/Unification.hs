@@ -2,17 +2,11 @@ module Fitch.Unification where
 
 import Data.Set qualified as Set
 import Fitch.Proof (
-  FormulaSpec (
-    FFreshVar,
-    FOpr,
-    FPlaceholder,
-    FPred,
-    FQuantifier,
-    FSubst
-  ),
+  AssumptionSpec (..),
+  FormulaSpec (..),
   Name,
   RawAssumption (..),
-  RawFormula (FreshVar, Opr, Pred, Quantifier),
+  RawFormula (Opr, Pred, Quantifier),
   Subst (..),
   Term (..),
   TermSpec (..),
@@ -48,11 +42,11 @@ instance AllVars RawFormula where
   allVars (Pred _ args) = foldMap allVars args
   allVars (Opr _ fs) = foldMap allVars fs
   allVars (Quantifier _ v f) = one v <> allVars f
-  allVars (FreshVar v) = one v
 
 instance AllVars RawAssumption where
   allVars :: RawAssumption -> Set Name
   allVars (RawAssumption f) = allVars f
+  allVars (FreshVar v) = one v
 
 -- ** Free variables
 
@@ -71,6 +65,10 @@ instance FreeVars RawFormula where
   freeVars (Pred _ args) = foldMap freeVars args
   freeVars (Opr _ fs) = foldMap freeVars fs
   freeVars (Quantifier _ v f) = Set.delete v $ freeVars f
+
+instance FreeVars RawAssumption where
+  freeVars :: RawAssumption -> Set Name
+  freeVars (RawAssumption f) = freeVars f
   freeVars (FreshVar _) = mempty
 
 -- * Substitution
@@ -205,8 +203,8 @@ termMatchesSpec _ = False
 
 -- | Unify formula with formula specification.
 formulaMatchesSpec :: RawFormula -> FormulaSpec -> Bool
-formulaMatchesSpec f@(FreshVar v) fs@(FFreshVar v') = True
-formulaMatchesSpec (FreshVar{}) _ = False
+-- formulaMatchesSpec f@(FreshVar v) fs@(FFreshVar v') = True
+-- formulaMatchesSpec (FreshVar{}) _ = False
 formulaMatchesSpec f@(Pred p ts) fs@(FPred p' ts')
   | p == p' && length ts == length ts' = termMatchesSpec (zip ts ts')
 formulaMatchesSpec (Opr op fs) (FOpr op' fs')
@@ -216,3 +214,8 @@ formulaMatchesSpec f@(Quantifier q v form) fs@(FQuantifier q' v' form')
 formulaMatchesSpec f fs@(FPlaceholder n) = True
 formulaMatchesSpec f fs@(FSubst n sub) = True
 formulaMatchesSpec _ _ = False
+
+assumptionMatchesSpec :: RawAssumption -> AssumptionSpec -> Bool
+assumptionMatchesSpec (FreshVar{}) (FFreshVar{}) = True
+assumptionMatchesSpec (RawAssumption rf) (AssumptionSpec fSpec) = formulaMatchesSpec rf fSpec
+assumptionMatchesSpec _ _ = False
