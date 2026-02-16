@@ -122,15 +122,16 @@ dropInto targetAddr = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
-    Just (Left na) -> proof %= naMoveBefore targetAddr na
+    Just (Left na) -> do
+      -- io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
+      proof %= naMoveBefore targetAddr na
     Just (Right pa) -> proof %= paMoveBefore targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
-    -- TODO adjust linenos
     Just SpawnLine -> do
       mp <-
         naInsertBefore
-          (Right . Left $ Derivation (tryParse m 999 "") (tryParse m 999 "(?)"))
+          (Right . Left $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
           targetAddr
           <$> use proof
       case mp of
@@ -142,7 +143,7 @@ dropInto targetAddr = do
       mp <-
         naInsertBefore
           ( Right . Right $
-              SubProof [] [] (Derivation (tryParse m 999 "") (tryParse m 999 "(?)"))
+              SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
           )
           targetAddr
           <$> use proof

@@ -515,8 +515,14 @@ instance Ord NodeAddr where
   compare (NAAssumption _) (NALine _) = LT
   compare (NALine _) (NAAssumption _) = GT
   compare (NALine n) (NALine m) = compare n m
-  compare (NALine n) (NAProof m _) = compare n m
-  compare (NAProof n _) (NALine m) = compare n m
+  compare (NALine n) (NAProof m _) = case compare n m of
+    LT -> LT
+    EQ -> LT
+    GT -> GT
+  compare (NAProof n _) (NALine m) = case compare n m of
+    LT -> LT
+    EQ -> GT
+    GT -> GT
   compare (NAAssumption _) (NAProof _ _) = LT
   compare (NAProof _ _) (NAAssumption _) = GT
   compare (NAProof n addr1) (NAProof m addr2) | n == m = compare addr1 addr2
@@ -527,8 +533,14 @@ instance Ord NodeAddr where
 
 compareNaPa :: NodeAddr -> ProofAddr -> Ordering
 compareNaPa (NAAssumption n) _ = LT
-compareNaPa (NALine n) (PAProof m) = compare n m
-compareNaPa (NALine n) (PANested m pa) = compare n m
+compareNaPa (NALine n) (PAProof m) = case compare n m of
+  LT -> LT
+  EQ -> LT
+  GT -> GT
+compareNaPa (NALine n) (PANested m pa) = case compare n m of
+  LT -> LT
+  EQ -> LT
+  GT -> GT
 compareNaPa NAConclusion _ = GT
 compareNaPa (NAProof n na) (PAProof m) = compare n m
 compareNaPa (NAProof n na) (PANested m pa) | n == m = compareNaPa na pa
@@ -929,14 +941,18 @@ naInsertBefore e na p = case go e na p of
   Nothing -> Nothing
   Just (napa, p) -> Just (napa, naInsertBeforeAdjustLineNos e napa p)
  where
-  go e@(Left a) na@(NAAssumption n) (SubProof fs ps c) = Just (Left $ NAAssumption n, SubProof (insertAt a n fs) ps c)
-  go e@(Right (Left (Derivation f _))) na@(NAAssumption n) (SubProof fs ps c) = Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
+  go e@(Left a) na@(NAAssumption n) (SubProof fs ps c) =
+    Just (Left $ NAAssumption n, SubProof (insertAt a n fs) ps c)
+  go e@(Right (Left (Derivation f _))) na@(NAAssumption n) (SubProof fs ps c) =
+    Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
   -- go (Left a) (NALine n) (SubProof fs ps c) =
   --   Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
   --  where
   --   d = Left $ Derivation (toFormula a) (Unparsed "(?)" "")
-  go e@(Right (Left d)) na@(NALine n) (SubProof fs ps c) = Just (Left $ NALine n, SubProof fs (insertAt (Left d) n ps) c)
-  go e@(Right (Right prf)) na@(NALine n) (SubProof fs ps c) = Just (Right $ PAProof n, SubProof fs (insertAt (Right prf) n ps) c)
+  go e@(Right (Left d)) na@(NALine n) (SubProof fs ps c) =
+    Just (Left $ NALine n, SubProof fs (insertAt (Left d) n ps) c)
+  go e@(Right (Right prf)) na@(NALine n) (SubProof fs ps c) =
+    Just (Right $ PAProof n, SubProof fs (insertAt (Right prf) n ps) c)
   go e na@(NAProof n na') (SubProof fs ps c) = case ps !!? n of
     Just (Right p') ->
       go e na' p'
@@ -965,6 +981,7 @@ naMoveBefore targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLo
         maybe p (naRemove sourceAddr) $ case naInsertBefore (fmap Left node) targetAddr p of
           Just (_, p') -> Just p'
           _ -> Nothing
+  -- _ -> error $ "did not move\ncompare targetAddr sourceAddr=" <> show (compare targetAddr sourceAddr) <> "\ntargetAddr=" <> show targetAddr <> "\nsourceAddr=" <> show sourceAddr -- p
   _ -> p
 
 {- | `naCompatible` @target@ @source@ returns `True`
