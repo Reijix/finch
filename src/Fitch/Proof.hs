@@ -211,19 +211,26 @@ data RawAssumption
   | RawAssumption RawFormula
   deriving (Eq, Show)
 
-type Assumption = Wrapper RawAssumption
+type Assumption = (Wrapper RawAssumption, Wrapper RuleApplication)
 
-toAssumption :: Formula -> Assumption
-toAssumption (Unparsed txt err) = Unparsed txt err
-toAssumption (ParsedInvalid txt err f) = ParsedInvalid txt err (RawAssumption f)
-toAssumption (ParsedValid txt f) = ParsedValid txt (RawAssumption f)
+mkAssumption :: Wrapper RawAssumption -> Assumption
+mkAssumption w = (w, ParsedValid "(⊤I)" (RuleApplication "⊤I" []))
 
--- toFormula :: Assumption -> Formula
--- toFormula (Unparsed txt err) = Unparsed txt err
--- toFormula (ParsedInvalid txt err (RawAssumption f)) = ParsedInvalid txt err f
--- toFormula (ParsedInvalid txt err a@(FreshVar v)) = Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)
--- toFormula (ParsedValid txt (RawAssumption f)) = ParsedValid txt f
--- toFormula (ParsedValid txt a@(FreshVar v)) = Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)
+instance PrettyPrint Assumption where
+  prettyPrint :: Assumption -> Text
+  prettyPrint = prettyPrint . fst
+
+toAssumption :: Derivation -> Assumption
+toAssumption (Derivation (Unparsed txt err) ra) = (Unparsed txt err, ra)
+toAssumption (Derivation (ParsedInvalid txt err f) ra) = (ParsedInvalid txt err (RawAssumption f), ra)
+toAssumption (Derivation (ParsedValid txt f) ra) = (ParsedValid txt (RawAssumption f), ra)
+
+toDerivation :: Assumption -> Derivation
+toDerivation (Unparsed txt err, ra) = Derivation (Unparsed txt err) ra
+toDerivation (ParsedInvalid txt err (RawAssumption f), ra) = Derivation (ParsedInvalid txt err f) ra
+toDerivation (ParsedInvalid txt err a@(FreshVar v), ra) = Derivation (Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)) ra
+toDerivation (ParsedValid txt (RawAssumption f), ra) = Derivation (ParsedValid txt f) ra
+toDerivation (ParsedValid txt a@(FreshVar v), ra) = Derivation (Unparsed (prettyPrint a) ("Could not parse " <> prettyPrint a)) ra
 
 instance PrettyPrint RawAssumption where
   prettyPrint :: RawAssumption -> Text
@@ -755,14 +762,6 @@ pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $ filte
   Nothing -> Left "Internal error on pCollectFreshnessNodes, should not happen!"
   Just l -> Right l
 
--- extractFormula :: Either Assumption Derivation -> Maybe RawFormula
--- extractFormula (Left a) = un $ fromWrapper a
--- extractFormula (Right (Derivation f _)) = fromWrapper f
-
-extractText :: Either Assumption Derivation -> Text
-extractText (Left a) = getText a
-extractText (Right (Derivation f _)) = getText f
-
 -- * Updating proof contents
 
 {- | `naUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ using @f@.
@@ -943,12 +942,12 @@ naInsertBefore e na p = case go e na p of
  where
   go e@(Left a) na@(NAAssumption n) (SubProof fs ps c) =
     Just (Left $ NAAssumption n, SubProof (insertAt a n fs) ps c)
-  go e@(Right (Left (Derivation f _))) na@(NAAssumption n) (SubProof fs ps c) =
-    Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption f) n fs) ps c)
-  -- go (Left a) (NALine n) (SubProof fs ps c) =
-  --   Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
-  --  where
-  --   d = Left $ Derivation (toFormula a) (Unparsed "(?)" "")
+  go e@(Right (Left d)) na@(NAAssumption n) (SubProof fs ps c) =
+    Just (Left $ NAAssumption n, SubProof (insertAt (toAssumption d) n fs) ps c)
+  go (Left a) (NALine n) (SubProof fs ps c) =
+    Just (Left $ NALine n, SubProof fs (insertAt d n ps) c)
+   where
+    d = Left (toDerivation a)
   go e@(Right (Left d)) na@(NALine n) (SubProof fs ps c) =
     Just (Left $ NALine n, SubProof fs (insertAt (Left d) n ps) c)
   go e@(Right (Right prf)) na@(NALine n) (SubProof fs ps c) =
@@ -995,7 +994,7 @@ this function also returns true, when comparing a proof with its contents.
 naCompatible :: NodeAddr -> Either NodeAddr ProofAddr -> Bool
 naCompatible (NAProof _ na) e = naCompatible na e
 naCompatible (NAAssumption{}) (Left na) | isNAAssumption na || isNALine na = True
-naCompatible (NALine{}; NAConclusion) (Left na) | isNALine na = True
+naCompatible (NALine{}; NAConclusion) (Left na) | isNALine na || isNAAssumption na = True
 naCompatible (NALine{}; NAConclusion) (Right pa) = True
 naCompatible _ _ = False
 

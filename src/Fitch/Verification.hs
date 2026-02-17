@@ -104,7 +104,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 <> prettyPrint fSpec
                 <> "."
     handleAssumption :: Int -> Assumption -> AssumptionSpec -> Either Text (RawAssumption, AssumptionSpec)
-    handleAssumption line a aSpec = case a of
+    handleAssumption line (a, _) aSpec = case a of
       Unparsed{} -> Left $ "Unparsed assumption at line " <> show line
       (ParsedInvalid txt err ra) -> handleRawAssumption ra
       (ParsedValid txt ra) -> handleRawAssumption ra

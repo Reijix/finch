@@ -179,10 +179,10 @@ checkFreshness = do
   proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goAssumption p) (const id) p))
  where
   goAssumption :: Proof -> NodeAddr -> Assumption -> Assumption
-  goAssumption _ _ a@(Unparsed{}) = a
-  goAssumption p na a@(ParsedInvalid txt _ ra) = goRawAssumption p na txt ra
-  goAssumption p na a@(ParsedValid txt ra) = goRawAssumption p na txt ra
-  goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Assumption
+  goAssumption _ _ a@(Unparsed{}, _) = a
+  goAssumption p na a@(ParsedInvalid txt _ ra, r) = (goRawAssumption p na txt ra, r)
+  goAssumption p na a@(ParsedValid txt ra, r) = (goRawAssumption p na txt ra, r)
+  goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
   goRawAssumption p na txt ra@(FreshVar v) = case pCollectFreshnessNodes na p of
     Left err -> ParsedInvalid txt err ra
     Right nodes ->
@@ -202,8 +202,8 @@ checkFreshness = do
   goRawAssumption _ _ txt ra = ParsedValid txt ra
   isFreshList :: Name -> [(NodeAddr, Either Assumption Derivation)] -> Maybe (NodeAddr, Either RawAssumption RawFormula)
   isFreshList v [] = Nothing
-  isFreshList v ((na, Left (fromWrapper -> Nothing)) : rest) = isFreshList v rest
-  isFreshList v ((na, Left (fromWrapper -> Just a)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)
+  isFreshList v ((na, Left (fromWrapper -> Nothing, _)) : rest) = isFreshList v rest
+  isFreshList v ((na, Left (fromWrapper -> Just a, _)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)
   isFreshList v ((na, Right (Derivation (fromWrapper -> Nothing) _)) : rest) = isFreshList v rest
   isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
 
@@ -219,11 +219,11 @@ regenerateSymbols = do
   proof <~ (use proof >>= pMapLinesMAccumL goAssumption goLine 1 <&> snd)
  where
   goAssumption :: Int -> Assumption -> m (Int, Assumption)
-  goAssumption n a@(Unparsed{}) = pure (n + 1, a)
-  goAssumption n a@(ParsedInvalid txt err (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedInvalid txt err f)
-  goAssumption n a@(ParsedInvalid txt err (FreshVar{})) = pure (n + 1, a)
-  goAssumption n a@(ParsedValid txt (RawAssumption f)) = second (RawAssumption <$>) <$> goFormula n (ParsedValid txt f)
-  goAssumption n a@(ParsedValid txt (FreshVar{})) = pure (n + 1, a)
+  goAssumption n a@(Unparsed{}, _) = pure (n + 1, a)
+  goAssumption n a@(ParsedInvalid txt err (RawAssumption f), r) = second ((,r) . (RawAssumption <$>)) <$> goFormula n (ParsedInvalid txt err f)
+  goAssumption n a@(ParsedInvalid _ _ (FreshVar{}), _) = pure (n + 1, a)
+  goAssumption n a@(ParsedValid txt (RawAssumption f), r) = second ((,r) . (RawAssumption <$>)) <$> goFormula n (ParsedValid txt f)
+  goAssumption n a@(ParsedValid _ (FreshVar{}), _) = pure (n + 1, a)
 
   -- collect symbols inside a formula
   goFormula :: Int -> Formula -> m (Int, Formula)

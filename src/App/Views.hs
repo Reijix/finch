@@ -136,7 +136,7 @@ viewLine model na e =
     ]
  where
   (semanticSuccess, parseSuccess, txt, err) = case e of
-    Left a -> case a of
+    Left (a, _) -> case a of
       ParsedValid str a' -> (True, True, ms str, "")
       ParsedInvalid str err a' -> (False, True, ms str, ms err)
       Unparsed str err -> (False, False, ms str, ms err)

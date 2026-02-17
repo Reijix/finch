@@ -230,8 +230,8 @@ updateModel (ProcessInput str start end (Left addr)) = do
                 m
                 (lineNoOr999 addr (m ^. proof))
                 (fromMisoString str) ::
-                Assumption
-        proof %= naUpdateFormula (Left $ const a) addr
+                Wrapper RawAssumption
+        proof %= naUpdateFormula (Left (\(_, r) -> (a, r))) addr
         pure $ T.length . getText $ a
       else do
         let f =
