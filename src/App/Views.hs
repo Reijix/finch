@@ -90,44 +90,49 @@ viewSpawnNode tp str =
 -- VIEWS
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
-  optionalAttrs
-    H.div_
-    [ HP.draggable_ $ na /= NAConclusion && (model ^. focusedLine) /= Just (Left na)
-    , HP.classList_
-        [ ("proof-line", True)
-        , ("draggable", na /= NAConclusion && (model ^. focusedLine) /= Just (Left na))
-        , ("can-hover", not (model ^. dragging))
-        , ("non-selectable", na == NAConclusion)
-        ]
+  H.div_
+    [ HP.class_ "proof-line"
+    , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess), ("can-hover", not (model ^. dragging))]
     ]
-    (not $ isNAConclusion na)
-    [ onDragStartWithOptions stopPropagation $ DragStart (Left na)
-    , onDragEndWithOptions defaultOptions DragEnd
-    ]
-    [ H.div_
-        [ onDoubleClick $ DoubleClick (Left na)
-        , HP.class_ "formula-container"
-        , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess), ("can-hover", not (model ^. dragging))]
-        ]
-        [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
-        , H.input_
-            [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
-            , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
-            , HP.classList_
-                [ ("formula-input", True)
-                , ("parse-fail", not parseSuccess || not semanticSuccess)
-                , ("draggable", Just (Left na) /= model ^. focusedLine)
-                ]
-            , HP.draggable_ False
-            , onBlur Blur
-            , onChange (const Change)
-            , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-            , onCreatedWith (KeyDownStart (Left na))
-            , onBeforeDestroyed (KeyDownStop (Left na))
-            , onDragStartWithOptions preventDefault Nop
-            , value_ txt
+    [ optionalAttrs
+        H.div_
+        [ HP.draggable_ $ na /= NAConclusion && (model ^. focusedLine) /= Just (Left na)
+        , HP.classList_
+            [ -- ("proof-line", True)
+              ("draggable", na /= NAConclusion && (model ^. focusedLine) /= Just (Left na))
+            , ("can-hover", not (model ^. dragging))
+            , ("non-selectable", na == NAConclusion)
             ]
         ]
+        (not $ isNAConclusion na)
+        [ onDragStartWithOptions stopPropagation $ DragStart (Left na)
+        , onDragEndWithOptions defaultOptions DragEnd
+        ]
+        [ H.div_
+            [ onDoubleClick $ DoubleClick (Left na)
+            , HP.class_ "formula-container"
+            ]
+            -- TODO fix another way!
+            [ H.input_
+                [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
+                , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
+                , HP.classList_
+                    [ ("formula-input", True)
+                    , ("parse-fail", not parseSuccess || not semanticSuccess)
+                    , ("draggable", Just (Left na) /= model ^. focusedLine)
+                    ]
+                , HP.draggable_ False
+                , onBlur Blur
+                , onChange (const Change)
+                , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+                , onCreatedWith (KeyDownStart (Left na))
+                , onBeforeDestroyed (KeyDownStop (Left na))
+                , onDragStartWithOptions preventDefault Nop
+                , value_ txt
+                ]
+            ]
+        ]
+    , H.code_ [HP.class_ "error", HP.draggable_ False, HP.hidden_ (parseSuccess && semanticSuccess)] [text err]
     ]
  where
   (semanticSuccess, parseSuccess, txt, err) = case e of

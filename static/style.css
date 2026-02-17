@@ -72,11 +72,6 @@ Proof containers
   padding-top: 10px
 }
 
-.proof.line.can-hover:hover {
-  background-color: cyan;
-  opacity: 0.1;
-}
-
 .proof-line {
   position: relative;
   max-width: 15rem;
@@ -224,6 +219,7 @@ Drag and drop related
 .drop-zone {
   height: 5px;
   transition: height 0.1s linear;
+  background-color: white
 }
 
 .expanded-drop-zone {
