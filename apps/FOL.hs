@@ -33,7 +33,7 @@ main = runApp exProof operatorsFOL infixPredsFOL quantifiersFOL rulesFOL
     |||Q(d) → R(d)        (∀E) 2
     |||R(d)               (→E) 6,7
     ||P(d) → R(d)         (→I) 4-8
-    |∀x.P(x) → R(x)       (∀I) 3-9
+    |∀x.P(x) → R(c)       (∀I) 3-9
     """
 
 -----------------------------------------------------------------------------

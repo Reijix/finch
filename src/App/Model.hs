@@ -174,6 +174,7 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 -- * Semantic checking
 
+-- TODO checkFreshness does not ignore subproofs above!!
 checkFreshness :: forall m. (MonadState Model m) => m ()
 checkFreshness = do
   proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goAssumption p) (const id) p))

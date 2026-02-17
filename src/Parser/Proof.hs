@@ -1,6 +1,7 @@
 module Parser.Proof where
 
 import Data.List.NonEmpty (some1)
+import Data.Text qualified as T
 import Fitch.Proof (
   Assumption,
   Derivation (..),
@@ -32,18 +33,21 @@ import Text.Megaparsec (
  )
 import Text.Megaparsec qualified as Parsec
 
+matchNoSpaces :: (Parser m) => m a -> m (Text, a)
+matchNoSpaces p = first T.strip <$> match p
+
 pFormula :: (FormulaParser m) => m Formula
-pFormula = match (lexeme pRawFormula) <&> uncurry ParsedValid
+pFormula = matchNoSpaces (lexeme pRawFormula) <&> uncurry ParsedValid
 
 pAssumption :: (FormulaParser m) => m Assumption
-pAssumption = mkAssumption <$> (match (lexeme pRawAssumption) <&> uncurry ParsedValid)
+pAssumption = mkAssumption <$> (matchNoSpaces (lexeme pRawAssumption) <&> uncurry ParsedValid)
 
 pDerivation :: (FormulaParser m) => m Derivation
 pDerivation =
   liftA2
     Derivation
     pFormula
-    (match (lexeme pRule) <&> uncurry ParsedValid)
+    (matchNoSpaces (lexeme pRule) <&> uncurry ParsedValid)
 
 pFormulaSep :: (Parser m) => Int -> m ()
 pFormulaSep ind = void . withIndent ind $ symbol "---"
