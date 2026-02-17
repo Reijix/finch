@@ -63,7 +63,7 @@ assertInvalid _ = pass
 expectValidProof :: Proof -> Assertion
 expectValidProof =
   pFoldLinesM
-    (const assertValid)
+    (\_ (a, _) -> assertValid a)
     (\_ (Derivation f r) -> assertValid f >> assertValid r)
     ()
 
@@ -75,7 +75,7 @@ expectInvalidRuleAt n p = case pIndex n p of
 expectInvalidFormulaAt :: Int -> Proof -> Assertion
 expectInvalidFormulaAt n p = case pIndex n p of
   Just (Right (Derivation f _)) -> assertInvalid f
-  Just (Left f) -> assertInvalid f
+  Just (Left (a, _)) -> assertInvalid a
   _ -> assertFailure "expectInvalidFormulaAt: internal error, pIndex failed!"
 
 testValidProofs :: TestTree

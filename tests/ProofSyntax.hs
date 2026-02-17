@@ -24,7 +24,7 @@ formula :: Int -> Formula
 formula n = ParsedValid (show n) $ Pred (show n) []
 
 assumption :: Int -> Assumption
-assumption n = ParsedValid (show n) $ RawAssumption $ Pred (show n) []
+assumption n = mkAssumption $ ParsedValid (show n) $ RawAssumption $ Pred (show n) []
 
 rule :: Int -> [Reference] -> Wrapper RuleApplication
 rule n ref = ParsedValid (show n) (RuleApplication "Rule" ref)
