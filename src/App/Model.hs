@@ -34,7 +34,7 @@ import Relude.Extra.Newtype
 -- * Types
 
 data DropLocation where
-  LocationAddr :: NodeAddr -> DropLocation
+  LineAddr :: NodeAddr -> DropLocation
   LocationBin :: DropLocation
   deriving (Show, Eq)
 
@@ -323,6 +323,6 @@ regenerateSymbols = do
 
 canSpawnIn :: NodeAddr -> SpawnType -> Bool
 canSpawnIn (NAProof n na) st = canSpawnIn na st
-canSpawnIn (NALine{}; NAAssumption{}; NAConclusion) SpawnLine = True
+canSpawnIn (NALine{}; NAAssumption{}; NAConclusion; NAAfterConclusion) SpawnLine = True
 canSpawnIn (NALine{}; NAConclusion) SpawnProof = True
 canSpawnIn _ _ = False

@@ -117,41 +117,38 @@ clearDrag = do
   dragTarget .= Nothing
   spawnType .= Nothing
 
-dropInto :: NodeAddr -> Effect ROOT Model Action
-dropInto targetAddr = do
+dropBeforeLine :: NodeAddr -> Effect ROOT Model Action
+dropBeforeLine targetAddr = do
   m <- get
   use dragTarget >>= \case
     Nothing -> pass
     Just (Left na) -> do
-      -- io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
+      io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
       proof %= naMoveBefore targetAddr na
     Just (Right pa) -> proof %= paMoveBefore targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do
-      mp <-
-        naInsertBefore
-          (Right . Left $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
-          targetAddr
-          <$> use proof
-      case mp of
-        Just (Left na, p) -> do
-          proof .= p
-          setFocus (Left targetAddr)
-        _ -> pass
-    Just SpawnProof -> do
-      mp <-
-        naInsertBefore
-          ( Right . Right $
-              SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
-          )
-          targetAddr
-          <$> use proof
-      case mp of
-        Just (Right pa, p) -> do
-          proof .= p
-          setFocus (Left $ naFromPA pa NAConclusion)
-        _ -> pass
+      io_ $ consoleLog $ "Spawning in " <> show targetAddr
+      use proof
+        >>= ( \case
+                Just (Left na, p) -> proof .= p >> setFocus (Left na)
+                _ -> pass
+            )
+          . naInsertBefore
+            (Right . Left $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
+            targetAddr
+    Just SpawnProof ->
+      use proof
+        >>= ( \case
+                Just (Right pa, p) -> proof .= p >> setFocus (Left $ naFromPA pa NAConclusion)
+                _ -> pass
+            )
+          . naInsertBefore
+            ( Right . Right $
+                SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
+            )
+            targetAddr
   clearDrag
   checkProof
 
@@ -181,7 +178,7 @@ updateModel (Drop LocationBin) = do
     Just (Right pa) -> proof %= paRemove pa
   clearDrag
   checkProof
-updateModel (Drop (LocationAddr targetAddr)) = dropInto targetAddr
+updateModel (Drop (LineAddr targetAddr)) = dropBeforeLine targetAddr
 updateModel (DragEnter na) = do
   p <- use proof
   use spawnType
@@ -192,7 +189,7 @@ updateModel (DragEnter na) = do
         currentHoverLine .= Nothing
       Nothing ->
         use dragTarget >>= \case
-          Just (naCanMoveBefore na -> True) -> currentHoverLine .= Just na
+          Just (naCanMoveBefore p na -> True) -> currentHoverLine .= Just na
           _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
@@ -203,7 +200,8 @@ updateModel (DragStart dt) = do
   dragging .= True
 updateModel DragEnd = do
   chl <- use currentHoverLine
-  maybe clearDrag dropInto chl
+  whenJust chl dropBeforeLine
+  clearDrag
 ------------------------------------
 -- Input related events
 updateModel (DoubleClick ea) = setFocus ea

@@ -40,27 +40,30 @@ import Util (interleave)
 contentEditable_ :: Bool -> Attribute action
 contentEditable_ = boolProp "contentEditable"
 
-interleaveWithDropZones :: Model -> Maybe MisoString -> (Int -> NodeAddr) -> [View Model Action] -> [View Model Action]
-interleaveWithDropZones model mclass na views = interleave dropzones views
+viewDropZoneAt :: Model -> Maybe MisoString -> NodeAddr -> View Model Action
+viewDropZoneAt model mclass na =
+  H.div_
+    [ HP.class_ "drop-zone"
+    , HP.id_ (show na)
+    , HP.classList_
+        [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
+        , (fromMaybe "" mclass, isJust mclass)
+        ]
+    , HP.draggable_ False
+    , onDragOverWithOptions preventDefault Nop
+    , onDragEnterWithOptions preventDefault (DragEnter na)
+    , onDropWithOptions defaultOptions (Drop (LineAddr na))
+    ]
+    []
+
+interleaveWithDropZones :: Model -> Maybe MisoString -> Maybe NodeAddr -> (Int -> NodeAddr) -> [View Model Action] -> [View Model Action]
+interleaveWithDropZones model mclass lastNA na views = interleave dropzones views
  where
   dropzones :: [View Model Action]
   dropzones =
     map
-      ( \n ->
-          H.div_
-            [ HP.class_ "drop-zone"
-            , HP.classList_
-                [ ("expanded-drop-zone", model ^. currentHoverLine == Just (na n))
-                , (fromMaybe "" mclass, n == length views && isJust mclass)
-                ]
-            , HP.draggable_ False
-            , onDragOverWithOptions preventDefault Nop
-            , onDragEnterWithOptions preventDefault (DragEnter (na n))
-            , onDropWithOptions defaultOptions (Drop (LocationAddr (na n)))
-            ]
-            []
-      )
-      [0 .. length views + 1]
+      (\n -> viewDropZoneAt model (if n == length views then mclass else Nothing) (if n == length views then fromMaybe (na n) lastNA else na n))
+      [0 .. length views]
 
 -----------------------------------------------------------------------------
 viewBin :: View Model Action
@@ -94,25 +97,20 @@ viewLine model na e =
     [ HP.class_ "proof-line"
     , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess), ("can-hover", not (model ^. dragging))]
     ]
-    [ optionalAttrs
-        H.div_
-        [ HP.draggable_ $ na /= NAConclusion && (model ^. focusedLine) /= Just (Left na)
+    [ H.div_
+        [ HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
         , HP.classList_
-            [ -- ("proof-line", True)
-              ("draggable", na /= NAConclusion && (model ^. focusedLine) /= Just (Left na))
+            [ ("draggable", (model ^. focusedLine) /= Just (Left na))
             , ("can-hover", not (model ^. dragging))
             , ("non-selectable", na == NAConclusion)
             ]
-        ]
-        (not $ isNAConclusion na)
-        [ onDragStartWithOptions stopPropagation $ DragStart (Left na)
+        , onDragStartWithOptions stopPropagation $ DragStart (Left na)
         , onDragEndWithOptions defaultOptions DragEnd
         ]
         [ H.div_
             [ onDoubleClick $ DoubleClick (Left na)
             , HP.class_ "formula-container"
             ]
-            -- TODO fix another way!
             [ H.input_
                 [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
                 , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
@@ -154,9 +152,9 @@ viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id 
   goProof lineNo na (SubProof fs ps c) =
     H.div_
       [HP.class_ "line-no-wrapper", HP.draggable_ False]
-      ( interleaveWithDropZones model (Just "empty-last-assumption") (na . NAAssumption) goFs
-          <> interleaveWithDropZones model Nothing (na . NALine) goPs
-          <> one goC
+      ( interleaveWithDropZones model (Just "empty-last-assumption") Nothing (na . NAAssumption) goFs
+          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) goPs
+          <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one goC))
       )
    where
     ((lineNo', _), goFs) = case fs of
@@ -183,9 +181,9 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
   go na (SubProof fs ps c) =
     H.div_
       [HP.class_ "rules-wrapper"]
-      ( interleaveWithDropZones model (Just "empty-last-assumption") (na . NAAssumption) goFs
-          <> interleaveWithDropZones model Nothing (na . NALine) goPs
-          <> one goC
+      ( interleaveWithDropZones model (Just "empty-last-assumption") Nothing (na . NAAssumption) goFs
+          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) goPs
+          <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one goC))
       )
    where
     goFs = case fs of
@@ -246,9 +244,9 @@ viewProof model =
   proofView =
     H.div_
       [HP.class_ "formulae-container"]
-      ( interleaveWithDropZones model (Just "last-assumption") NAAssumption viewAssumptions
-          <> interleaveWithDropZones model Nothing NALine viewProofs
-          <> one viewConclusion
+      ( interleaveWithDropZones model (Just "last-assumption") Nothing NAAssumption viewAssumptions
+          <> interleaveWithDropZones model Nothing (Just NAConclusion) NALine viewProofs
+          <> drop 1 (interleaveWithDropZones model Nothing (Just NAAfterConclusion) (const NAAfterConclusion) (one viewConclusion))
       )
    where
     (SubProof fs ps d) = model ^. proof
@@ -275,9 +273,9 @@ viewProof model =
       , onDragStartWithOptions stopPropagation $ DragStart (Right pa)
       , onDragEndWithOptions defaultOptions DragEnd
       ]
-      ( interleaveWithDropZones model (Just "last-assumption") (na . NAAssumption) viewAssumptions
-          <> interleaveWithDropZones model Nothing (na . NALine) viewProofs
-          <> one viewConclusion
+      ( interleaveWithDropZones model (Just "last-assumption") Nothing (na . NAAssumption) viewAssumptions
+          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) viewProofs
+          <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one viewConclusion))
       )
    where
     viewAssumptions = case fs of
