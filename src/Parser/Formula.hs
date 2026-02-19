@@ -2,7 +2,7 @@ module Parser.Formula where
 
 import Control.Monad.Combinators.Expr (makeExprParser)
 import Fitch.Proof (Name, RawAssumption (..), RawFormula (..), Term (..))
-import Parser.Prelude (
+import Parser.Util (
   binary,
   brackets,
   comma,

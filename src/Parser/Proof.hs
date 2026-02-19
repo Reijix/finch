@@ -13,7 +13,7 @@ import Fitch.Proof (
   mkAssumption,
  )
 import Parser.Formula (FormulaParser, FormulaParserState (..), pFreshVariable, pRawAssumption, pRawFormula)
-import Parser.Prelude (Parser, lexeme, symbol)
+import Parser.Util (Parser, lexeme, symbol)
 import Parser.Rule (pRule)
 import Text.Megaparsec (
   ErrorItem (..),

@@ -1,4 +1,4 @@
-module Parser.Prelude where
+module Parser.Util where
 
 import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),

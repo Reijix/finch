@@ -125,7 +125,7 @@ library fitch-editor-lib
     Fitch.Unification
     Fitch.Verification
     Parser.Formula
-    Parser.Prelude
+    Parser.Util
     Parser.Proof
     Parser.Rule
     Specification.FOL

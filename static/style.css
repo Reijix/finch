@@ -58,6 +58,7 @@ Proof containers
 --------------------------------------------------
 */
 .fitch-container {
+  width: 100%;
   display: inline-flex;
 }
 

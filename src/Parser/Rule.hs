@@ -5,7 +5,7 @@ import Control.Monad.Combinators.Expr (
   makeExprParser,
  )
 import Fitch.Proof (Reference (..), RuleApplication (..))
-import Parser.Prelude (
+import Parser.Util (
   Parser,
   comma,
   lexeme,
