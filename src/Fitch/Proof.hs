@@ -984,7 +984,7 @@ naInsertBefore ::
 naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
   Just (napa, p@(fromNodeAddr na -> Just lineNo)) ->
     offsetFor p napa >>= \offset ->
-      Just (napa, pMapRefs (pure . goRef p napa offset lineNo) p)
+      Just (napa, pMapRefs (pure . goRef prf napa offset lineNo) p)
   _ -> Nothing
  where
   offsetFor :: Proof -> Either NodeAddr ProofAddr -> Maybe Int
@@ -999,31 +999,53 @@ naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
     | lineNo <= line = LineReference $ line + offset
   goRef p napa offset lineNo (ProofReference start end)
     | lineNo > start && lineNo > end = ProofReference start end
-    | lineNo > start && lineNo <= end = ProofReference start (end + offset)
-    | lineNo < start = ProofReference (start + offset) (end + offset)
-    | lineNo == start =
-        if maybe False (maybe (const False) naInSameProof (leftToMaybe napa)) (fromLineNo (end + offset) p)
-          then ProofReference start (end + offset)
-          else ProofReference (start + offset) (end + offset)
+    | targetInRange lineNo (start, end) p = ProofReference start (end + offset)
+    | lineNo <= start = ProofReference (start + offset) (end + offset)
 
 {- | `naMoveBefore` @target@ @source@ @p@ moves the line at the source address
 before the target line.
 -}
+naMoveBeforeRaw :: NodeAddr -> NodeAddr -> Proof -> Proof
+naMoveBeforeRaw targetAddr sourceAddr p = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
+  (LT, Just node) ->
+    let p' = naRemoveRaw sourceAddr p
+     in case naInsertBeforeRaw (fmap Left node) targetAddr p' of
+          Just (_, p') -> p'
+          _ -> p
+  (GT, Just node) ->
+    maybe p (naRemoveRaw sourceAddr) $ case naInsertBeforeRaw (fmap Left node) targetAddr p of
+      Just (_, p') -> Just p'
+      _ -> Nothing
+  _ -> p
+
+targetInRange :: Int -> (Int, Int) -> Proof -> Bool
+targetInRange lineNo (start, end) p =
+  (lineNo > start && lineNo <= end)
+    || ( lineNo == start
+           && maybe False (maybe (const False) naInSameProof (fromLineNo start p)) (fromLineNo end p)
+       )
+
 naMoveBefore :: NodeAddr -> NodeAddr -> Proof -> Proof
 naMoveBefore targetAddr sourceAddr p = if naCanMoveBefore p targetAddr (Left sourceAddr) then go else p
  where
-  go = case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
-    (LT, Just node) ->
-      let p' = naRemoveRaw sourceAddr p
-       in case naInsertBeforeRaw (fmap Left node) targetAddr p' of
-            Just (_, p') -> p'
-            _ -> p
-    (GT, Just node) ->
-      maybe p (naRemoveRaw sourceAddr) $ case naInsertBeforeRaw (fmap Left node) targetAddr p of
-        Just (_, p') -> Just p'
-        _ -> Nothing
-    -- _ -> error $ "did not move\ncompare targetAddr sourceAddr=" <> show (compare targetAddr sourceAddr) <> "\ntargetAddr=" <> show targetAddr <> "\nsourceAddr=" <> show sourceAddr -- p
+  p' = naMoveBeforeRaw targetAddr sourceAddr p
+  go = case (fromNodeAddr targetAddr p, fromNodeAddr sourceAddr p) of
+    (Just target, Just source) -> pMapRefs (pure . goRef target source) p'
     _ -> p
+  goRef :: Int -> Int -> Reference -> Reference
+  goRef target source (LineReference line)
+    | line == source = LineReference target
+    | line < source && line >= target = LineReference (line + 1)
+    | line > source && line < target = LineReference (line - 1)
+    | otherwise = LineReference line
+  goRef target source (ProofReference start end)
+    | targetInRange target (start, end) p && source < start = ProofReference (start - 1) end
+    | targetInRange target (start, end) p && source > end = ProofReference start (end + 1)
+    | target <= start && source >= start && source <= end = ProofReference (start + 1) end
+    | target <= start && source > end = ProofReference (start + 1) (end + 1)
+    | target > end && source >= start && source <= end = ProofReference start (end - 1)
+    | target > end && source < start = ProofReference (start - 1) (end - 1)
+    | otherwise = ProofReference start end
 
 {- | `naCompatible` @target@ @source@ returns `True`
 if @source@ and @target@ target are compatible, which means
