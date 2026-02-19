@@ -157,9 +157,8 @@ viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id 
           <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one goC))
       )
    where
-    ((lineNo', _), goFs) = case fs of
-      [] -> ((lineNo, 0), one $ H.p_ [HP.class_ "empty-assumption-rule"] [])
-      _ -> mapAccumL (\(lineNo, d) f -> ((lineNo + 1, d + 1), lineNoFor lineNo)) (lineNo, 0) fs
+    ((lineNo', _), goFs) =
+      mapAccumL (\(lineNo, d) f -> ((lineNo + 1, d + 1), lineNoFor lineNo)) (lineNo, 0) fs
     ((lineNo'', _), goPs) =
       mapAccumL
         ( \(lineNo, n) e ->
@@ -186,9 +185,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
           <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one goC))
       )
    where
-    goFs = case fs of
-      [] -> one $ H.p_ [HP.class_ "empty-assumption-rule"] []
-      _ -> map (const $ H.p_ [HP.class_ "empty-rule"] []) fs
+    goFs = map (const $ H.p_ [HP.class_ "empty-rule"] []) fs
     goPs =
       snd $
         mapAccumL
@@ -250,14 +247,12 @@ viewProof model =
       )
    where
     (SubProof fs ps d) = model ^. proof
-    viewAssumptions = case fs of
-      [] -> one $ H.p_ [HP.class_ "empty-assumptions"] []
-      _ ->
-        snd $
-          L.mapAccumL
-            (\n f -> (n + 1, viewLine model (NAAssumption n) (Left f)))
-            0
-            fs
+    viewAssumptions =
+      snd $
+        L.mapAccumL
+          (\n f -> (n + 1, viewLine model (NAAssumption n) (Left f)))
+          0
+          fs
     viewProofs =
       snd $
         L.mapAccumL
@@ -278,21 +273,19 @@ viewProof model =
           <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one viewConclusion))
       )
    where
-    viewAssumptions = case fs of
-      [] -> one $ H.p_ [HP.class_ "empty-assumptions"] []
-      _ ->
-        snd $
-          L.mapAccumL
-            ( \m f ->
-                ( m + 1
-                , viewLine
-                    model
-                    (na (NAAssumption m))
-                    (Left f)
-                )
-            )
-            0
-            fs
+    viewAssumptions =
+      snd $
+        L.mapAccumL
+          ( \m f ->
+              ( m + 1
+              , viewLine
+                  model
+                  (na (NAAssumption m))
+                  (Left f)
+              )
+          )
+          0
+          fs
     viewProofs =
       snd $
         L.mapAccumL
