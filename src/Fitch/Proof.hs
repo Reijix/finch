@@ -1067,12 +1067,12 @@ targetInRange lineNo (start, end) p =
     || lineNo == start
       && maybe False (maybe (const False) naInSameProof (fromLineNo start p)) (fromLineNo end p)
 
-naMoveBefore :: NodeAddr -> NodeAddr -> Proof -> Maybe Proof
+naMoveBefore :: NodeAddr -> NodeAddr -> Proof -> Maybe (NodeAddr, Proof)
 naMoveBefore targetAddr sourceAddr p =
   if naCanMoveBefore p targetAddr (Left sourceAddr)
     then case naMoveBeforeRaw targetAddr sourceAddr p of
       Nothing -> Nothing
-      Just (targetAddr', p') -> go targetAddr' p'
+      Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
     else Nothing
  where
   go :: NodeAddr -> Proof -> Maybe Proof

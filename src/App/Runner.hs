@@ -117,6 +117,16 @@ clearDrag = do
   dragTarget .= Nothing
   spawnType .= Nothing
 
+reParseLine :: NodeAddr -> Effect ROOT Model Action
+reParseLine na =
+  get >>= \m ->
+    use proof >>= \p -> case (naLookup na p, fromNodeAddr na p) of
+      (Just (Left (a, r)), Just lineNo) ->
+        proof %=? naUpdateFormula (Left $ const (reParse m lineNo a, r)) na
+      (Just (Right (Derivation f _)), Just lineNo) ->
+        proof %=? naUpdateFormula (Right $ const (reParse m lineNo f)) na
+      _ -> pass
+
 dropBeforeLine :: NodeAddr -> Effect ROOT Model Action
 dropBeforeLine targetAddr = do
   m <- get
@@ -124,31 +134,39 @@ dropBeforeLine targetAddr = do
     Nothing -> pass
     Just (Left na) -> do
       io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
-      proof %=? naMoveBefore targetAddr na
+      use proof >>= \p -> case naMoveBefore targetAddr na p of
+        Nothing -> pass
+        Just (ta, p) -> do
+          proof %= const p
+          reParseLine ta
     Just (Right pa) -> proof %=? paMoveBefore targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do
       io_ $ consoleLog $ "Spawning in " <> show targetAddr
       use proof
-        >>= ( \case
-                Just (Left na, p) -> proof .= p >> setFocus (Left na)
-                _ -> pass
-            )
-          . naInsertBefore
+        >>= \p ->
+          case naInsertBefore
+            -- TODO move to model
             (Right . Left $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
             targetAddr
+            p of
+            Just (Left na, p) -> do
+              proof .= p
+              setFocus (Left na)
+            _ -> pass
     Just SpawnProof ->
       use proof
-        >>= ( \case
-                Just (Right pa, p) -> proof .= p >> setFocus (Left $ naFromPA pa NAConclusion)
-                _ -> pass
-            )
-          . naInsertBefore
-            ( Right . Right $
-                SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
-            )
-            targetAddr
+        >>= \p -> case naInsertBefore
+          ( Right . Right $
+              SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
+          )
+          targetAddr
+          p of
+          Just (Right pa, p) -> do
+            proof .= p
+            setFocus (Left $ naFromPA pa NAConclusion)
+          _ -> pass
   clearDrag
   checkProof
 
@@ -401,3 +419,9 @@ tryParse m n txt = case fromText m n replacedTxt :: Either Text a of
       (\(alias, name) t -> T.replace alias name t)
       (foldr (\(alias, name, _) t -> T.replace alias name t) txt (m ^. operators))
       (m ^. quantifiers)
+
+reParse ::
+  forall a.
+  (FromText a) =>
+  Model -> Int -> Wrapper a -> Wrapper a
+reParse m n w = tryParse m n (getText w)
