@@ -139,7 +139,7 @@ dropBeforeLine targetAddr = do
         Just (ta, p) -> do
           proof %= const p
           reParseLine ta
-    Just (Right pa) -> proof %=? paMoveBefore targetAddr pa
+    Just (Right pa) -> proof %=? (fmap snd . paMoveBefore targetAddr pa)
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do

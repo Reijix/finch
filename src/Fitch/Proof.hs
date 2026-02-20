@@ -534,6 +534,11 @@ naInSameProof (NAProof n na1) (NAProof m na2) = n == m && naInSameProof na1 na2
 naInSameProof (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) = True
 naInSameProof _ _ = False
 
+paInSameProof :: ProofAddr -> ProofAddr -> Bool
+paInSameProof (PANested n pa1) (PANested m pa2) = n == m && paInSameProof pa1 pa2
+paInSameProof PAProof{} PAProof{} = True
+paInSameProof _ _ = False
+
 -- TODO comment
 data ProofAddr
   = PAProof Int
@@ -641,8 +646,7 @@ fromLineRange start end p = join $ go start end 0 p
         Nothing -> Nothing
         Just Nothing -> Just $ Just $ PAProof n
         Just (Just pa) -> Just $ Just $ PANested n pa
-
--- go start end n (SubProof fs ps c) = go (start - length fs) (end - length fs) n (SubProof [] ps c)
+  go start end n p = Nothing
 
 {- | Takes a `NodeAddr` and returns the corresponding line index for a given proof.
 
@@ -668,14 +672,19 @@ lineNoOr999 :: NodeAddr -> Proof -> Int
 lineNoOr999 na p = fromMaybe 999 (fromNodeAddr na p)
 
 lineRangeFromProofAddr :: ProofAddr -> Proof -> Maybe (Int, Int)
-lineRangeFromProofAddr = go 1
+lineRangeFromProofAddr pa p = go 1 pa p
  where
   go :: Int -> ProofAddr -> Proof -> Maybe (Int, Int)
-  go n (PAProof 0) (SubProof [] ((Right p) : _) c) = Just (n, n + pLength p - 1)
+  go n (PAProof 0) (SubProof [] (e : _) c) = case e of
+    Right p -> Just (n, n + pLength p - 1)
+    _ -> Nothing
   go n (PAProof m) (SubProof [] (p : ps) c) = go (n + either (const 1) pLength p) (PAProof (m - 1)) (SubProof [] ps c)
-  go n (PANested 0 pa) (SubProof [] ((Right p) : _) _) = go n pa p
+  go n (PANested 0 pa) (SubProof [] (e : _) _) = case e of
+    Right p -> go n pa p
+    _ -> Nothing
   go n (PANested m pa) (SubProof [] (p : ps) c) = go (n + either (const 1) pLength p) (PANested (m - 1) pa) (SubProof [] ps c)
-  go n pa (SubProof fs ps c) = go (n + length fs) pa (SubProof [] ps c)
+  go n pa (SubProof (f : fs) ps c) = go (n + length fs + 1) pa (SubProof [] ps c)
+  go _ _ _ = Nothing
 
 -- ** Utilities for working with addresses
 
@@ -999,7 +1008,7 @@ naInsertBeforeRaw e (NAProof n na) (SubProof fs ps c) = case ps !!? n of
                   (liftA3 SubProof (pure fs) (updateAtM n (const . pure $ Right p') ps) (pure c))
           )
   _ -> Nothing
-naInsertBeforeRaw _ _ _ = error ""
+naInsertBeforeRaw _ _ _ = Nothing
 
 naInsertBefore ::
   Either Assumption (Either Derivation Proof) ->
@@ -1008,8 +1017,11 @@ naInsertBefore ::
   Maybe (Either NodeAddr ProofAddr, Proof)
 naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
   Just (Left na', p@(fromNodeAddr na' -> Just lineNo)) ->
-    offsetFor p (Left na') >>= \offset ->
-      Just (Left na', pMapRefs (pure . goRef prf na' offset lineNo) p)
+    Just (Left na', pMapRefs (pure . goRef prf (Left na') 1 lineNo) p)
+  Just (Right pa, p@(lineRangeFromProofAddr pa -> Just (targetStart, targetEnd))) ->
+    offsetFor p (Right pa) >>= \offset ->
+      -- TODO is targetStart correct??
+      Just (Right pa, pMapRefs (pure . goRef prf (Right pa) offset targetStart) p)
   _ -> Nothing
  where
   offsetFor :: Proof -> Either NodeAddr ProofAddr -> Maybe Int
@@ -1018,15 +1030,15 @@ naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
   offsetFor (SubProof fs ps c) (Right (PANested n pa)) = case ps !!? n of
     Just (Right p) -> offsetFor p (Right pa)
     _ -> Nothing
-  goRef :: Proof -> NodeAddr -> Int -> Int -> Reference -> Reference
-  goRef p na offset lineNo (LineReference line)
+  goRef :: Proof -> Either NodeAddr ProofAddr -> Int -> Int -> Reference -> Reference
+  goRef p _ offset lineNo (LineReference line)
     | lineNo > line = LineReference line
     | lineNo <= line = LineReference $ line + offset
-  goRef p na offset lineNo (ProofReference start end) = case fromLineRange start end p of
+  goRef p napa offset lineNo (ProofReference start end) = case fromLineRange start end p of
     Nothing -> ProofReference start end
     Just pa
       | lineNo > end -> ProofReference start end
-      | naContainedIn na pa -> ProofReference start (end + offset)
+      | either (`naContainedIn` pa) (`paContainedIn` pa) napa -> ProofReference start (end + offset)
       | lineNo <= start -> ProofReference (start + offset) (end + offset)
 
 {- | `naMoveBefore` @target@ @source@ @p@ moves the line at the source address
@@ -1126,6 +1138,11 @@ naContainedIn (NAProof n _) (PAProof m) = n == m
 naContainedIn (NAProof n na) (PANested m pa) = n == m && naContainedIn na pa
 naContainedIn _ _ = False
 
+paContainedIn :: ProofAddr -> ProofAddr -> Bool
+paContainedIn (PANested n _) (PAProof m) = n == m
+paContainedIn (PANested n pa1) (PANested m pa2) = n == m && paContainedIn pa1 pa2
+paContainedIn _ _ = False
+
 naSameOrNext :: Proof -> NodeAddr -> Either NodeAddr ProofAddr -> Bool
 naSameOrNext (SubProof _ ps _) (NAProof n na) (Left (NAProof m na'))
   | n == m = case ps !!? n of
@@ -1169,13 +1186,47 @@ naCanMoveBefore p na e =
       Left _ -> True
       Right pa -> not $ naContainedIn na pa
 
-paMoveBefore :: NodeAddr -> ProofAddr -> Proof -> Maybe Proof
-paMoveBefore targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
+paMoveBeforeRaw :: NodeAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
+paMoveBeforeRaw targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
   (LT, Just prf) -> do
     p' <- paRemoveRaw sourceAddr p
-    (_, p') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p'
-    pure p'
+    (e, p'') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p'
+    pa <- rightToMaybe e
+    pure (pa, p'')
   (GT, Just prf) -> do
-    (_, p') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p
-    paRemoveRaw sourceAddr p'
+    (e, p') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p
+    pa <- rightToMaybe e
+    p'' <- paRemoveRaw sourceAddr p'
+    let
+      decrementProofAddrOrSame :: ProofAddr -> ProofAddr
+      decrementProofAddrOrSame (PAProof n) = PAProof (n - 1)
+      decrementProofAddrOrSame (PANested n pa) = PANested n $ decrementProofAddrOrSame pa
+      pa' =
+        if paInSameProof pa sourceAddr
+          then decrementProofAddrOrSame pa
+          else pa
+    pure (pa', p'')
   _ -> Nothing
+
+inRange :: (Int, Int) -> Int -> Bool
+inRange (start, end) n = n >= start && n <= end
+
+paMoveBefore :: NodeAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
+paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAddr p of
+  Nothing -> Nothing
+  Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
+ where
+  go :: ProofAddr -> Proof -> Maybe Proof
+  go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
+    (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
+    _ -> Nothing
+  goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
+  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
+    | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)
+    | line < sourceStart && targetStart <= line = LineReference (line + proofLen)
+    | line > sourceEnd && targetEnd > line = LineReference (line - proofLen)
+    | otherwise = LineReference line
+   where
+    proofOffset = line - sourceStart
+    proofLen = sourceEnd - sourceStart + 1
+  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end) = ProofReference start end
