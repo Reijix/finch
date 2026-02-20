@@ -150,7 +150,7 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
 prop_lRemoveMinus1 :: PrettyProof -> Property
 prop_lRemoveMinus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    pLength (naRemove a p) === pLength p - 1
+    (pLength <$> naRemove a p) === Just (pLength p - 1)
 
 prop_lRemoveShift :: PrettyProof -> Property
 prop_lRemoveShift (PrettyProof p) =
@@ -158,8 +158,8 @@ prop_lRemoveShift (PrettyProof p) =
     case (`pIsLine` p) <$> incrementNodeAddr a of
       Nothing -> discard
       Just a' ->
-        naLookup a (naRemove a p)
-      === ((`naLookup` p) =<< incrementNodeAddr a)
+        naLookup a <$> naRemove a p
+      === Just ((`naLookup` p) =<< incrementNodeAddr a)
 
 lRemoveQCTests :: TestTree
 lRemoveQCTests =
