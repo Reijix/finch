@@ -124,8 +124,8 @@ dropBeforeLine targetAddr = do
     Nothing -> pass
     Just (Left na) -> do
       io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
-      proof %= naMoveBefore targetAddr na
-    Just (Right pa) -> proof %= paMoveBefore targetAddr pa
+      proof %=? naMoveBefore targetAddr na
+    Just (Right pa) -> proof %=? paMoveBefore targetAddr pa
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do
@@ -174,8 +174,8 @@ updateModel (Drop LocationBin) = do
   dt <- use dragTarget
   case dt of
     Nothing -> pass
-    Just (Left na) -> proof %= naRemove na
-    Just (Right pa) -> proof %= paRemove pa
+    Just (Left na) -> proof %=? naRemove na
+    Just (Right pa) -> proof %=? paRemove pa
   clearDrag
   checkProof
 updateModel (Drop (LineAddr targetAddr)) = dropBeforeLine targetAddr
@@ -229,7 +229,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
                 (lineNoOr999 addr (m ^. proof))
                 (fromMisoString str) ::
                 Wrapper RawAssumption
-        proof %= naUpdateFormula (Left (\(_, r) -> (a, r))) addr
+        proof %=? naUpdateFormula (Left (\(_, r) -> (a, r))) addr
         pure $ T.length . getText $ a
       else do
         let f =
@@ -238,7 +238,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
                 (lineNoOr999 addr (m ^. proof))
                 (fromMisoString str) ::
                 Formula
-        proof %= naUpdateFormula (Right $ const f) addr
+        proof %=? naUpdateFormula (Right $ const f) addr
         pure $ T.length . getText $ f
 
   checkProof
@@ -260,7 +260,7 @@ updateModel (ProcessInput str start end (Right addr)) = do
           (lineNoOr999 addr (m ^. proof))
           (fromMisoString str) ::
           Wrapper RuleApplication
-  proof %= naUpdateRule (const r) addr
+  proof %=? naUpdateRule (const r) addr
   checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
@@ -277,9 +277,9 @@ updateModel (ProcessParens eaddr start end) = do
   p <- use proof
   case eaddr of
     Left addr ->
-      proof %= naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
+      proof %=? naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
-      proof %= naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
+      proof %=? naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
   checkProof
  where
   update :: Model -> Text -> Either Formula (Wrapper RuleApplication)
