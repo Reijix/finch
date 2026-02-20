@@ -514,6 +514,32 @@ data NodeAddr
   | NAProof Int NodeAddr
   deriving (Show, Eq)
 
+instance Ord NodeAddr where
+  compare :: NodeAddr -> NodeAddr -> Ordering
+  compare (NAAssumption n) (NAAssumption m) = compare n m
+  compare (NAAssumption _) (NALine _) = LT
+  compare (NALine _) (NAAssumption _) = GT
+  compare (NALine n) (NALine m) = compare n m
+  compare (NALine n) (NAProof m _) = case compare n m of
+    LT -> LT
+    EQ -> LT
+    GT -> GT
+  compare (NAProof n _) (NALine m) = case compare n m of
+    LT -> LT
+    EQ -> GT
+    GT -> GT
+  compare (NAAssumption _) (NAProof _ _) = LT
+  compare (NAProof _ _) (NAAssumption _) = GT
+  compare (NAProof n addr1) (NAProof m addr2) | n == m = compare addr1 addr2
+  compare (NAProof n _) (NAProof m _) = compare n m
+  compare NAConclusion NAConclusion = EQ
+  compare NAAfterConclusion NAAfterConclusion = EQ
+  compare NAConclusion NAAfterConclusion = LT
+  compare NAConclusion a = GT
+  compare NAAfterConclusion a = GT
+  compare a NAConclusion = LT
+  compare a NAAfterConclusion = LT
+
 isNAAssumption :: NodeAddr -> Bool
 isNAAssumption (NAProof _ na) = isNAAssumption na
 isNAAssumption NAAssumption{} = True
@@ -545,51 +571,23 @@ data ProofAddr
   | PANested Int ProofAddr
   deriving (Show, Eq)
 
-paProofToNested :: ProofAddr -> (ProofAddr -> ProofAddr)
-paProofToNested (PAProof n) = PANested n
-paProofToNested (PANested n pa) = PANested n . paProofToNested pa
-
-instance Ord NodeAddr where
-  compare :: NodeAddr -> NodeAddr -> Ordering
-  compare (NAAssumption n) (NAAssumption m) = compare n m
-  compare (NAAssumption _) (NALine _) = LT
-  compare (NALine _) (NAAssumption _) = GT
-  compare (NALine n) (NALine m) = compare n m
-  compare (NALine n) (NAProof m _) = case compare n m of
+instance Ord ProofAddr where
+  compare :: ProofAddr -> ProofAddr -> Ordering
+  compare (PAProof n) (PAProof m) = compare n m
+  compare (PAProof n) (PANested m _) = case compare n m of
     LT -> LT
     EQ -> LT
     GT -> GT
-  compare (NAProof n _) (NALine m) = case compare n m of
+  compare (PANested n _) (PAProof m) = case compare n m of
     LT -> LT
     EQ -> GT
     GT -> GT
-  compare (NAAssumption _) (NAProof _ _) = LT
-  compare (NAProof _ _) (NAAssumption _) = GT
-  compare (NAProof n addr1) (NAProof m addr2) | n == m = compare addr1 addr2
-  compare (NAProof n _) (NAProof m _) = compare n m
-  compare NAConclusion NAConclusion = EQ
-  compare NAAfterConclusion NAAfterConclusion = EQ
-  compare NAConclusion NAAfterConclusion = LT
-  compare NAConclusion a = GT
-  compare NAAfterConclusion a = GT
-  compare a NAConclusion = LT
-  compare a NAAfterConclusion = LT
+  compare (PANested n addr1) (PANested m addr2) | n == m = compare addr1 addr2
+  compare (PANested n _) (PANested m _) = compare n m
 
-compareNaPa :: NodeAddr -> ProofAddr -> Ordering
-compareNaPa (NAAssumption n) _ = LT
-compareNaPa (NALine n) (PAProof m) = case compare n m of
-  LT -> LT
-  EQ -> LT
-  GT -> GT
-compareNaPa (NALine n) (PANested m pa) = case compare n m of
-  LT -> LT
-  EQ -> LT
-  GT -> GT
-compareNaPa NAConclusion _ = GT
-compareNaPa NAAfterConclusion _ = GT
-compareNaPa (NAProof n na) (PAProof m) = compare n m
-compareNaPa (NAProof n na) (PANested m pa) | n == m = compareNaPa na pa
-compareNaPa (NAProof n _) (PANested m _) = compare n m
+paProofToNested :: ProofAddr -> (ProofAddr -> ProofAddr)
+paProofToNested (PAProof n) = PANested n
+paProofToNested (PANested n pa) = PANested n . paProofToNested pa
 
 -- ** Conversion between line numbers and `NodeAddr`
 
@@ -617,14 +615,14 @@ fromLineRange :: Int -> Int -> Proof -> Maybe ProofAddr
 fromLineRange start end p = join $ go start end 0 p
  where
   go :: Int -> Int -> Int -> Proof -> Maybe (Maybe ProofAddr)
-  go start end _ _ | start < 1 || end <= start = Nothing
+  go start end _ _ | start < 1 || end < start = Nothing
   go 1 end n p = do
     first <- fromLineNo 1 p
     last <- fromLineNo end p
-    unifyNAs p first last
+    unifyNAs first last p
    where
-    unifyNAs :: Proof -> NodeAddr -> NodeAddr -> Maybe (Maybe ProofAddr)
-    unifyNAs p na NAConclusion | isFirstLineIn p na = Just Nothing
+    unifyNAs :: NodeAddr -> NodeAddr -> Proof -> Maybe (Maybe ProofAddr)
+    unifyNAs na NAConclusion p | isFirstLineIn p na = Just Nothing
      where
       isFirstLineIn :: Proof -> NodeAddr -> Bool
       isFirstLineIn (SubProof (_ : _) _ _) (NAAssumption 0) = True
@@ -632,12 +630,10 @@ fromLineRange start end p = join $ go start end 0 p
       isFirstLineIn (SubProof [] (Right p : _) _) (NAProof 0 na) = isFirstLineIn p na
       isFirstLineIn (SubProof [] [] _) NAConclusion = True
       isFirstLineIn _ _ = False
-    unifyNAs (SubProof fs ps c) (NAProof n na1) (NAProof m na2) | n == m = case ps !!? n of
-      Just (Right p) -> case unifyNAs p na1 na2 of
-        Nothing -> Nothing
-        Just Nothing -> Just $ Just $ PAProof n
-        Just (Just pa) -> Just $ Just $ PANested n pa
-      _ -> Nothing
+    unifyNAs (NAProof n na1) (NAProof m na2) (SubProof _ ((!!? n) -> Just (Right p)) _) | n == m = case unifyNAs na1 na2 p of
+      Nothing -> Nothing
+      Just Nothing -> Just $ Just $ PAProof n
+      Just (Just pa) -> Just $ Just $ PANested n pa
     unifyNAs _ _ _ = Nothing
   go start end n (SubProof fs (Left d : ps) c) = go (start - 1) (end - 1) (n + 1) (SubProof fs ps c)
   go start end n (SubProof fs (Right p : ps) c)
@@ -663,9 +659,7 @@ fromNodeAddr = go 1
     | holdsAt isLeft ps m =
         pure $ length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)
   go n NAConclusion (SubProof fs ps _) = pure $ length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 ps
-  go n (NAProof m na) (SubProof fs ps _) = case ps !!? m of
-    Just (Right p) -> go (length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)) na p
-    _ -> Nothing
+  go n (NAProof m na) (SubProof fs ps@((!!? m) -> Just (Right p)) _) = go (length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)) na p
   go _ _ _ = Nothing
 
 lineNoOr999 :: NodeAddr -> Proof -> Int
@@ -695,13 +689,19 @@ incrementNodeAddr (NALine n) = Just $ NALine (n + 1)
 incrementNodeAddr (NAProof n na) = NAProof n <$> incrementNodeAddr na
 incrementNodeAddr _ = Nothing
 
-paFromNA :: NodeAddr -> Maybe ProofAddr
-paFromNA (NAProof n (NAAssumption{})) = Just $ PAProof n
-paFromNA (NAProof n (NALine{})) = Just $ PAProof n
-paFromNA (NAProof n NAConclusion) = Just $ PAProof n
-paFromNA (NAProof n NAAfterConclusion) = Just $ PAProof n
-paFromNA (NAProof n na) = PANested n <$> paFromNA na
-paFromNA _ = Nothing
+paFromNA :: NodeAddr -> Proof -> Maybe ProofAddr
+paFromNA (NALine n) _ = Just $ PAProof n
+paFromNA NAConclusion (SubProof _ ps _) = Just $ PAProof (length ps)
+paFromNA (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = PANested n <$> paFromNA na p
+paFromNA _ _ = Nothing
+
+paContaining :: NodeAddr -> Maybe ProofAddr
+paContaining (NAProof n (NAAssumption{})) = Just $ PAProof n
+paContaining (NAProof n (NALine{})) = Just $ PAProof n
+paContaining (NAProof n NAConclusion) = Just $ PAProof n
+paContaining (NAProof n NAAfterConclusion) = Just $ PAProof n
+paContaining (NAProof n na) = PANested n <$> paContaining na
+paContaining _ = Nothing
 
 naFromPA :: ProofAddr -> (NodeAddr -> NodeAddr)
 naFromPA (PAProof n) = NAProof n
@@ -965,72 +965,94 @@ paRemove pa p@(lineRangeFromProofAddr pa -> Just (start, end)) = pMapRefs goRef 
 Both formulae and derivations are inserted before the specified address.
 -}
 naInsertBeforeRaw ::
-  Either Assumption (Either Derivation Proof) ->
+  Either Assumption Derivation ->
   NodeAddr ->
   Proof ->
-  Maybe (Either NodeAddr ProofAddr, Proof)
+  Maybe (NodeAddr, Proof)
 -- Inserting before NAAssumption
 naInsertBeforeRaw (Left a) (NAAssumption n) (SubProof fs ps c) =
-  fmap (Left $ NAAssumption n,) (liftA3 SubProof (insertAt a n fs) (pure ps) (pure c))
-naInsertBeforeRaw (Right (Left d)) (NAAssumption n) (SubProof fs ps c) =
-  fmap (Left $ NAAssumption n,) (liftA3 SubProof (insertAt (toAssumption d) n fs) (pure ps) (pure c))
+  fmap (NAAssumption n,) (liftA3 SubProof (insertAt a n fs) (pure ps) (pure c))
+naInsertBeforeRaw (Right d) (NAAssumption n) (SubProof fs ps c) =
+  fmap (NAAssumption n,) (liftA3 SubProof (insertAt (toAssumption d) n fs) (pure ps) (pure c))
 -- Inserting before NALine
 naInsertBeforeRaw (Left a) (NALine n) (SubProof fs ps c) =
-  fmap (Left $ NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left $ toDerivation a) n ps) (pure c))
-naInsertBeforeRaw (Right (Left d)) (NALine n) (SubProof fs ps c) =
-  fmap (Left $ NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left d) n ps) (pure c))
-naInsertBeforeRaw (Right (Right p)) (NALine n) (SubProof fs ps c) =
-  fmap (Right $ PAProof n,) (liftA3 SubProof (pure fs) (insertAt (Right p) n ps) (pure c))
+  fmap (NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left $ toDerivation a) n ps) (pure c))
+naInsertBeforeRaw (Right d) (NALine n) (SubProof fs ps c) =
+  fmap (NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left d) n ps) (pure c))
 -- Inserting before NAConclusion
 naInsertBeforeRaw (Left a) NAConclusion (SubProof fs ps c) =
-  pure (Left $ NALine (length ps), SubProof fs (ps <> one (Left $ toDerivation a)) c)
-naInsertBeforeRaw (Right (Left d)) NAConclusion (SubProof fs ps c) =
-  pure (Left $ NALine (length ps), SubProof fs (ps <> one (Left d)) c)
-naInsertBeforeRaw (Right (Right p)) NAConclusion (SubProof fs ps c) =
-  pure (Right $ PAProof (length ps), SubProof fs (ps <> one (Right p)) c)
+  pure (NALine (length ps), SubProof fs (ps <> one (Left $ toDerivation a)) c)
+naInsertBeforeRaw (Right d) NAConclusion (SubProof fs ps c) =
+  pure (NALine (length ps), SubProof fs (ps <> one (Left d)) c)
 -- Inserting before NAAfterConclusion
 naInsertBeforeRaw (Left a) NAAfterConclusion (SubProof fs ps c) =
-  pure (Left NAConclusion, SubProof fs (ps <> one (Left c)) (toDerivation a))
-naInsertBeforeRaw (Right (Left d)) NAAfterConclusion (SubProof fs ps c) =
-  pure (Left NAConclusion, SubProof fs (ps <> one (Left c)) d)
+  pure (NAConclusion, SubProof fs (ps <> one (Left c)) (toDerivation a))
+naInsertBeforeRaw (Right d) NAAfterConclusion (SubProof fs ps c) =
+  pure (NAConclusion, SubProof fs (ps <> one (Left c)) d)
 -- Descent
-naInsertBeforeRaw e (NAProof n na) (SubProof fs ps c) = case ps !!? n of
-  Just (Right p) ->
-    naInsertBeforeRaw e na p
-      >>= ( \(addr, p') -> case addr of
-              Left na ->
-                fmap
-                  (Left $ NAProof n na,)
-                  (liftA3 SubProof (pure fs) (updateAtM n (either (const Nothing) (const . pure $ Right p')) ps) (pure c))
-              Right pa ->
-                fmap
-                  (Right $ PANested n pa,)
-                  (liftA3 SubProof (pure fs) (updateAtM n (const . pure $ Right p') ps) (pure c))
-          )
-  _ -> Nothing
+naInsertBeforeRaw e (NAProof n na) (SubProof fs ps@((!!? n) -> Just (Right p)) c) =
+  naInsertBeforeRaw e na p
+    >>= \(addr, p') ->
+      fmap
+        (NAProof n addr,)
+        (liftA3 SubProof (pure fs) (updateAtM n (either (const Nothing) (const . pure $ Right p')) ps) (pure c))
 naInsertBeforeRaw _ _ _ = Nothing
 
 naInsertBefore ::
-  Either Assumption (Either Derivation Proof) ->
+  Either Assumption Derivation ->
   NodeAddr ->
   Proof ->
-  Maybe (Either NodeAddr ProofAddr, Proof)
+  Maybe (NodeAddr, Proof)
 naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
-  Just (Left na', p@(fromNodeAddr na' -> Just lineNo)) ->
-    Just (Left na', pMapRefs (pure . goRef prf (Left na') 1 lineNo) p)
-  Just (Right pa, p@(lineRangeFromProofAddr pa -> Just (targetStart, targetEnd))) ->
-    Just (Right pa, pMapRefs (pure . goRef prf (Right pa) (targetEnd - targetStart + 1) targetStart) p)
+  Just (na', p@(fromNodeAddr na' -> Just lineNo)) ->
+    Just (na', pMapRefs (pure . goRef prf na' lineNo) p)
   _ -> Nothing
  where
-  goRef :: Proof -> Either NodeAddr ProofAddr -> Int -> Int -> Reference -> Reference
-  goRef p _ offset lineNo (LineReference line)
+  goRef :: Proof -> NodeAddr -> Int -> Reference -> Reference
+  goRef p _ lineNo (LineReference line)
     | lineNo > line = LineReference line
-    | lineNo <= line = LineReference $ line + offset
-  goRef p napa offset lineNo (ProofReference start end) = case fromLineRange start end p of
+    | lineNo <= line = LineReference $ line + 1
+  goRef p na lineNo (ProofReference start end) = case fromLineRange start end p of
     Nothing -> ProofReference start end
     Just pa
       | lineNo > end -> ProofReference start end
-      | either (`naContainedIn` pa) (`paContainedIn` pa) napa -> ProofReference start (end + offset)
+      | naContainedIn na pa -> ProofReference start (end + 1)
+      | lineNo <= start -> ProofReference (start + 1) (end + 1)
+
+paInsertBeforeRaw ::
+  Proof ->
+  ProofAddr ->
+  Proof ->
+  Maybe (ProofAddr, Proof)
+paInsertBeforeRaw p (PAProof n) (SubProof fs ps c) =
+  fmap (PAProof n,) (liftA3 SubProof (pure fs) (insertAt (Right p) n ps) (pure c))
+paInsertBeforeRaw p (PANested n pa) (SubProof fs ps@((!!? n) -> Just (Right prf)) c) =
+  paInsertBeforeRaw p pa prf
+    >>= \(pa, p') ->
+      fmap
+        (PANested n pa,)
+        (liftA3 SubProof (pure fs) (updateAtM n (const . pure $ Right p') ps) (pure c))
+paInsertBeforeRaw _ _ _ = Nothing
+
+paInsertBefore ::
+  Proof ->
+  ProofAddr ->
+  Proof ->
+  Maybe (ProofAddr, Proof)
+paInsertBefore p pa prf = case paInsertBeforeRaw p pa prf of
+  Just (pa, p@(lineRangeFromProofAddr pa -> Just (targetStart, targetEnd))) ->
+    Just (pa, pMapRefs (pure . goRef prf pa (targetEnd - targetStart + 1) targetStart) p)
+  _ -> Nothing
+ where
+  goRef :: Proof -> ProofAddr -> Int -> Int -> Reference -> Reference
+  goRef _ _ offset lineNo (LineReference line)
+    | lineNo > line = LineReference line
+    | lineNo <= line = LineReference $ line + offset
+  goRef p pa offset lineNo (ProofReference start end) = case fromLineRange start end p of
+    Nothing -> ProofReference start end
+    Just pa'
+      | lineNo > end -> ProofReference start end
+      | paContainedIn pa pa' -> ProofReference start (end + offset)
       | lineNo <= start -> ProofReference (start + offset) (end + offset)
 
 {- | `naMoveBefore` @target@ @source@ @p@ moves the line at the source address
@@ -1041,29 +1063,20 @@ naMoveBeforeRaw targetAddr sourceAddr p =
   case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
     (LT, Just node) -> do
       p' <- naRemoveRaw sourceAddr p
-      (e, p'') <- naInsertBeforeRaw (Left <$> node) targetAddr p'
-      na <- leftToMaybe e
-      pure (na, p'')
+      naInsertBeforeRaw node targetAddr p'
     (GT, Just node) -> do
       -- since `e` is returned here already
-      (e, p') <- naInsertBeforeRaw (Left <$> node) targetAddr p
-      na <- leftToMaybe e
+      (na, p') <- naInsertBeforeRaw node targetAddr p
       p'' <- naRemoveRaw sourceAddr p'
       -- we might need to decrement `e` by one, if sourceAddr is in the same proof.
       let
-        decrementNodeAddrOrSame :: NodeAddr -> NodeAddr
-        decrementNodeAddrOrSame (NAAssumption n) = NAAssumption (n - 1)
-        decrementNodeAddrOrSame (NALine n) = NALine (n - 1)
-        decrementNodeAddrOrSame (NAProof n na) = NAProof n $ decrementNodeAddrOrSame na
-        decrementNodeAddrOrSame na = na
-        na' =
-          if naInSameProof na sourceAddr
-            && ( (isNAAssumption na && isNAAssumption sourceAddr)
-                   || (isNALine na && isNALine sourceAddr)
-               )
-            then decrementNodeAddrOrSame na
-            else na
-      pure (na', p'')
+        naDecrementWhenOnSameLevel :: NodeAddr -> NodeAddr -> NodeAddr
+        naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} = NAAssumption (n - 1)
+        naDecrementWhenOnSameLevel (NALine n) NALine{} = NALine (n - 1)
+        naDecrementWhenOnSameLevel (NAProof n na) NALine{} = NAProof (n - 1) na
+        naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
+        naDecrementWhenOnSameLevel na _ = na
+      pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
 
 targetInRange :: Int -> (Int, Int) -> Proof -> Bool
 targetInRange lineNo (start, end) p =
@@ -1082,33 +1095,34 @@ naMoveBefore targetAddr sourceAddr p =
   go :: NodeAddr -> Proof -> Maybe Proof
   go targetAddr' p' =
     case (fromNodeAddr targetAddr' p', fromNodeAddr sourceAddr p) of
-      (Just target, Just source) -> pure $ pMapRefs (pure . goRef targetAddr' target source) p'
-      _ -> Nothing
-  -- error $
-  --   "targetAddr'="
-  --     <> show targetAddr'
-  --     <> "\nsourceAddr="
-  --     <> show sourceAddr
-  --     <> "\np=\n"
-  --     <> prettyPrint p
-  --     <> "\np'=\n"
-  --     <> prettyPrint p'
-  goRef :: NodeAddr -> Int -> Int -> Reference -> Reference
-  goRef _ target source (LineReference line)
+      (Just target, Just source) -> pure $ pMapRefs (pure . goRef target source) p'
+      _ ->
+        -- Nothing
+        error $
+          "targetAddr'="
+            <> show targetAddr'
+            <> "\nsourceAddr="
+            <> show sourceAddr
+            <> "\np=\n"
+            <> prettyPrint p
+            <> "\np'=\n"
+            <> prettyPrint p'
+  goRef :: Int -> Int -> Reference -> Reference
+  goRef target source (LineReference line)
     | line == source = LineReference target
     | line < source && line >= target = LineReference (line + 1)
     | line > source && line <= target = LineReference (line - 1)
     | otherwise = LineReference line
-  goRef targetAddr' target source (ProofReference start end) = case fromLineRange start end p of
+  goRef target source (ProofReference start end) = case fromLineRange start end p of
     Nothing -> ProofReference start end
     Just pa
-      | naContainedIn targetAddr' pa && source < start -> ProofReference (start - 1) end
-      | naContainedIn targetAddr' pa && source > end -> ProofReference start (end + 1)
-      | naContainedIn targetAddr' pa -> ProofReference start end
+      | naContainedIn targetAddr pa && source < start -> ProofReference (start - 1) end
+      | naContainedIn targetAddr pa && source > end -> ProofReference start (end + 1)
+      | naContainedIn targetAddr pa -> ProofReference start end
       | target <= start && naContainedIn sourceAddr pa -> ProofReference (start + 1) end
       | target <= start && source > end -> ProofReference (start + 1) (end + 1)
-      | target > end && naContainedIn sourceAddr pa -> ProofReference start (end - 1)
-      | target > end && source < start -> ProofReference (start - 1) (end - 1)
+      | target >= end && naContainedIn sourceAddr pa -> ProofReference start (end - 1)
+      | target >= end && source < start -> ProofReference (start - 1) (end - 1)
       | otherwise -> ProofReference start end
 
 {- | `naCompatible` @target@ @source@ returns `True`
@@ -1135,26 +1149,22 @@ paContainedIn (PANested n _) (PAProof m) = n == m
 paContainedIn (PANested n pa1) (PANested m pa2) = n == m && paContainedIn pa1 pa2
 paContainedIn _ _ = False
 
-naSameOrNext :: Proof -> NodeAddr -> Either NodeAddr ProofAddr -> Bool
-naSameOrNext (SubProof _ ps _) (NAProof n na) (Left (NAProof m na'))
-  | n == m = case ps !!? n of
-      Just (Right p) -> naSameOrNext p na (Left na')
-      _ -> False
-naSameOrNext (SubProof _ ps _) (NAProof n na) (Right (PANested m pa))
-  | n == m = case ps !!? n of
-      Just (Right p) -> naSameOrNext p na (Right pa)
-      _ -> False
-naSameOrNext _ (NAAssumption n) (Left (NAAssumption m)) = n == m || n == m + 1
-naSameOrNext _ (NALine n) (Left (NALine m)) = n == m || n == m + 1
-naSameOrNext _ (NALine n) (Right (PAProof m)) = n == m || n == m + 1
-naSameOrNext _ NAAfterConclusion (Left NAConclusion) = True
-naSameOrNext _ NAConclusion (Left NAConclusion) = True
-naSameOrNext (SubProof _ ps _) NAConclusion (Left (NALine n)) = n == length ps - 1
-naSameOrNext (SubProof _ ps _) NAConclusion (Right (PAProof n)) = n == length ps - 1
+naSameOrNext :: NodeAddr -> Either NodeAddr ProofAddr -> Proof -> Bool
+naSameOrNext (NAProof n na) (Left (NAProof ((== n) -> True) na')) (SubProof _ ((!!? n) -> Just (Right p)) _) =
+  naSameOrNext na (Left na') p
+naSameOrNext (NAProof n na) (Right (PANested ((== n) -> True) pa)) (SubProof _ ((!!? n) -> Just (Right p)) _) =
+  naSameOrNext na (Right pa) p
+naSameOrNext (NAAssumption n) (Left (NAAssumption m)) _ = n == m || n == m + 1
+naSameOrNext (NALine n) (Left (NALine m)) _ = n == m || n == m + 1
+naSameOrNext (NALine n) (Right (PAProof m)) _ = n == m || n == m + 1
+naSameOrNext NAAfterConclusion (Left NAConclusion) _ = True
+naSameOrNext NAConclusion (Left NAConclusion) _ = True
+naSameOrNext NAConclusion (Left (NALine n)) (SubProof _ ps _) = n == length ps - 1
+naSameOrNext NAConclusion (Right (PAProof n)) (SubProof _ ps _) = n == length ps - 1
 naSameOrNext _ _ _ = False
 
-naCanMoveConclusion :: Proof -> Maybe NodeAddr -> NodeAddr -> Bool
-naCanMoveConclusion (SubProof fs ps c) target NAConclusion = case unsnoc ps of
+naCanMoveConclusion :: Maybe NodeAddr -> NodeAddr -> Proof -> Bool
+naCanMoveConclusion target NAConclusion (SubProof fs ps c) = case unsnoc ps of
   Nothing -> case fs of
     [] -> case target of
       Just NAAssumption{} -> False
@@ -1162,48 +1172,41 @@ naCanMoveConclusion (SubProof fs ps c) target NAConclusion = case unsnoc ps of
     _ -> False
   Just (_, Left _) -> True
   Just (_, Right _) -> False
-naCanMoveConclusion (SubProof fs ps c) na' (NAProof n na) = case ps !!? n of
-  Just (Right p) -> case na' of
-    Just (NAProof m na'') | m == n -> naCanMoveConclusion p (Just na'') na
-    _ -> naCanMoveConclusion p Nothing na
-  _ -> False
+naCanMoveConclusion na' (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = case na' of
+  Just (NAProof m na'') | m == n -> naCanMoveConclusion (Just na'') na p
+  _ -> naCanMoveConclusion Nothing na p
 naCanMoveConclusion _ _ _ = True
 
 naCanMoveBefore :: Proof -> NodeAddr -> Either NodeAddr ProofAddr -> Bool
 naCanMoveBefore p na e =
   naCompatible na e
-    && either (naCanMoveConclusion p (Just na)) (const True) e
-    && not (naSameOrNext p na e)
+    && either (\n -> naCanMoveConclusion (Just na) n p) (const True) e
+    && not (naSameOrNext na e p)
     && case e of
       Left _ -> True
       Right pa -> not $ naContainedIn na pa
 
-paMoveBeforeRaw :: NodeAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
-paMoveBeforeRaw targetAddr sourceAddr p = case (compareNaPa targetAddr sourceAddr, paLookup sourceAddr p) of
+paMoveBeforeRaw :: ProofAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
+paMoveBeforeRaw targetAddr sourceAddr p = case (compare targetAddr sourceAddr, paLookup sourceAddr p) of
   (LT, Just prf) -> do
     p' <- paRemoveRaw sourceAddr p
-    (e, p'') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p'
-    pa <- rightToMaybe e
-    pure (pa, p'')
+    paInsertBeforeRaw prf targetAddr p'
   (GT, Just prf) -> do
-    (e, p') <- naInsertBeforeRaw (Right $ Right prf) targetAddr p
-    pa <- rightToMaybe e
+    (pa, p') <- paInsertBeforeRaw prf targetAddr p
     p'' <- paRemoveRaw sourceAddr p'
     let
-      decrementProofAddrOrSame :: ProofAddr -> ProofAddr
-      decrementProofAddrOrSame (PAProof n) = PAProof (n - 1)
-      decrementProofAddrOrSame (PANested n pa) = PANested n $ decrementProofAddrOrSame pa
-      pa' =
-        if paInSameProof pa sourceAddr
-          then decrementProofAddrOrSame pa
-          else pa
-    pure (pa', p'')
+      paDecrementWhenOnSameLevel :: ProofAddr -> ProofAddr -> ProofAddr
+      paDecrementWhenOnSameLevel (PAProof n) PAProof{} = PAProof (n - 1)
+      paDecrementWhenOnSameLevel (PANested n pa) PAProof{} = PANested (n - 1) pa
+      paDecrementWhenOnSameLevel (PANested n pa1) (PANested m pa2) | n == m = PANested n $ paDecrementWhenOnSameLevel pa1 pa2
+      paDecrementWhenOnSameLevel na _ = na
+    pure (paDecrementWhenOnSameLevel pa sourceAddr, p'')
   _ -> Nothing
 
 inRange :: (Int, Int) -> Int -> Bool
 inRange (start, end) n = n >= start && n <= end
 
-paMoveBefore :: NodeAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
+paMoveBefore :: ProofAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
 paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAddr p of
   Nothing -> Nothing
   Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
@@ -1212,6 +1215,7 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
   go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
     (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
     _ -> Nothing
+  -- error $ "lineRangeFromProofAddr targetAddr' p'=" <> show (lineRangeFromProofAddr targetAddr' p') <> "\ntargetAddr'=" <> show targetAddr'
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)
@@ -1221,4 +1225,10 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
    where
     proofOffset = line - sourceStart
     proofLen = sourceEnd - sourceStart + 1
-  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end) = ProofReference start end
+  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end)
+    | start == sourceStart && end == sourceEnd = ProofReference targetStart targetEnd
+    | inRange (sourceStart, sourceEnd) start = ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
+    | inRange (start, end) sourceStart && targetStart < start = ProofReference (start + proofLen) end
+    | otherwise = ProofReference start end
+   where
+    proofLen = sourceEnd - sourceStart + 1

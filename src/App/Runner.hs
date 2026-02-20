@@ -139,7 +139,12 @@ dropBeforeLine targetAddr = do
         Just (ta, p) -> do
           proof %= const p
           reParseLine ta
-    Just (Right pa) -> proof %=? (fmap snd . paMoveBefore targetAddr pa)
+    Just (Right pa) -> do
+      io_ $ consoleLog $ "Moving " <> show pa <> " into " <> show targetAddr
+      use proof >>= \p -> io_ $ consoleLog $ "paFromNA=" <> show (paFromNA targetAddr p)
+      proof %=? \p -> do
+        paTarget <- paFromNA targetAddr p
+        snd <$> paMoveBefore paTarget pa p
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do
@@ -148,22 +153,22 @@ dropBeforeLine targetAddr = do
         >>= \p ->
           case naInsertBefore
             -- TODO move to model
-            (Right . Left $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
+            (Right $ Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
             targetAddr
             p of
-            Just (Left na, p) -> do
+            Just (na, p) -> do
               proof .= p
               setFocus (Left na)
             _ -> pass
     Just SpawnProof ->
       use proof
-        >>= \p -> case naInsertBefore
-          ( Right . Right $
-              SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)"))
-          )
-          targetAddr
-          p of
-          Just (Right pa, p) -> do
+        >>= \p -> case join $
+          liftA3
+            paInsertBefore
+            (pure $ SubProof [] [] (Derivation (tryParse m 999 "⊤") (tryParse m 999 "(⊤I)")))
+            (paFromNA targetAddr p)
+            (pure p) of
+          Just (pa, p) -> do
             proof .= p
             setFocus (Left $ naFromPA pa NAConclusion)
           _ -> pass
