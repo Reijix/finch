@@ -264,6 +264,7 @@ viewProof model =
   _viewProof pa na (SubProof fs ps d) =
     H.div_
       [ HP.class_ "subproof"
+      , HP.id_ (show pa)
       , HP.draggable_ True
       , onDragStartWithOptions stopPropagation $ DragStart (Right pa)
       , onDragEndWithOptions defaultOptions DragEnd

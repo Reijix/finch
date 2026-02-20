@@ -547,7 +547,7 @@ data ProofAddr
 
 paProofToNested :: ProofAddr -> (ProofAddr -> ProofAddr)
 paProofToNested (PAProof n) = PANested n
-paProofToNested (PANested n pa) = PANested n
+paProofToNested (PANested n pa) = PANested n . paProofToNested pa
 
 instance Ord NodeAddr where
   compare :: NodeAddr -> NodeAddr -> Ordering
@@ -1019,17 +1019,9 @@ naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
   Just (Left na', p@(fromNodeAddr na' -> Just lineNo)) ->
     Just (Left na', pMapRefs (pure . goRef prf (Left na') 1 lineNo) p)
   Just (Right pa, p@(lineRangeFromProofAddr pa -> Just (targetStart, targetEnd))) ->
-    offsetFor p (Right pa) >>= \offset ->
-      -- TODO is targetStart correct??
-      Just (Right pa, pMapRefs (pure . goRef prf (Right pa) offset targetStart) p)
+    Just (Right pa, pMapRefs (pure . goRef prf (Right pa) (targetEnd - targetStart + 1) targetStart) p)
   _ -> Nothing
  where
-  offsetFor :: Proof -> Either NodeAddr ProofAddr -> Maybe Int
-  offsetFor _ Left{} = Just 1
-  offsetFor (SubProof fs ps c) (Right (PAProof n)) = either (const Nothing) (Just . pLength) =<< (ps !!? n)
-  offsetFor (SubProof fs ps c) (Right (PANested n pa)) = case ps !!? n of
-    Just (Right p) -> offsetFor p (Right pa)
-    _ -> Nothing
   goRef :: Proof -> Either NodeAddr ProofAddr -> Int -> Int -> Reference -> Reference
   goRef p _ offset lineNo (LineReference line)
     | lineNo > line = LineReference line
