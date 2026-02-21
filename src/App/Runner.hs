@@ -11,6 +11,7 @@ module App.Runner (
 ) where
 
 -----------------------------------------------------------------------------
+import App.Decoder
 import App.Model
 import App.Views
 import Data.Text qualified as T
@@ -29,6 +30,7 @@ import Miso (
   PointerEvent (client),
   ROOT,
   Schedule,
+  URI (uriQueryString),
   View,
   addEventListener,
   callFunction,
@@ -45,6 +47,7 @@ import Miso (
   fromMisoString,
   getElementById,
   getProperty,
+  getURI,
   io,
   io_,
   issue,
@@ -54,6 +57,7 @@ import Miso (
   newEvent,
   preventDefault,
   removeEventListener,
+  replaceURI,
   select,
   setSelectionRange,
   startApp,
@@ -65,12 +69,12 @@ import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
-import Miso.Lens
+import Miso.Lens (Lens, use, (%=), (.=), (^.))
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
 import Parser.Rule (parseRuleApplication)
-import Relude.Extra.Newtype
+import Relude.Extra.Map (insert)
 
 -----------------------------------------------------------------------------
 
@@ -116,6 +120,24 @@ clearDrag = do
   dragging .= False
   dragTarget .= Nothing
   spawnType .= Nothing
+
+replaceQueryString :: MisoString -> MisoString -> URI -> URI
+replaceQueryString name value uri = uri{uriQueryString = insert name (Just value) (uriQueryString uri)}
+
+readURI :: Effect ROOT Model Action
+readURI = undefined
+
+updateURI :: Effect ROOT Model Action
+updateURI = do
+  p <- use proof
+  io_ $ do
+    uri <- getURI
+    let encoded = ms $ encodeForUrl p
+    consoleLog $ "encoded: " <> encoded
+    case decodeFromUrl (fromMisoString encoded :: Text) of
+      Left err -> consoleLog $ ms err
+      Right (decoded :: Proof) -> consoleLog $ "decoded:\n" <> ms (prettyPrint decoded)
+    replaceURI $ replaceQueryString "proof" (ms $ encodeForUrl p) uri
 
 reParseLine :: NodeAddr -> Effect ROOT Model Action
 reParseLine na =
@@ -190,7 +212,7 @@ setFocus ea = do
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = checkProof
+updateModel Setup = checkProof >> updateURI
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do

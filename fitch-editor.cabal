@@ -118,6 +118,7 @@ executable fitch-editor-Prop
 
 library fitch-editor-lib
   exposed-modules:
+    App.Decoder
     App.Model
     App.Runner
     App.Views
@@ -147,6 +148,9 @@ library fitch-editor-lib
 
   build-depends:
     base >=4.21.0 && <5,
+    base64-bytestring,
+    cereal,
+    cereal-text,
     containers >=0.7 && <0.9,
     megaparsec >=9.7.0 && <9.8,
     miso >=1.9 && <1.9.1,

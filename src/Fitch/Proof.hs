@@ -44,7 +44,7 @@ data Wrapper a where
     Wrapper a
   -- | Parse failure
   Unparsed :: Text -> Text -> Wrapper a
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance PrettyPrint (Wrapper a) where
   prettyPrint :: Wrapper a -> Text
@@ -84,7 +84,7 @@ data RuleSpec
     a list of assumptions that are subproofs or formulae, and the conclusion.
     -}
     RuleSpec [FormulaSpec] [ProofSpec] FormulaSpec
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 type Name = Text
 
@@ -94,7 +94,7 @@ data Term
     Var Name
   | -- | A function applied to terms in first-order logic
     Fun Name [Term]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 isFun :: Term -> Bool
 isFun (Fun{}) = True
@@ -107,7 +107,7 @@ instance PrettyPrint Term where
   prettyPrint (Fun f ts) = f <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
 
 data Subst a = Subst Name a
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 infixl 9 ~>
 (~>) :: Name -> a -> Subst a
@@ -171,7 +171,7 @@ data RawFormula
     Opr Text [RawFormula]
   | -- | A quantifier, like @∀@ for universal quantification.
     Quantifier Name Name RawFormula
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 instance PrettyPrint RawFormula where
   prettyPrint :: RawFormula -> Text
@@ -196,7 +196,7 @@ data Reference where
   LineReference :: Int -> Reference
   -- | Referencing a subproof by a line interval, i.e. `ProofReference` @from@ @to@
   ProofReference :: Int -> Int -> Reference
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance PrettyPrint Reference where
   prettyPrint :: Reference -> Text
@@ -210,7 +210,7 @@ data RawAssumption
   = -- | A fresh variable of a subproof, written like @[c]@
     FreshVar Name
   | RawAssumption RawFormula
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 type Assumption = (Wrapper RawAssumption, Wrapper RuleApplication)
 
@@ -242,7 +242,7 @@ instance PrettyPrint RawAssumption where
 data RuleApplication
   = -- | Application of a rule, consisting of the `Name` of the rule, and a list of references.
     RuleApplication Name [Reference]
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance {-# OVERLAPPING #-} PrettyPrint (Wrapper RuleApplication) where
   prettyPrint :: Wrapper RuleApplication -> Text
@@ -264,7 +264,7 @@ data Derivation
     and a ruleapplication that justifies how the formula was derived.
     -}
     Derivation Formula (Wrapper RuleApplication)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 instance PrettyPrint Derivation where
   prettyPrint :: Derivation -> Text
@@ -274,7 +274,7 @@ instance PrettyPrint Derivation where
 data Proof where
   -- | A subproof consisting of a list of assumptions, a list of subproofs (or derivations) and a conclusion.
   SubProof :: [Assumption] -> [Either Derivation Proof] -> Derivation -> Proof
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 instance PrettyPrint Proof where
   prettyPrint :: Proof -> Text
