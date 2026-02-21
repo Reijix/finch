@@ -124,45 +124,17 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 <> "."
     unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
     unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
-      f <- lookupReference refLine p
+      f <- lookupLineReference refLine p
       f' <- case f of
         Left a -> Left <$> handleAssumption refLine a (AssumptionSpec fSpec)
         Right f -> Right <$> handleFormula refLine f fSpec
       fs <- unifyReferences (n + 1) (RuleSpec fSpecs pSpecs cSpec) refs
       pure (f' : fs)
-    unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) =
-      case pIndexProof start end p of
-        Nothing ->
-          Left $
-            "Line range "
-              <> show start
-              <> "-"
-              <> show end
-              <> " does not correspond to a subproof.\nLine "
-              <> show start
-              <> " should mark the start of a subproof and line "
-              <> show end
-              <> " should be its conclusion."
-        Just prf -> do
-          case (fromLineNo ruleLine p, fromLineRange start end p) of
-            (Nothing, _) ->
-              Left $
-                "Line "
-                  <> show ruleLine
-                  <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-            (_, Nothing) ->
-              Left $
-                "Line range "
-                  <> show start
-                  <> "-"
-                  <> show end
-                  <> " is not a valid range. INTERNAL ERROR, SHOULD NOT HAPPEN"
-            (Just ruleAddr, Just refAddr) -> case refIsVisible start ruleAddr (Right refAddr) of
-              Nothing -> Right ()
-              Just err -> Left err
-          fs <- handleProof (start, end) prf pSpec
-          fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-          pure (fs ++ fs')
+    unifyReferences n (RuleSpec [] (pSpec : pSpecs) cSpec) (ProofReference start end : refs) = do
+      prf <- lookupProofReference start end p
+      fs <- handleProof (start, end) prf pSpec
+      fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
+      pure (fs ++ fs')
      where
       handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
@@ -425,42 +397,74 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     ---------------------------------------------------
 
     -- helpers
-    refIsVisible :: Int -> NodeAddr -> Either NodeAddr ProofAddr -> Maybe Text
-    refIsVisible line ruleAddr (Left refAddr)
-      | ruleAddr <= refAddr = Just "Can only reference lines that appear before this line!"
-    refIsVisible line (NAProof n na1) (Left (NAProof m na2))
-      | n == m = refIsVisible line na1 (Left na2)
-    refIsVisible line rua ra@(Left (NAProof _ _)) =
-      Just "Line cannot be referenced because it is located inside of a subproof."
-    -- TODO adjust for ProofAddr!!
-    refIsVisible _ _ _ = Nothing
-
-    lookupReference :: Int -> Proof -> Either Text (Either Assumption Formula)
-    lookupReference refLine p
-      | ruleLine < refLine =
-          Left $
+    refIsVisible :: (Int, NodeAddr) -> Either (Int, NodeAddr) ((Int, Int), ProofAddr) -> Maybe Text
+    refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr))
+      | ruleLine <= refLine =
+          Just $
             "Line "
               <> show refLine
-              <> " can not be referenced because it appears after this line."
-      | ruleLine == refLine =
-          Left "Can not reference the same line."
-    lookupReference refLine p = case (fromLineNo ruleLine p, fromLineNo refLine p) of
-      (Nothing, _) ->
+              <> "can not be referenced, because it does not appear before line "
+              <> show ruleLine
+              <> "!"
+    refIsVisible (ruleLine, ruleAddr) (Right ((start, end), refAddr))
+      | ruleLine < start =
+          Just $
+            "Line range "
+              <> show start
+              <> "-"
+              <> show end
+              <> " can not be referenced, because it does not appear before line "
+              <> show ruleLine
+              <> "!"
+    refIsVisible (ruleLine, NAProof n na1) (Left (line, NAProof m na2))
+      | n == m = refIsVisible (ruleLine, na1) (Left (line, na2))
+    refIsVisible (ruleLine, NAProof n na1) (Right ((start, end), PANested m pa2))
+      | n == m = refIsVisible (ruleLine, na1) (Right ((start, end), pa2))
+    refIsVisible _ (Left (line, NAProof _ _)) =
+      Just $ "Line " <> show line <> " cannot be referenced because it is located inside of a subproof."
+    refIsVisible (ruleLine, ruleAddr) (Right ((start, end), naContainedIn ruleAddr -> True)) =
+      Just $
+        "Line range "
+          <> show start
+          <> "-"
+          <> show end
+          <> " can not be referenced, because it contains line "
+          <> show ruleLine
+          <> "!"
+    refIsVisible _ (Right ((start, end), PANested _ _)) =
+      Just $
+        "Line range "
+          <> show start
+          <> "-"
+          <> show end
+          <> " cannot be referenced because it is located inside of a subproof."
+    refIsVisible _ _ = Nothing
+
+    lookupProofReference :: Int -> Int -> Proof -> Either Text Proof
+    lookupProofReference start end p = case (pIndexProof start end p, fromLineRange start end p, fromLineNo ruleLine p) of
+      (_, _, Nothing) -> error "Should not happen!"
+      ((Nothing, _, _); (_, Nothing, _)) ->
         Left $
-          "Line "
-            <> show ruleLine
-            <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-      (_, Nothing) ->
+          "Line range "
+            <> show start
+            <> "-"
+            <> show end
+            <> " does not correspond to a subproof.\nLine "
+            <> show start
+            <> " should mark the start of a subproof and line "
+            <> show end
+            <> " should be its conclusion."
+      (Just prf, Just refAddr, Just ruleAddr) -> case refIsVisible (ruleLine, ruleAddr) (Right ((start, end), refAddr)) of
+        Nothing -> Right prf
+        Just err -> Left err
+
+    lookupLineReference :: Int -> Proof -> Either Text (Either Assumption Formula)
+    lookupLineReference refLine p = case (pIndex refLine p, fromLineNo refLine p, fromLineNo ruleLine p) of
+      (_, _, Nothing) -> error "Should not happen!"
+      ((Nothing, _, _); (_, Nothing, _)) ->
         Left $
-          "Line "
+          "Can not reference line "
             <> show refLine
-            <> " is not a valid line. INTERNAL ERROR, SHOULD NOT HAPPEN"
-      (Just ruleAddr, Just refAddr) ->
-        maybe
-          ( case pIndex refLine p of
-              Nothing -> Left $ "Line " <> show refLine <> " is not a valid line."
-              Just (Left f) -> Right $ Left f
-              Just (Right (Derivation f _)) -> Right $ Right f
-          )
-          Left
-          (refIsVisible refLine ruleAddr (Left refAddr))
+            <> " because it does not exist."
+      (Just (Left a), Just refAddr, Just ruleAddr) -> maybeToLeft (Left a) (refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr)))
+      (Just (Right (Derivation f _)), Just refAddr, Just ruleAddr) -> maybeToLeft (Right f) (refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr)))

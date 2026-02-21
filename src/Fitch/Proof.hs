@@ -244,6 +244,11 @@ data RuleApplication
     RuleApplication Name [Reference]
   deriving (Show, Eq)
 
+instance {-# OVERLAPPING #-} PrettyPrint (Wrapper RuleApplication) where
+  prettyPrint :: Wrapper RuleApplication -> Text
+  prettyPrint Unparsed{} = "()"
+  prettyPrint w = getText w
+
 instance PrettyPrint RuleApplication where
   prettyPrint :: RuleApplication -> Text
   prettyPrint (RuleApplication n refs) = "(" <> n <> ")" <> " " <> T.intercalate "," (map prettyPrint refs)
