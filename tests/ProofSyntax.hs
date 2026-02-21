@@ -171,7 +171,7 @@ lRemoveQCTests =
 
 -- TESTING naInsertBefore
 naInsertBefore' ::
-  Either Assumption (Either Derivation Proof) ->
+  Either Assumption Derivation ->
   NodeAddr ->
   Proof ->
   Maybe Proof
@@ -197,12 +197,12 @@ prop_lInsertlLookupFormulaBefore (PrettyProof p) =
 prop_lInsertBeforeLinePlus1 :: PrettyProof -> Property
 prop_lInsertBeforeLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    (pLength <$> naInsertBefore' (Right . Left $ derivation 0) a p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore' (Right $ derivation 0) a p) === Just (pLength p + 1)
 
 prop_lInsertAfterLinePlus1 :: PrettyProof -> Property
 prop_lInsertAfterLinePlus1 (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p LineKind) $ \a ->
-    (pLength <$> naInsertBefore' (Right . Left $ derivation 0) a p) === Just (pLength p + 1)
+    (pLength <$> naInsertBefore' (Right $ derivation 0) a p) === Just (pLength p + 1)
 
 lInsertQCTests :: TestTree
 lInsertQCTests =

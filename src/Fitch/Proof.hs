@@ -1077,6 +1077,7 @@ naMoveBeforeRaw targetAddr sourceAddr p =
         naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
         naDecrementWhenOnSameLevel na _ = na
       pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
+    _ -> Nothing
 
 targetInRange :: Int -> (Int, Int) -> Proof -> Bool
 targetInRange lineNo (start, end) p =
@@ -1214,21 +1215,34 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
   go :: ProofAddr -> Proof -> Maybe Proof
   go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
     (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
-    _ -> Nothing
-  -- error $ "lineRangeFromProofAddr targetAddr' p'=" <> show (lineRangeFromProofAddr targetAddr' p') <> "\ntargetAddr'=" <> show targetAddr'
+    _ -> error $ "lineRangeFromProofAddr targetAddr' p'=" <> show (lineRangeFromProofAddr targetAddr' p') <> "\ntargetAddr'=" <> show targetAddr'
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)
     | line < sourceStart && targetStart <= line = LineReference (line + proofLen)
-    | line > sourceEnd && targetEnd > line = LineReference (line - proofLen)
+    | line > sourceEnd && targetEnd >= line = LineReference (line - proofLen)
     | otherwise = LineReference line
    where
     proofOffset = line - sourceStart
     proofLen = sourceEnd - sourceStart + 1
-  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end)
-    | start == sourceStart && end == sourceEnd = ProofReference targetStart targetEnd
-    | inRange (sourceStart, sourceEnd) start = ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
-    | inRange (start, end) sourceStart && targetStart < start = ProofReference (start + proofLen) end
-    | otherwise = ProofReference start end
+  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end) = case fromLineRange start end p of
+    Nothing -> ProofReference start end
+    Just pa
+      | start == sourceStart && end == sourceEnd -> ProofReference targetStart targetEnd
+      | paContainedIn pa sourceAddr -> ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
+      | paContainedIn sourceAddr pa && not (paContainedIn targetAddr pa) ->
+          case compare targetAddr pa of
+            LT; EQ -> ProofReference (start + proofLen) end
+            GT -> ProofReference start (end - proofLen)
+      | paContainedIn targetAddr pa && not (paContainedIn sourceAddr pa) ->
+          case compare sourceAddr pa of
+            LT; EQ -> ProofReference (start - proofLen) end
+            GT -> ProofReference start (end + proofLen)
+      | not (paContainedIn targetAddr pa) && not (paContainedIn sourceAddr pa) ->
+          case (compare sourceAddr pa, compare targetAddr pa) of
+            ((,) (LT; EQ) GT) -> ProofReference (start - proofLen) (end - proofLen)
+            ((,) GT (LT; EQ)) -> ProofReference (start + proofLen) (end + proofLen)
+            _ -> ProofReference start end
+      | otherwise -> ProofReference start end
    where
     proofLen = sourceEnd - sourceStart + 1
