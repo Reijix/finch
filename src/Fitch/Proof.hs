@@ -11,6 +11,14 @@ import Util
 class PrettyPrint a where
   prettyPrint :: a -> Text
 
+instance (PrettyPrint a, PrettyPrint b) => PrettyPrint (a, b) where
+  prettyPrint :: (PrettyPrint a, PrettyPrint b) => (a, b) -> Text
+  prettyPrint (x, y) = "(" <> prettyPrint x <> "," <> prettyPrint y <> ")"
+
+instance PrettyPrint Text where
+  prettyPrint :: Text -> Text
+  prettyPrint = id
+
 instance (PrettyPrint a) => PrettyPrint [a] where
   prettyPrint :: [a] -> Text
   prettyPrint xs = unlines $ map prettyPrint xs
@@ -217,7 +225,7 @@ type Assumption = (Wrapper RawAssumption, Wrapper RuleApplication)
 mkAssumption :: Wrapper RawAssumption -> Assumption
 mkAssumption w = (w, ParsedValid "(⊤I)" (RuleApplication "⊤I" []))
 
-instance PrettyPrint Assumption where
+instance {-# OVERLAPPING #-} PrettyPrint Assumption where
   prettyPrint :: Assumption -> Text
   prettyPrint = prettyPrint . fst
 

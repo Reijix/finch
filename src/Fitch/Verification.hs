@@ -338,6 +338,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 Nothing -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
                 -- compare assignment of E
                 Just mgu -> case (mgu !? x', termMap !? t) of
+                  _ | size mgu > 1 -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
                   ((Nothing, _); (_, Nothing)) ->
                     insertWith
                       (<>)
