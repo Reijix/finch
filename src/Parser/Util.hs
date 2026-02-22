@@ -44,6 +44,9 @@ pLowerName =
 pSymbolicName :: (Parser m) => m Text
 pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ("()" :: String)) <?> "name"
 
+pText :: (Parser m) => m Text
+pText = takeWhileP (Just "text") (`notElem` ("\28\29\30\31" :: String)) <?> "text"
+
 comma :: (Parser m) => m Text
 comma = symbol ","
 

@@ -126,6 +126,7 @@ library fitch-editor-lib
     Fitch.Unification
     Fitch.Verification
     Parser.Formula
+    Parser.IncompleteProof
     Parser.Proof
     Parser.Rule
     Parser.Util
@@ -147,8 +148,9 @@ library fitch-editor-lib
     ViewPatterns
 
   build-depends:
+    -- base64-bytestring,
     base >=4.21.0 && <5,
-    base64-bytestring,
+    base64,
     cereal,
     cereal-text,
     containers >=0.7 && <0.9,

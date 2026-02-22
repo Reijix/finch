@@ -44,6 +44,7 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
+  SetProof :: Proof -> Action
   Setup :: Action
   Blur :: Action
   Input :: MisoString -> DOMRef -> Action
@@ -185,7 +186,7 @@ checkFreshness = do
   goAssumption p na a@(ParsedValid txt ra, r) = (goRawAssumption p na txt ra, r)
   goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
   goRawAssumption p na txt ra@(FreshVar v) = case pCollectFreshnessNodes na p of
-    Left err -> ParsedInvalid txt err ra
+    Left err -> error "pCollectFreshnessNodes failed"
     Right nodes ->
       case isFreshList v nodes of
         Nothing -> ParsedValid txt ra

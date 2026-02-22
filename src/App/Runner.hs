@@ -64,6 +64,7 @@ import Miso (
   startSub,
   stopSub,
   text,
+  withSink,
  )
 import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
@@ -74,7 +75,7 @@ import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
 import Parser.Rule (parseRuleApplication)
-import Relude.Extra.Map (insert)
+import Relude.Extra.Map (insert, (!?))
 
 -----------------------------------------------------------------------------
 
@@ -125,28 +126,32 @@ replaceQueryString :: MisoString -> MisoString -> URI -> URI
 replaceQueryString name value uri = uri{uriQueryString = insert name (Just value) (uriQueryString uri)}
 
 readURI :: Effect ROOT Model Action
-readURI = undefined
+readURI = withSink $ \sink -> do
+  uri <- getURI
+  case uriQueryString uri !? "proof" of
+    Just (Just str) -> case decodeFromUrl (fromMisoString str :: Text) of
+      Nothing -> pass
+      Just (p :: Proof) -> sink (SetProof p)
+    _ -> pass
 
 updateURI :: Effect ROOT Model Action
 updateURI = do
   p <- use proof
   io_ $ do
     uri <- getURI
-    let encoded = ms $ encodeForUrl p
-    consoleLog $ "encoded: " <> encoded
-    case decodeFromUrl (fromMisoString encoded :: Text) of
-      Left err -> consoleLog $ ms err
-      Right (decoded :: Proof) -> consoleLog $ "decoded:\n" <> ms (prettyPrint decoded)
     replaceURI $ replaceQueryString "proof" (ms $ encodeForUrl p) uri
 
-reParseLine :: NodeAddr -> Effect ROOT Model Action
-reParseLine na =
+proofReparse :: Effect ROOT Model Action
+proofReparse = get >>= \m -> proof %= reparseProof m
+
+naReparseLine :: NodeAddr -> Effect ROOT Model Action
+naReparseLine na =
   get >>= \m ->
     use proof >>= \p -> case (naLookup na p, fromNodeAddr na p) of
       (Just (Left (a, r)), Just lineNo) ->
-        proof %=? naUpdateFormula (Left $ const (reParse m lineNo a, r)) na
+        proof %=? naUpdateFormula (Left $ const (reparse m lineNo a, r)) na
       (Just (Right (Derivation f _)), Just lineNo) ->
-        proof %=? naUpdateFormula (Right $ const (reParse m lineNo f)) na
+        proof %=? naUpdateFormula (Right $ const (reparse m lineNo f)) na
       _ -> pass
 
 dropBeforeLine :: NodeAddr -> Effect ROOT Model Action
@@ -160,7 +165,7 @@ dropBeforeLine targetAddr = do
         Nothing -> pass
         Just (ta, p) -> do
           proof %= const p
-          reParseLine ta
+          naReparseLine ta
     Just (Right pa) -> do
       io_ $ consoleLog $ "Moving " <> show pa <> " into " <> show targetAddr
       use proof >>= \p -> io_ $ consoleLog $ "paFromNA=" <> show (paFromNA targetAddr p)
@@ -196,6 +201,7 @@ dropBeforeLine targetAddr = do
           _ -> pass
   clearDrag
   checkProof
+  updateURI
 
 setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
 setFocus ea = do
@@ -212,7 +218,8 @@ setFocus ea = do
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = checkProof >> updateURI
+updateModel Setup = readURI >> checkProof >> updateURI
+updateModel (SetProof p) = proof .= p >> proofReparse
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
@@ -447,8 +454,14 @@ tryParse m n txt = case fromText m n replacedTxt :: Either Text a of
       (foldr (\(alias, name, _) t -> T.replace alias name t) txt (m ^. operators))
       (m ^. quantifiers)
 
-reParse ::
+reparse ::
   forall a.
   (FromText a) =>
   Model -> Int -> Wrapper a -> Wrapper a
-reParse m n w = tryParse m n (getText w)
+reparse m n w = tryParse m n (getText w)
+
+reparseProof :: Model -> Proof -> Proof
+reparseProof model = pMapLinesWithLineNo reparseAssumption reparseDerivation
+ where
+  reparseDerivation line (Derivation f r) = Derivation (reparse model line f) (reparse model line r)
+  reparseAssumption line (a, r) = (reparse model line a, reparse model line r)
