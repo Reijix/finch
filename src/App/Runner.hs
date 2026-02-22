@@ -16,6 +16,7 @@ import App.Model
 import App.Views
 import Data.Text qualified as T
 import Fitch.Proof
+import Fitch.Unification
 import Fitch.Verification (verifyProof)
 import Miso (
   App,
@@ -70,7 +71,7 @@ import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
-import Miso.Lens (Lens, use, (%=), (.=), (^.))
+import Miso.Lens (Lens, use, (%=), (.=), (<~), (^.))
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
@@ -126,13 +127,15 @@ replaceQueryString :: MisoString -> MisoString -> URI -> URI
 replaceQueryString name value uri = uri{uriQueryString = insert name (Just value) (uriQueryString uri)}
 
 readURI :: Effect ROOT Model Action
-readURI = withSink $ \sink -> do
-  uri <- getURI
-  case uriQueryString uri !? "proof" of
-    Just (Just str) -> case decodeFromUrl (fromMisoString str :: Text) of
-      Nothing -> pass
-      Just (p :: Proof) -> sink (SetProof p)
-    _ -> pass
+readURI = do
+  p <- use proof
+  withSink $ \sink -> do
+    uri <- getURI
+    case uriQueryString uri !? "proof" of
+      Just (Just str) -> case decodeFromUrl (fromMisoString str :: Text) of
+        Nothing -> sink (SetProof p)
+        Just (p :: Proof) -> sink (SetProof p)
+      _ -> pass
 
 updateURI :: Effect ROOT Model Action
 updateURI = do
@@ -218,8 +221,8 @@ setFocus ea = do
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = readURI >> checkProof >> updateURI
-updateModel (SetProof p) = proof .= p >> proofReparse
+updateModel Setup = readURI
+updateModel (SetProof p) = proof .= p >> proofReparse >> checkProof >> updateURI
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do

@@ -175,16 +175,17 @@ rules = lens (._rules) $ \model rs -> model{_rules = rs}
 
 -- * Semantic checking
 
--- TODO checkFreshness does not ignore subproofs above!!
 checkFreshness :: forall m. (MonadState Model m) => m ()
 checkFreshness = do
-  proof <~ (use proof >>= \p -> pure (pMapLinesWithAddr (goAssumption p) (const id) p))
+  p <- use proof
+  proof .= pMapLinesWithAddr (goAssumption p) (const id) p
  where
   goAssumption :: Proof -> NodeAddr -> Assumption -> Assumption
   goAssumption _ _ a@(Unparsed{}, _) = a
   goAssumption p na a@(ParsedInvalid txt _ ra, r) = (goRawAssumption p na txt ra, r)
   goAssumption p na a@(ParsedValid txt ra, r) = (goRawAssumption p na txt ra, r)
   goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
+  -- TODO refactor pCollectFreshnessNodes, it does not need to throw errors!!
   goRawAssumption p na txt ra@(FreshVar v) = case pCollectFreshnessNodes na p of
     Left err -> error "pCollectFreshnessNodes failed"
     Right nodes ->
