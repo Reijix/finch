@@ -213,10 +213,6 @@ Drag and drop related
   cursor: -webkit-grab;
 }
 
-.non-selectable {
-  cursor: pointer;
-}
-
 .drop-zone {
   height: 5px;
   transition: height 0.1s linear;

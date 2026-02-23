@@ -102,7 +102,6 @@ viewLine model na e =
         , HP.classList_
             [ ("draggable", (model ^. focusedLine) /= Just (Left na))
             , ("can-hover", not (model ^. dragging))
-            , ("non-selectable", na == NAConclusion)
             ]
         , onDragStartWithOptions stopPropagation $ DragStart (Left na)
         , onDragEndWithOptions defaultOptions DragEnd
@@ -227,6 +226,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       (ParsedInvalid str err _) -> (False, True, ms str, ms err)
       (Unparsed str err) -> (False, False, ms str, ms err)
 
+-- TODO can use _viewProof with na = id
 viewProof :: Model -> View Model Action
 viewProof model =
   H.div_

@@ -3,7 +3,7 @@ CABAL_OPTIONS = --allow-newer --with-compiler=javascript-unknown-ghcjs-ghc --wit
 
 .PHONY: update build serve
 
-all: update build
+all: build
 
 update:
 	cabal update $(CABAL_OPTIONS)

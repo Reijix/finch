@@ -57,6 +57,7 @@ import Miso (
   ms,
   newEvent,
   preventDefault,
+  pushURI,
   removeEventListener,
   replaceURI,
   select,
@@ -65,6 +66,7 @@ import Miso (
   startSub,
   stopSub,
   text,
+  uriSub,
   withSink,
  )
 import Miso.DSL (jsg, (#))
@@ -100,14 +102,22 @@ runApp ::
   Map Name RuleSpec ->
   -- | Resulting program
   IO ()
-runApp proof operators infixPreds quantifiers rules =
+runApp proof operators infixPreds quantifiers rules = do
+  -- read in initial URI, possibly containing an initial proof.
+  uri <- getURI
+  p' <- case proofFromURI uri of
+    Nothing -> pushURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
+    Just p -> pure p
+  let m = initialModel p' operators infixPreds quantifiers rules
   startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css"]
       , mount = Just Setup
+      , subs = [uriSub PopState]
       }
- where
-  m = initialModel proof operators infixPreds quantifiers rules
+
+updateProof :: Effect ROOT Model Action
+updateProof = checkProof >> updateURI
 
 checkProof :: forall m. (MonadState Model m) => m ()
 checkProof = do
@@ -126,23 +136,26 @@ clearDrag = do
 replaceQueryString :: MisoString -> MisoString -> URI -> URI
 replaceQueryString name value uri = uri{uriQueryString = insert name (Just value) (uriQueryString uri)}
 
-readURI :: Effect ROOT Model Action
-readURI = do
-  p <- use proof
-  withSink $ \sink -> do
-    uri <- getURI
-    case uriQueryString uri !? "proof" of
-      Just (Just str) -> case decodeFromUrl (fromMisoString str :: Text) of
-        Nothing -> sink (SetProof p)
-        Just (p :: Proof) -> sink (SetProof p)
-      _ -> pass
+proofFromURI :: URI -> Maybe Proof
+proofFromURI uri = case uriQueryString uri !? "proof" of
+  Just (Just str) -> decodeFromUrl (fromMisoString str :: Text)
+  _ -> Nothing
+
+readURI :: URI -> Effect ROOT Model Action
+readURI uri = do
+  case uriQueryString uri !? "proof" of
+    Just (Just str) -> case decodeFromUrl (fromMisoString str :: Text) of
+      Nothing -> pass
+      Just (p :: Proof) -> proof .= p
+    _ -> pass
 
 updateURI :: Effect ROOT Model Action
 updateURI = do
   p <- use proof
   io_ $ do
     uri <- getURI
-    replaceURI $ replaceQueryString "proof" (ms $ encodeForUrl p) uri
+    let newURI = replaceQueryString "proof" (ms $ encodeForUrl p) uri
+    if uri /= newURI then replaceURI newURI else pass
 
 proofReparse :: Effect ROOT Model Action
 proofReparse = get >>= \m -> proof %= reparseProof m
@@ -202,9 +215,7 @@ dropBeforeLine targetAddr = do
             proof .= p
             setFocus (Left $ naFromPA pa NAConclusion)
           _ -> pass
-  clearDrag
-  checkProof
-  updateURI
+  clearDrag >> updateProof
 
 setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
 setFocus ea = do
@@ -221,8 +232,10 @@ setFocus ea = do
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = readURI
-updateModel (SetProof p) = proof .= p >> proofReparse >> checkProof >> updateURI
+updateModel Setup = proofReparse >> checkProof
+updateModel (PopState uri) = do
+  io_ $ consoleLog "PopState called"
+  readURI uri >> proofReparse >> checkProof
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
@@ -231,8 +244,7 @@ updateModel (Drop LocationBin) = do
     Nothing -> pass
     Just (Left na) -> proof %=? naRemove na
     Just (Right pa) -> proof %=? paRemove pa
-  clearDrag
-  checkProof
+  clearDrag >> updateProof
 updateModel (Drop (LineAddr targetAddr)) = dropBeforeLine targetAddr
 updateModel (DragEnter na) = do
   p <- use proof
@@ -261,7 +273,7 @@ updateModel DragEnd = do
 -- Input related events
 updateModel (DoubleClick ea) = setFocus ea
 updateModel Blur = focusedLine .= Nothing
-updateModel Change = checkProof
+updateModel Change = updateProof
 updateModel (Input str ref) = do
   m <- get
   fline <- use focusedLine
@@ -272,7 +284,7 @@ updateModel (Input str ref) = do
       Just (start :: Int) <- castJSVal =<< getProperty ref "selectionStart"
       Just (end :: Int) <- castJSVal =<< getProperty ref "selectionEnd"
       pure $ ProcessInput str start end addr
-  checkProof
+  updateProof
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   fLen <-
@@ -296,7 +308,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
         proof %=? naUpdateFormula (Right $ const f) addr
         pure $ T.length . getText $ f
 
-  checkProof
+  updateProof
   let delta = T.length (fromMisoString str) - fLen
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
@@ -316,7 +328,7 @@ updateModel (ProcessInput str start end (Right addr)) = do
           (fromMisoString str) ::
           Wrapper RuleApplication
   proof %=? naUpdateRule (const r) addr
-  checkProof
+  updateProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
@@ -335,7 +347,7 @@ updateModel (ProcessParens eaddr start end) = do
       proof %=? naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
       proof %=? naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
-  checkProof
+  updateProof
  where
   update :: Model -> Text -> Either Formula (Wrapper RuleApplication)
   update m txt =
@@ -355,8 +367,13 @@ updateModel (ProcessParens eaddr start end) = do
                 m
                 (lineNoOr999 addr (m ^. proof))
                 newTxt
-updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" ++ show addr) (onKeyDownSub addr ref)
-updateModel (KeyDownStop addr) = stopSub ("keyDownSub" ++ show addr)
+-- THIS DOES NOT WORK, because addresses change!!
+updateModel (KeyDownStart addr ref) = do
+  -- io_ $ consoleLog ("Registering addr=" <> show addr)
+  startSub ("keyDownSub" <> show addr) (onKeyDownSub addr ref)
+updateModel (KeyDownStop addr) = do
+  -- io_ $ consoleLog ("Stopping addr=" <> show addr)
+  stopSub ("keyDownSub" <> show addr)
 ------------------------------------
 updateModel Nop = pass
 
@@ -385,7 +402,7 @@ Used for detecting presses of '(' and 'Enter'.
 * On '(' inserts the closing parenthesis at the end of selection.
 -}
 onKeyDownSub :: Either NodeAddr NodeAddr -> DOMRef -> Sub Action
-onKeyDownSub addr domRef = createSub acquire (const pass)
+onKeyDownSub addr domRef = createSub acquire (removeEventListener domRef "keydown")
  where
   acquire = do
     addEventListener domRef "keydown" $ \evt -> do

@@ -11,6 +11,7 @@ import Miso (
   KeyInfo,
   MisoString,
   ROOT,
+  URI,
   View,
   consoleLog,
   io_,
@@ -44,7 +45,7 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
-  SetProof :: Proof -> Action
+  PopState :: URI -> Action
   Setup :: Action
   Blur :: Action
   Input :: MisoString -> DOMRef -> Action
