@@ -16,7 +16,6 @@ import App.Model
 import App.Views
 import Data.Text qualified as T
 import Fitch.Proof
-import Fitch.Unification
 import Fitch.Verification (verifyProof)
 import Miso (
   App,
@@ -106,7 +105,7 @@ runApp proof operators infixPreds quantifiers rules = do
   -- read in initial URI, possibly containing an initial proof.
   uri <- getURI
   p' <- case proofFromURI uri of
-    Nothing -> pushURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
+    Nothing -> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
     Just p -> pure p
   let m = initialModel p' operators infixPreds quantifiers rules
   startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
@@ -155,7 +154,7 @@ updateURI = do
   io_ $ do
     uri <- getURI
     let newURI = replaceQueryString "proof" (ms $ encodeForUrl p) uri
-    if uri /= newURI then replaceURI newURI else pass
+    if uri /= newURI then pushURI newURI else pass
 
 proofReparse :: Effect ROOT Model Action
 proofReparse = get >>= \m -> proof %= reparseProof m
@@ -368,12 +367,8 @@ updateModel (ProcessParens eaddr start end) = do
                 (lineNoOr999 addr (m ^. proof))
                 newTxt
 -- THIS DOES NOT WORK, because addresses change!!
-updateModel (KeyDownStart addr ref) = do
-  -- io_ $ consoleLog ("Registering addr=" <> show addr)
-  startSub ("keyDownSub" <> show addr) (onKeyDownSub addr ref)
-updateModel (KeyDownStop addr) = do
-  -- io_ $ consoleLog ("Stopping addr=" <> show addr)
-  stopSub ("keyDownSub" <> show addr)
+updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" <> show addr) (onKeyDownSub addr ref)
+updateModel (KeyDownStop addr) = stopSub ("keyDownSub" <> show addr)
 ------------------------------------
 updateModel Nop = pass
 

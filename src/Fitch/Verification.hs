@@ -404,7 +404,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           Just $
             "Line "
               <> show refLine
-              <> "can not be referenced, because it does not appear before line "
+              <> " can not be referenced, because it does not appear before line "
               <> show ruleLine
               <> "!"
     refIsVisible (ruleLine, ruleAddr) (Right ((start, end), refAddr))
