@@ -283,7 +283,7 @@ updateModel (Input str ref) = do
       Just (start :: Int) <- castJSVal =<< getProperty ref "selectionStart"
       Just (end :: Int) <- castJSVal =<< getProperty ref "selectionEnd"
       pure $ ProcessInput str start end addr
-  updateProof
+  checkProof
 updateModel (ProcessInput str start end (Left addr)) = do
   m <- get
   fLen <-
@@ -307,7 +307,7 @@ updateModel (ProcessInput str start end (Left addr)) = do
         proof %=? naUpdateFormula (Right $ const f) addr
         pure $ T.length . getText $ f
 
-  updateProof
+  checkProof
   let delta = T.length (fromMisoString str) - fLen
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
@@ -327,7 +327,7 @@ updateModel (ProcessInput str start end (Right addr)) = do
           (fromMisoString str) ::
           Wrapper RuleApplication
   proof %=? naUpdateRule (const r) addr
-  updateProof
+  checkProof
   let delta = T.length (fromMisoString str) - (T.length . getText $ r)
   -- restore selectionStart and selectionEnd (delta-adjusted)
   io_ $
@@ -346,7 +346,7 @@ updateModel (ProcessParens eaddr start end) = do
       proof %=? naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
     Right addr ->
       proof %=? naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
-  updateProof
+  checkProof
  where
   update :: Model -> Text -> Either Formula (Wrapper RuleApplication)
   update m txt =
@@ -371,20 +371,6 @@ updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" <> show addr) (onKe
 updateModel (KeyDownStop addr) = stopSub ("keyDownSub" <> show addr)
 ------------------------------------
 updateModel Nop = pass
-
--- | Takes a `Model` and returns the corresponding `View`.
-viewModel :: Model -> View Model Action
-viewModel model =
-  H.div_
-    [HP.class_ "fitch-container"]
-    [ H.div_
-        [HP.class_ "button-container"]
-        [ viewBin
-        , viewSpawnNode SpawnLine "+Line"
-        , viewSpawnNode SpawnProof "+Proof"
-        ]
-    , viewProof model
-    ]
 
 -----------------------------------------------------------------------------
 

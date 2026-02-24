@@ -13,6 +13,7 @@ import Miso (
   defaultOptions,
   emptyDecoder,
   focus,
+  fromMisoString,
   keyInfoDecoder,
   ms,
   onBeforeDestroyed,
@@ -37,35 +38,36 @@ import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 import Util (interleave)
 
-contentEditable_ :: Bool -> Attribute action
-contentEditable_ = boolProp "contentEditable"
+-----------------------------------------------------------------------------
 
-viewDropZoneAt :: Model -> Maybe MisoString -> NodeAddr -> View Model Action
-viewDropZoneAt model mclass na =
-  H.div_
-    [ HP.class_ "drop-zone"
-    , HP.id_ (show na)
-    , HP.classList_
-        [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
-        , (fromMaybe "" mclass, isJust mclass)
-        ]
-    , HP.draggable_ False
-    , onDragOverWithOptions preventDefault Nop
-    , onDragEnterWithOptions preventDefault (DragEnter na)
-    , onDropWithOptions defaultOptions (Drop (LineAddr na))
-    ]
-    []
-
-interleaveWithDropZones :: Model -> Maybe MisoString -> Maybe NodeAddr -> (Int -> NodeAddr) -> [View Model Action] -> [View Model Action]
-interleaveWithDropZones model mclass lastNA na views = interleave dropzones views
- where
-  dropzones :: [View Model Action]
-  dropzones =
-    map
-      (\n -> viewDropZoneAt model (if n == length views then mclass else Nothing) (if n == length views then fromMaybe (na n) lastNA else na n))
-      [0 .. length views]
+-- * Views
 
 -----------------------------------------------------------------------------
+
+-- | Takes a `Model` and returns the corresponding `View`.
+viewModel :: Model -> View Model Action
+viewModel model =
+  H.div_
+    [HP.class_ "app-container"]
+    [ H.header_
+        [HP.class_ "header"]
+        [text "Finch"]
+    , H.div_
+        [HP.class_ "content-container"]
+        [ viewSidebar
+        , viewProof model
+        ]
+    ]
+
+viewSidebar :: View Model Action
+viewSidebar =
+  H.div_
+    [HP.class_ "sidebar"]
+    [ viewBin
+    , viewSpawnNode SpawnLine "+Line"
+    , viewSpawnNode SpawnProof "+Proof"
+    ]
+
 viewBin :: View Model Action
 viewBin =
   H.div_
@@ -90,7 +92,6 @@ viewSpawnNode tp str =
     ]
     [H.p_ [] [text $ ms str]]
 
--- VIEWS
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
   H.div_
@@ -118,6 +119,7 @@ viewLine model na e =
                     , ("parse-fail", not parseSuccess || not semanticSuccess)
                     , ("draggable", Just (Left na) /= model ^. focusedLine)
                     ]
+                , HP.autocomplete_ False
                 , HP.draggable_ False
                 , onBlur Blur
                 , onChange (const Change)
@@ -209,6 +211,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
           , HP.id_ . ms $ "proof-line-rule" ++ show (lineNoOr999 na (model ^. proof))
           , HP.classList_
               [("parse-fail", not parseSuccess || not semanticSuccess)]
+          , HP.autocomplete_ False
           , HP.draggable_ False
           , HP.inert_ (Just (Right na) /= model ^. focusedLine)
           , onBlur Blur
@@ -303,5 +306,32 @@ viewProof model =
     viewConclusion = viewLine model (na NAConclusion) (Right d)
 
 -----------------------------------------------------------------------------
-toEm :: Int -> MisoString
-toEm n = ms (show n ++ "em")
+
+-- * Utilities
+
+-----------------------------------------------------------------------------
+
+viewDropZoneAt :: Model -> Maybe MisoString -> NodeAddr -> View Model Action
+viewDropZoneAt model mclass na =
+  H.div_
+    [ HP.class_ "drop-zone"
+    , HP.id_ (show na)
+    , HP.classList_
+        [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
+        , (fromMaybe "" mclass, isJust mclass)
+        ]
+    , HP.draggable_ False
+    , onDragOverWithOptions preventDefault Nop
+    , onDragEnterWithOptions preventDefault (DragEnter na)
+    , onDropWithOptions defaultOptions (Drop (LineAddr na))
+    ]
+    []
+
+interleaveWithDropZones :: Model -> Maybe MisoString -> Maybe NodeAddr -> (Int -> NodeAddr) -> [View Model Action] -> [View Model Action]
+interleaveWithDropZones model mclass lastNA na views = interleave dropzones views
+ where
+  dropzones :: [View Model Action]
+  dropzones =
+    map
+      (\n -> viewDropZoneAt model (if n == length views then mclass else Nothing) (if n == length views then fromMaybe (na n) lastNA else na n))
+      [0 .. length views]

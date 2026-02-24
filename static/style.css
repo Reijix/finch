@@ -3,23 +3,49 @@
 Variables
 --------------------------------------------------
 */
-:root {
-  --line-height: 1.3rem;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
+:root {
+  --line-height: calc(1rem + 4vh);
+  --normal-text-size: calc(1rem + 3vh);
+  --error-text-size: calc(0.5rem + 1.5vh);
+  --bg-color: rgba(233, 241, 244);
+  --sidebar-color: rgba(241, 246, 249);
+  --proof-color: #fefefe;
+  --drop-zone-height: 1vh;
+}
+
+body {
+  margin: 0;
+  width: 100vw;
+}
+
+input:focus {
+  outline: none;
+}
 
 /* 
 --------------------------------------------------
 Button containers
 --------------------------------------------------
 */
-.button-container {
+.sidebar {
   display: flex;
   flex-direction: column;
-  font-size: 8px;
+  /* font-size: 8px; */
+  width: 20%;
+  background-color: var(--sidebar-color);
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.button-container>div {
+.sidebar>div {
   margin-right: 15px;
   margin-bottom: 5px;
   max-width: 6rem;
@@ -41,9 +67,10 @@ Button containers
 Line number containers
 --------------------------------------------------
 */
-.line-nos-container {
+.line-no-container {
   display: flex;
   flex-direction: column;
+  width: 5%;
 }
 
 .empty-line-no {
@@ -57,27 +84,61 @@ Line number containers
 Proof containers
 --------------------------------------------------
 */
-.fitch-container {
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(250, 250, 250);
+  border-bottom: 1px solid #e0e0e0;
+  /* height: 1.3rem; */
+  font-size: calc(1rem + 3vw);
+  padding: 2px;
+}
+
+.app-container {
+  height: 100vh;
   width: 100%;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  background-color: var(--bg-color);
+  font-size: var(--normal-text-size);
+}
+
+.content-container {
   display: inline-flex;
+  width: 100%;
+  overflow-y: hidden;
 }
 
 .proof-container-border {
-  padding: 3px;
+  width: 78%;
+  height: 100%;
+  /* width: 80vw;
+  height: 80vh; */
 }
 
 .proof-container {
+  margin: 1vw;
+  /* margin: 1vw; */
+  background-color: var(--proof-color);
+  border-radius: 0.5vw;
   display: flex;
   flex-direction: row;
-  height: fit-content;
-  padding-top: 10px
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  /* overflow-x: hidden; */
+  /* -ms-overflow-style: none;
+  scrollbar-width: none; */
 }
 
 .proof-line {
   position: relative;
-  max-width: 15rem;
+  /* max-width: 15rem; */
   height: var(--line-height);
-  box-sizing: border-box;
+  max-width: 100%;
+  /* box-sizing: border-box; */
 }
 
 .line-no {
@@ -88,17 +149,18 @@ Proof containers
 
 .formula-input {
   border: none;
-  width: 100%;
+  max-width: 100%;
   padding: 0;
   margin: 0;
+  font-size: var(--normal-text-size);
 }
 
 .formula-container {
   display: flex;
   flex-direction: row;
   position: relative;
-  height: 100%;
-  width: 100%;
+  height: fit-content;
+  max-width: 100%;
   padding: 0;
   margin: 0;
 }
@@ -108,14 +170,18 @@ Proof containers
   box-sizing: border-box;
   border-left: 2px solid black;
   margin-left: 5px;
+  width: 75%;
+  height: fit-content;
+  /* width: fit-content; */
 }
 
 .error {
   visibility: hidden;
   opacity: 0;
   position: absolute;
-  top: 100%;
-  font-size: 6px;
+  top: -100%;
+  right: 10vw;
+  /* font-size: 6px; */
   border: 1px solid;
   border-radius: 2px;
   width: fit-content;
@@ -125,6 +191,7 @@ Proof containers
   color: #000;
   z-index: 110;
   transition: visibility 0s, opacity .5s;
+  font-size: var(--error-text-size);
 }
 
 .has-error.can-hover:hover .error {
@@ -139,7 +206,8 @@ Proof containers
 
 .subproof {
   position: relative;
-  box-sizing: border-box;
+  /* box-sizing: border-box; */
+  max-width: 100%;
   border-left: 2px solid black;
   margin-left: 5px;
 }
@@ -191,14 +259,19 @@ Rule containers
   width: 100%;
   padding: 0;
   margin: 0;
+  font-size: var(--normal-text-size);
 }
 
 .rule-container {
-  width: 5rem;
+  width: 100%;
   padding: 0;
   margin: 0;
   height: var(--line-height);
   position: relative;
+}
+
+.rules-container {
+  width: 20%;
 }
 
 /* 
@@ -214,7 +287,7 @@ Drag and drop related
 }
 
 .drop-zone {
-  height: 5px;
+  height: var(--drop-zone-height);
   transition: height 0.1s linear;
   background-color: white
 }
