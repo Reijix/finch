@@ -63,9 +63,15 @@ viewSidebar :: View Model Action
 viewSidebar =
   H.div_
     [HP.class_ "sidebar"]
+    [viewProofActions]
+
+viewProofActions :: View Model Action
+viewProofActions =
+  H.div_
+    [HP.class_ "proof-actions"]
     [ viewBin
-    , viewSpawnNode SpawnLine "+Line"
-    , viewSpawnNode SpawnProof "+Proof"
+    , viewSpawnNode SpawnLine "add-line-icon.svg" "Add Line"
+    , viewSpawnNode SpawnProof "add-subproof-icon.svg" "Add Subproof"
     ]
 
 viewBin :: View Model Action
@@ -76,11 +82,14 @@ viewBin =
     , onDragLeaveWithOptions preventDefault Nop
     , onDropWithOptions defaultOptions (Drop LocationBin)
     , HP.class_ "bin"
+    , HP.class_ "icon-container"
     ]
-    [H.p_ [] ["Delete"]]
+    [ H.img_ [HP.src_ "delete-icon.svg"]
+    , H.p_ [] ["Delete"]
+    ]
 
-viewSpawnNode :: SpawnType -> String -> View Model Action
-viewSpawnNode tp str =
+viewSpawnNode :: SpawnType -> MisoString -> MisoString -> View Model Action
+viewSpawnNode tp iconPath str =
   H.div_
     [ HP.classList_
         [ ("spawn-button", True)
@@ -89,9 +98,11 @@ viewSpawnNode tp str =
     , HP.draggable_ True
     , onDragStartWithOptions stopPropagation $ SpawnStart tp
     , onDragEndWithOptions defaultOptions DragEnd
+    , HP.class_ "icon-container"
     ]
-    [H.p_ [] [text $ ms str]]
-
+    [ H.img_ [HP.src_ iconPath]
+    , H.p_ [] [text str]
+    ]
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
   H.div_
