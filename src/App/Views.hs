@@ -49,9 +49,7 @@ viewModel :: Model -> View Model Action
 viewModel model =
   H.div_
     [HP.class_ "app-container"]
-    [ H.header_
-        [HP.class_ "header"]
-        [text "Finch"]
+    [ viewHeader
     , H.div_
         [HP.class_ "content-container"]
         [ viewSidebar
@@ -59,11 +57,20 @@ viewModel model =
         ]
     ]
 
+viewNewProof :: View Model Action
+viewNewProof = H.button_ [HP.class_ "new-proof-button"] [text "New Proof"]
+
+viewHeader :: View Model Action
+viewHeader = H.header_ [HP.class_ "header"] [text "Finch", viewNewProof]
+
 viewSidebar :: View Model Action
 viewSidebar =
   H.div_
     [HP.class_ "sidebar"]
     [viewProofActions]
+
+viewAccordion :: MisoString -> View Model Action -> View Model Action
+viewAccordion heading content = H.details_ [] [H.summary_ [] [text heading], content]
 
 viewProofActions :: View Model Action
 viewProofActions =

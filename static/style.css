@@ -37,11 +37,17 @@ Button containers
   display: flex;
   flex-direction: column;
   width: 20%;
+
   background-color: var(--sidebar-color);
   border-right: 1px solid #e0e0e0;
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.card {
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+  padding: 4px 4px;
 }
 
 .proof-actions {
@@ -122,6 +128,7 @@ Proof containers
 .content-container {
   display: inline-flex;
   width: 100%;
+  height: 100%;
   overflow-y: hidden;
 }
 
@@ -137,7 +144,7 @@ Proof containers
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: 100%;
+  height: fit-content;
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
