@@ -27,16 +27,13 @@ import Miso (
   textRaw,
   valueDecoder,
  )
-import Miso.Html qualified as HP
 import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property (value_)
 import Miso.Html.Property qualified as HP
 import Miso.Lens
 import Miso.Property (boolProp, textProp)
-import Miso.Svg (onFocusOut, onMouseDown, text_, tspan_)
-import Miso.Svg.Element qualified as S
-import Miso.Svg.Property qualified as SP
+import Relude.Extra (toPairs)
 import Util (interleave)
 
 -----------------------------------------------------------------------------
@@ -53,52 +50,97 @@ viewModel model =
     [ viewHeader model
     , H.div_
         [HP.class_ "content-container"]
-        [ viewSidebar
+        [ viewSidebar model
         , viewProof model
         ]
     ]
 
 viewNewProof :: Model -> View Model Action
-viewNewProof model = H.button_ [HP.class_ "app-button", HP.onClick (SetProof (model ^. emptyProof))] [text "New Proof"]
+viewNewProof model = H.button_ [HP.class_ "app-button", onClick (SetProof (model ^. emptyProof))] [text "New Proof"]
 
 viewHeader :: Model -> View Model Action
-viewHeader model = H.header_ [HP.class_ "header"] [H.h1_ [] ["Finch"], viewNewProof model]
+viewHeader model = H.header_ [HP.class_ "header"] [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewNewProof model]
 
-viewSidebar :: View Model Action
-viewSidebar =
+viewSidebar :: Model -> View Model Action
+viewSidebar model =
   H.div_
     [HP.class_ "sidebar"]
-    [viewProofActions, viewGrammarAccordion, viewRuleAccordion, viewExamplesAccordion]
+    [viewProofActions, viewGrammarAccordion model, viewRuleAccordion model, viewExamplesAccordion model]
 
-viewAccordion :: MisoString -> [View Model Action] -> View Model Action
-viewAccordion heading content = H.details_ [] [H.summary_ [] [text heading], H.div_ [HP.class_ "accordion-content"] content]
+viewAccordion :: [View Model Action] -> [View Model Action] -> View Model Action
+viewAccordion heading content =
+  H.details_
+    [HP.open_ True, HP.class_ "sidebar-element"]
+    [ H.summary_
+        [HP.class_ "sidebar-header"]
+        (heading <> [H.span_ [HP.class_ "material-symbols-outlined", HP.class_ "summary-arrow"] ["keyboard_arrow_down"]])
+    , H.div_ [HP.class_ "sidebar-content"] content
+    ]
+
+viewTextWithIcon :: MisoString -> MisoString -> View Model Action
+viewTextWithIcon txt icon = H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, text txt]
+
+viewMaterialIcon :: MisoString -> View Model Action
+viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
 
 viewProofActions :: View Model Action
 viewProofActions =
-  viewAccordion
-    "Proof Actions"
-    [ viewBin
-    , viewSpawnNode SpawnLine "add-line-icon.svg" "Add Line"
-    , viewSpawnNode SpawnProof "add-subproof-icon.svg" "Add Subproof"
+  H.div_
+    [ HP.class_ "sidebar-element"
+    ]
+    [ H.p_
+        [HP.class_ "sidebar-header"]
+        [viewTextWithIcon "Proof Actions" "action_key", H.span_ [] []]
+    , H.div_
+        [HP.class_ "sidebar-content"]
+        [ viewBin
+        , H.div_
+            [HP.class_ "spawn-buttons"]
+            [ viewSpawnNode SpawnLine "add" "Add Line"
+            , viewSpawnNode SpawnProof "variable_add" "Add Subproof"
+            ]
+        ]
     ]
 
-viewGrammarAccordion :: View Model Action
-viewGrammarAccordion =
+viewGrammarAccordion :: Model -> View Model Action
+viewGrammarAccordion model =
   viewAccordion
-    "Grammar"
-    [text "phipsi"]
+    [viewTextWithIcon "Symbols" "abc"]
+    ( map
+        viewSingleSymbol
+        ( map (\(a, b, _) -> (a, b)) (model ^. operators)
+            <> model ^. quantifiers
+            <> model ^. infixPreds
+        )
+    )
+ where
+  viewSingleSymbol :: (Name, Name) -> View Model Action
+  viewSingleSymbol (alias, symbol) = H.button_ [HP.class_ "app-button"] [text $ ms symbol]
 
-viewRuleAccordion :: View Model Action
-viewRuleAccordion =
+viewRuleAccordion :: Model -> View Model Action
+viewRuleAccordion model =
   viewAccordion
-    "Rules"
-    [text "rules"]
+    [viewTextWithIcon "Rules" "rule"]
+    (map viewSingleRule (toPairs $ model ^. rules))
+ where
+  viewSingleRule :: (Name, RuleSpec) -> View Model Action
+  viewSingleRule (name, rs) =
+    H.button_
+      [HP.class_ "app-button"]
+      [text $ ms name]
 
-viewExamplesAccordion :: View Model Action
-viewExamplesAccordion =
+viewExamplesAccordion :: Model -> View Model Action
+viewExamplesAccordion model =
   viewAccordion
-    "Examples"
-    [text "Examples"]
+    [viewTextWithIcon "Examples" "menu"]
+    $ one (H.div_ [HP.class_ "examples"] (map mkExample examples))
+ where
+  mkExample :: (MisoString, Proof) -> View Model Action
+  mkExample (name, p) =
+    H.button_
+      [HP.class_ "example", HP.class_ "app-button", onClick (SetProof (model ^. emptyProof))]
+      [text name]
+  examples = [("Example1", undefined), ("Example2", undefined), ("Example3", undefined)]
 
 viewBin :: View Model Action
 viewBin =
@@ -109,24 +151,23 @@ viewBin =
     , onDropWithOptions defaultOptions (Drop LocationBin)
     , HP.class_ "bin"
     , HP.class_ "icon-container"
+    , HP.title_ "Drag lines or subproofs here to delete them."
     ]
-    [ H.img_ [HP.src_ "delete-icon.svg"]
+    [ viewMaterialIcon "delete"
     , H.p_ [] ["Delete"]
     ]
 
 viewSpawnNode :: SpawnType -> MisoString -> MisoString -> View Model Action
-viewSpawnNode tp iconPath str =
+viewSpawnNode tp icon str =
   H.div_
-    [ HP.classList_
-        [ ("spawn-button", True)
-        , ("draggable", True)
-        ]
+    [ HP.class_ "spawn-button"
+    , HP.class_ "draggable"
     , HP.draggable_ True
     , onDragStartWithOptions stopPropagation $ SpawnStart tp
     , onDragEndWithOptions defaultOptions DragEnd
     , HP.class_ "icon-container"
     ]
-    [ H.img_ [HP.src_ iconPath]
+    [ viewMaterialIcon icon
     , H.p_ [] [text str]
     ]
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
@@ -273,10 +314,11 @@ viewProof model =
     [ HP.class_ "proof-container-border"
     , onDragEnterWithOptions preventDefault DragLeave
     ]
-    . one
-    $ H.div_
-      [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
-      [viewLineNos model, proofView, viewRules model]
+    [ H.p_ [HP.class_ "workspace-heading"] ["Proof Workspace"]
+    , H.div_
+        [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
+        [viewLineNos model, proofView, viewRules model]
+    ]
  where
   proofView =
     H.div_
