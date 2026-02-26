@@ -148,11 +148,8 @@ library fitch-editor-lib
     ViewPatterns
 
   build-depends:
-    -- base64-bytestring,
     base >=4.21.0 && <5,
     base64,
-    cereal,
-    cereal-text,
     containers >=0.7 && <0.9,
     megaparsec >=9.7.0 && <9.8,
     miso >=1.9 && <1.9.1,
