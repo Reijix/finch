@@ -110,7 +110,7 @@ runApp proof operators infixPreds quantifiers rules = do
   let m = initialModel p' operators infixPreds quantifiers rules
   startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
-      { styles = [Href "style.css"]
+      { styles = [Href "style.css" False]
       , mount = Just Setup
       , subs = [uriSub PopState]
       }
