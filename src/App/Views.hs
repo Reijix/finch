@@ -27,6 +27,7 @@ import Miso (
   textRaw,
   valueDecoder,
  )
+import Miso.Html qualified as HP
 import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property (value_)
@@ -49,7 +50,7 @@ viewModel :: Model -> View Model Action
 viewModel model =
   H.div_
     [HP.class_ "app-container"]
-    [ viewHeader
+    [ viewHeader model
     , H.div_
         [HP.class_ "content-container"]
         [ viewSidebar
@@ -57,29 +58,47 @@ viewModel model =
         ]
     ]
 
-viewNewProof :: View Model Action
-viewNewProof = H.button_ [HP.class_ "new-proof-button"] [text "New Proof"]
+viewNewProof :: Model -> View Model Action
+viewNewProof model = H.button_ [HP.class_ "app-button", HP.onClick (SetProof (model ^. emptyProof))] [text "New Proof"]
 
-viewHeader :: View Model Action
-viewHeader = H.header_ [HP.class_ "header"] [text "Finch", viewNewProof]
+viewHeader :: Model -> View Model Action
+viewHeader model = H.header_ [HP.class_ "header"] [H.h1_ [] ["Finch"], viewNewProof model]
 
 viewSidebar :: View Model Action
 viewSidebar =
   H.div_
     [HP.class_ "sidebar"]
-    [viewProofActions]
+    [viewProofActions, viewGrammarAccordion, viewRuleAccordion, viewExamplesAccordion]
 
-viewAccordion :: MisoString -> View Model Action -> View Model Action
-viewAccordion heading content = H.details_ [] [H.summary_ [] [text heading], content]
+viewAccordion :: MisoString -> [View Model Action] -> View Model Action
+viewAccordion heading content = H.details_ [] [H.summary_ [] [text heading], H.div_ [HP.class_ "accordion-content"] content]
 
 viewProofActions :: View Model Action
 viewProofActions =
-  H.div_
-    [HP.class_ "proof-actions"]
+  viewAccordion
+    "Proof Actions"
     [ viewBin
     , viewSpawnNode SpawnLine "add-line-icon.svg" "Add Line"
     , viewSpawnNode SpawnProof "add-subproof-icon.svg" "Add Subproof"
     ]
+
+viewGrammarAccordion :: View Model Action
+viewGrammarAccordion =
+  viewAccordion
+    "Grammar"
+    [text "phipsi"]
+
+viewRuleAccordion :: View Model Action
+viewRuleAccordion =
+  viewAccordion
+    "Rules"
+    [text "rules"]
+
+viewExamplesAccordion :: View Model Action
+viewExamplesAccordion =
+  viewAccordion
+    "Examples"
+    [text "Examples"]
 
 viewBin :: View Model Action
 viewBin =
@@ -285,6 +304,7 @@ viewProof model =
   _viewProof pa na (SubProof fs ps d) =
     H.div_
       [ HP.class_ "subproof"
+      , HP.class_ "draggable"
       , HP.id_ (show pa)
       , HP.draggable_ True
       , onDragStartWithOptions stopPropagation $ DragStart (Right pa)

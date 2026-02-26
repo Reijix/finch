@@ -232,6 +232,11 @@ setFocus ea = do
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 updateModel Setup = proofReparse >> checkProof
+updateModel (SetProof p) = do
+  proof .= p
+  proofReparse
+  checkProof
+  updateURI
 updateModel (PopState uri) = do
   io_ $ consoleLog "PopState called"
   readURI uri >> proofReparse >> checkProof

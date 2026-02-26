@@ -10,22 +10,38 @@ Variables
 }
 
 :root {
-  --line-height: calc(1rem + 4vh);
-  --normal-text-size: calc(1rem + 3vh);
-  --error-text-size: calc(0.5rem + 1.5vh);
+  /* Colors */
   --bg-color: rgba(233, 241, 244);
   --sidebar-color: rgba(241, 246, 249);
   --proof-color: rgba(0, 0, 0, 0);
+  /* Line heights */
+  --line-height: calc(var(--normal-text-size) + 0.4vh);
   --drop-zone-height: 1vh;
+  /* Text sizes */
+  --sidebar-heading-text-size: clamp(1rem, 1vw + 0.75rem, 1.125rem);
+  --sidebar-content-text-size: smaller;
+  --error-text-size: calc(var(--normal-text-size) - 0.5rem);
+  --normal-text-size: clamp(1.125rem, 2vw + 0.75rem, 1.5rem);
+  --header-text-size: clamp(1.5rem, 2.5vw + 1rem, 2.25rem);
+  --subproof-border: 0.2rem solid rgba(193, 201, 204);
+  --subproof-border-expanded: 0.3rem solid rgba(193, 201, 204);
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-math: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 body {
   margin: 0;
   width: 100vw;
+  font-family: var(--font-ui);
 }
 
 input:focus {
   outline: none;
+}
+
+h1 {
+  margin-block: 0.67em;
+  font-size: var(--header-text-size);
 }
 
 /* 
@@ -36,13 +52,52 @@ Button containers
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 20%;
+  width: 15%;
 
   background-color: var(--sidebar-color);
+  font-family: inherit;
   border-right: 1px solid #e0e0e0;
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.sidebar>details {
+  font-family: inherit;
+  font-size: var(--sidebar-heading-text-size);
+}
+
+.sidebar>details>summary {
+  font-family: inherit;
+  font-size: var(--sidebar-heading-text-size);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5vh 0.5vw;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar>details>summary::after {
+  content: '';
+  width: var(--sidebar-heading-text-size);
+  height: var(--sidebar-heading-text-size);
+  background: url('arrow-down.svg') no-repeat;
+  background-size: cover;
+  transition: 0.2s;
+}
+
+.sidebar>details[open]>summary::after {
+  transform: rotate(180deg);
+}
+
+.sidebar>details>summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar>details>.accordion-content {
+  font-size: var(--sidebar-content-text-size);
 }
 
 .card {
@@ -111,8 +166,34 @@ Proof containers
   align-items: center;
   background-color: rgba(250, 250, 250);
   border-bottom: 1px solid #e0e0e0;
-  font-size: calc(1rem + 3vw);
-  padding: 2px;
+  font-size: var(--header-text-size);
+  padding: 1vh;
+  height: calc(var(--header-text-size) + .5vh);
+}
+
+.app-button {
+  display: inline-block;
+  outline: 0;
+  cursor: pointer;
+  padding: 5px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  vertical-align: middle;
+  border: 1px solid;
+  border-radius: 6px;
+  color: #24292e;
+  background-color: #fafbfc;
+  border-color: #1b1f2326;
+  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
+  transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+  transition-property: color, background-color, border-color;
+}
+
+.app-button:hover {
+  background-color: #f3f4f6;
+  border-color: #1b1f2326;
+  transition-duration: 0.1s;
 }
 
 .app-container {
@@ -133,11 +214,12 @@ Proof containers
 }
 
 .proof-container-border {
-  width: 78%;
+  width: 83%;
   height: 100%;
 }
 
 .proof-container {
+  padding: 1vh;
   margin: 1vw;
   background-color: white;
   border-radius: 0.5vw;
@@ -161,15 +243,18 @@ Proof containers
   padding: 0;
   margin: 0;
   height: var(--line-height);
+  /* font-family: var(--font-math); */
 }
 
 .formula-input {
   border: none;
   max-width: 100%;
-  padding: 0;
+  padding-left: 0.3vw;
   background-color: var(--proof-color);
   margin: 0;
   font-size: var(--normal-text-size);
+  font-family: inherit;
+  /* font-family: var(--font-math); */
 }
 
 .formula-container {
@@ -186,7 +271,7 @@ Proof containers
 .formulae-container {
   position: relative;
   box-sizing: border-box;
-  border-left: 2px solid black;
+  border-left: var(--subproof-border);
   margin-left: 5px;
   width: 75%;
   height: fit-content;
@@ -223,22 +308,17 @@ Proof containers
 .subproof {
   position: relative;
   max-width: 100%;
-  border-left: 2px solid black;
+  border-left: var(--subproof-border);
   margin-left: 5px;
 }
 
-/* TODO just give subproof the draggable class... */
 .subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
-  border-left: 3px solid black;
+  border-left: var(--subproof-border-expanded);
   transition: .1s linear;
-  cursor: move;
-  /* fallback if grab cursor is unsupported */
-  cursor: grab;
-  cursor: -webkit-grab;
 }
 
 .last-assumption {
-  border-bottom: 2px solid black;
+  border-bottom: var(--subproof-border);
 }
 
 .empty-last-assumption {
@@ -275,6 +355,7 @@ Rule containers
   width: 100%;
   padding: 0;
   margin: 0;
+  font-family: inherit;
   font-size: var(--normal-text-size);
   background-color: var(--proof-color);
 }

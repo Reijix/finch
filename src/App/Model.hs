@@ -45,6 +45,7 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
+  SetProof :: Proof -> Action
   PopState :: URI -> Action
   Setup :: Action
   Blur :: Action
@@ -72,6 +73,7 @@ type Pos = Int
 data Model = Model
   { _focusedLine :: Maybe (Either NodeAddr NodeAddr)
   -- ^ the line that is currently focused
+  , _emptyProof :: Proof
   , _proof :: Proof
   -- ^ the current proof
   , _dragTarget :: Maybe (Either NodeAddr ProofAddr)
@@ -124,6 +126,7 @@ initialModel ::
 initialModel p operators infixPreds quantifiers rules =
   Model
     { _focusedLine = Nothing
+    , _emptyProof = p
     , _proof = p
     , _dragTarget = Nothing
     , _spawnType = Nothing
@@ -140,6 +143,9 @@ initialModel p operators infixPreds quantifiers rules =
 -- * Lenses
 focusedLine :: Lens Model (Maybe (Either NodeAddr NodeAddr))
 focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
+
+emptyProof :: Lens Model Proof
+emptyProof = lens (._emptyProof) $ \model p -> model{_emptyProof = p}
 
 proof :: Lens Model Proof
 proof = lens (._proof) $ \model p -> model{_proof = p}
