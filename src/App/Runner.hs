@@ -107,7 +107,7 @@ runApp proof operators infixPreds quantifiers rules = do
   p' <- case proofFromURI uri of
     Nothing -> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
     Just p -> pure p
-  let m = initialModel p' operators infixPreds quantifiers rules
+  let m = initialModel proof p' operators infixPreds quantifiers rules
   startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css" False]
@@ -237,6 +237,7 @@ updateModel (SetProof p) = do
   proofReparse
   checkProof
   updateURI
+  io_ $ consoleLog $ ms $ "SetProof called with p=\n" <> prettyPrint p
 updateModel (PopState uri) = do
   io_ $ consoleLog "PopState called"
   readURI uri >> proofReparse >> checkProof

@@ -3,25 +3,9 @@ module App.Model where
 import Fitch.Proof
 import Fitch.Unification
 import Miso (
-  App,
-  Attribute,
   DOMRef,
-  Effect,
-  KeyCode,
-  KeyInfo,
   MisoString,
-  ROOT,
   URI,
-  View,
-  consoleLog,
-  io_,
-  mouseSub,
-  ms,
-  onWithOptions,
-  pointerDecoder,
-  preventDefault,
-  startApp,
-  text,
  )
 import Miso.CSS qualified as CSS
 import Miso.Lens (Lens, lens, use, (%=), (.=), (<~))
@@ -112,6 +96,8 @@ data Model = Model
 
 -- * Initial constructors
 initialModel ::
+  -- | The empty proof
+  Proof ->
   -- | The starting proof
   Proof ->
   -- | A list of operators (alias, operator, arity)
@@ -123,10 +109,10 @@ initialModel ::
   -- | The map of rules
   Map Name RuleSpec ->
   Model
-initialModel p operators infixPreds quantifiers rules =
+initialModel emptyP p operators infixPreds quantifiers rules =
   Model
     { _focusedLine = Nothing
-    , _emptyProof = p
+    , _emptyProof = emptyP
     , _proof = p
     , _dragTarget = Nothing
     , _spawnType = Nothing
