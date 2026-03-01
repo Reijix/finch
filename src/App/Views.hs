@@ -144,7 +144,7 @@ viewRuleAccordion model =
           , textProp "popover" "manual"
           , HP.draggable_ False
           ]
-          [text . ms $ "\\[(" <> name <> ")" <> ruleSpecTex rs <> "\\]"]
+          [text . ms $ "\\[(\\mathrm{" <> name <> "})" <> ruleSpecTex rs <> "\\]"]
       ]
 
 viewExamplesAccordion :: Model -> View Model Action
