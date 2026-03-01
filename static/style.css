@@ -14,8 +14,6 @@ Variables
   --bg-color: rgba(233, 241, 244);
   --sidebar-color: rgba(241, 246, 249);
   --proof-color: rgba(0, 0, 0, 0);
-  /* Line heights */
-  --line-height: calc(var(--normal-text-size) + 0.4vh);
   --drop-zone-height: 1vh;
   /* Text sizes */
   --sidebar-heading-text-size: clamp(1rem, 1vw + 0.75rem, 1.125rem);
@@ -25,8 +23,8 @@ Variables
   --header-text-size: clamp(1.5rem, 2.5vw + 1rem, 2.25rem);
   --subproof-border: 0.2rem solid rgba(193, 201, 204);
   --subproof-border-expanded: 0.3rem solid rgba(193, 201, 204);
-  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-math: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-ui: 'Fira Sans', system-ui, -apple-system, sans-serif;
+  --font-math: 'Fira Sans', monospace;
 }
 
 body {
@@ -286,12 +284,6 @@ Proof containers
   padding: 1vh;
   margin: 1vw;
   background-color: #ffffff;
-
-  /*linear-gradient(to right, #f1f5f9 1px, transparent 1px),
-  linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
-  background-size: 10px 10px;
-  */
-
   border-radius: 0.5vw;
   display: flex;
   flex-direction: row;
@@ -302,9 +294,8 @@ Proof containers
   scrollbar-width: none;
 }
 
-.proof-line {
-  position: relative;
-  height: var(--line-height);
+.formula-container {
+  height: fit-content;
   background-color: var(--proof-color);
   width: 100%;
   anchor-scope: --error-anchor;
@@ -313,8 +304,9 @@ Proof containers
 .line-no {
   padding: 0;
   margin: 0;
-  height: var(--line-height);
-  /* font-family: var(--font-math); */
+  height: fit-content;
+  font-size: var(--normal-text-size);
+  font-family: var(--font-math);
 }
 
 .formula-input {
@@ -324,16 +316,9 @@ Proof containers
   background-color: var(--proof-color);
   margin: 0;
   font-size: var(--normal-text-size);
-  font-family: inherit;
-  /* font-family: var(--font-math); */
+  /* font-family: inherit; */
+  font-family: var(--font-math);
   anchor-name: --error-anchor;
-}
-
-.formula-container {
-  background-color: var(--proof-color);
-  max-width: 100%;
-  padding: 0;
-  margin: 0;
 }
 
 .formulae-container {
@@ -398,7 +383,9 @@ Rule containers
 .empty-rule {
   padding: 0;
   margin: 0;
-  height: var(--line-height);
+  font-family: var(--font-math);
+  font-size: var(--normal-text-size);
+  height: fit-content;
 }
 
 .empty-assumption-rule {
@@ -412,7 +399,7 @@ Rule containers
   width: 100%;
   padding: 0;
   margin: 0;
-  font-family: inherit;
+  font-family: var(--font-math);
   font-size: var(--normal-text-size);
   background-color: var(--proof-color);
   anchor-name: --error-anchor;
@@ -422,7 +409,7 @@ Rule containers
   width: 100%;
   padding: 0;
   margin: 0;
-  height: var(--line-height);
+  height: fit-content;
   position: relative;
   background-color: var(--proof-color);
   anchor-scope: --error-anchor;
@@ -451,7 +438,7 @@ Drag and drop related
 }
 
 .expanded-drop-zone {
-  height: var(--line-height);
+  height: var(--normal-text-size);
 }
 
 .material-symbols-outlined {

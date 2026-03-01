@@ -254,7 +254,7 @@ data RuleApplication
 
 instance {-# OVERLAPPING #-} PrettyPrint (Wrapper RuleApplication) where
   prettyPrint :: Wrapper RuleApplication -> Text
-  prettyPrint Unparsed{} = "()"
+  prettyPrint (Unparsed "" _) = "()"
   prettyPrint w = getText w
 
 instance PrettyPrint RuleApplication where

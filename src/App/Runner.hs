@@ -222,8 +222,8 @@ setFocus ea = do
   focusedLine .= Just ea
   p <- use proof
   case ea of
-    Left a -> selectFocus ("proof-line" <> show (lineNoOr999 a p))
-    Right a -> selectFocus ("proof-line-rule" <> show (lineNoOr999 a p))
+    Left na -> selectFocus (mkFormulaInputId na p)
+    Right na -> selectFocus (mkRuleInputId na p)
  where
   selectFocus :: MisoString -> Effect ROOT Model Action
   selectFocus str = do

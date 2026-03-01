@@ -184,46 +184,49 @@ viewErrorBox name err =
     ]
     [text err]
 
+mkFormulaInputId :: NodeAddr -> Proof -> MisoString
+mkFormulaInputId na p = "formula-input-" <> show (lineNoOr999 na p)
+
+mkRuleInputId :: NodeAddr -> Proof -> MisoString
+mkRuleInputId na p = "rule-input-" <> show (lineNoOr999 na p)
+
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
   let
     lineno = lineNoOr999 na (model ^. proof)
+    errorBoxId = "formula-error-" <> show lineno
+    inputId = mkFormulaInputId na (model ^. proof)
    in
     H.div_
-      [ HP.class_ "proof-line"
+      [ HP.class_ "formula-container"
       , HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
       , HP.classList_
-          [ ("draggable", (model ^. focusedLine) /= Just (Left na))
-          ]
+          [("draggable", (model ^. focusedLine) /= Just (Left na))]
       , onDragStartWithOptions stopPropagation $ DragStart (Left na)
       , onDragEndWithOptions defaultOptions DragEnd
-      , onMouseOver (PopOpen ("formula-error-" <> show lineno) hasError)
-      , onMouseOut (PopClose ("formula-error-" <> show lineno))
+      , onMouseOver (PopOpen errorBoxId hasError)
+      , onMouseOut (PopClose errorBoxId)
+      , onDoubleClick $ DoubleClick (Left na)
       ]
-      [ H.div_
-          [ onDoubleClick $ DoubleClick (Left na)
-          , HP.class_ "formula-container"
-          ]
-          [ H.input_
-              [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
-              , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
-              , HP.classList_
-                  [ ("formula-input", True)
-                  , ("has-error", hasError)
-                  , ("draggable", Just (Left na) /= model ^. focusedLine)
-                  ]
-              , HP.autocomplete_ False
-              , HP.draggable_ False
-              , onBlur Blur
-              , onChange (const Change)
-              , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-              , onCreatedWith (KeyDownStart (Left na))
-              , onBeforeDestroyed (KeyDownStop (Left na))
-              , onDragStartWithOptions preventDefault Nop
-              , value_ txt
+      [ H.input_
+          [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
+          , HP.id_ inputId
+          , HP.classList_
+              [ ("formula-input", True)
+              , ("has-error", hasError)
+              , ("draggable", Just (Left na) /= model ^. focusedLine)
               ]
+          , HP.autocomplete_ False
+          , HP.draggable_ False
+          , onBlur Blur
+          , onChange (const Change)
+          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+          , onCreatedWith (KeyDownStart (Left na))
+          , onBeforeDestroyed (KeyDownStop (Left na))
+          , onDragStartWithOptions preventDefault Nop
+          , value_ txt
           ]
-      , viewErrorBox ("formula-error-" <> show lineno) err
+      , viewErrorBox errorBoxId err
       ]
  where
   (hasError, txt, err) = case e of
@@ -278,7 +281,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
           <> drop 1 (interleaveWithDropZones model Nothing (Just (na NAAfterConclusion)) (const $ na NAAfterConclusion) (one goC))
       )
    where
-    goFs = map (const $ H.p_ [HP.class_ "empty-rule"] []) fs
+    goFs = map (const $ H.p_ [HP.class_ "empty-rule"] [textRaw "\160"]) fs
     goPs =
       snd $
         mapAccumL
@@ -290,17 +293,19 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
   goDerivation na (Derivation _ p) =
     let
       lineno = lineNoOr999 na (model ^. proof)
+      inputId = mkRuleInputId na (model ^. proof)
+      errorBoxId = "rule-error-" <> show lineno
      in
       H.div_
         [ onDoubleClick $ DoubleClick (Right na)
-        , onMouseOver (PopOpen ("rule-error-" <> show lineno) hasError)
-        , onMouseOut (PopClose ("rule-error-" <> show lineno))
+        , onMouseOver (PopOpen errorBoxId hasError)
+        , onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
         ]
-        [ viewErrorBox ("rule-error-" <> show lineno) err
+        [ viewErrorBox errorBoxId err
         , H.input_
             [ HP.class_ "rule-input"
-            , HP.id_ . ms $ "proof-line-rule" ++ show (lineNoOr999 na (model ^. proof))
+            , HP.id_ inputId
             , HP.classList_
                 [("has-error", hasError)]
             , HP.autocomplete_ False
