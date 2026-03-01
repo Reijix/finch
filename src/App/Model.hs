@@ -146,7 +146,7 @@ spawnType :: Lens Model (Maybe SpawnType)
 spawnType = lens (._spawnType) $ \model st -> model{_spawnType = st}
 
 currentHoverLine :: Lens Model (Maybe NodeAddr)
-currentHoverLine = lens (._currentHoverLine) $ \model dt -> model{_currentHoverLine = dt}
+currentHoverLine = lens (._currentHoverLine) $ \model chl -> model{_currentHoverLine = chl}
 
 dragging :: Lens Model Bool
 dragging = lens (._dragging) $ \model d -> model{_dragging = d}

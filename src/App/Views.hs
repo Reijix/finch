@@ -66,7 +66,7 @@ viewHeader model = H.header_ [HP.class_ "header"] [H.h1_ [] [H.img_ [HP.src_ "fa
 viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
-    [HP.class_ "sidebar"]
+    [HP.class_ "sidebar", onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave]
     [viewProofActions, viewGrammarAccordion model, viewRuleAccordion model, viewExamplesAccordion model]
 
 viewAccordion :: [View Model Action] -> [View Model Action] -> View Model Action
