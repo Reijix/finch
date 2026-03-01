@@ -141,10 +141,12 @@ library fitch-editor-lib
 
   default-extensions:
     FlexibleInstances
+    MultilineStrings
     OrPatterns
     OverloadedLists
     OverloadedRecordDot
     OverloadedStrings
+    QuasiQuotes
     ViewPatterns
 
   build-depends:

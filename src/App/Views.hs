@@ -127,9 +127,25 @@ viewRuleAccordion model =
  where
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
   viewSingleRule (name, rs) =
-    H.button_
-      [HP.class_ "app-button"]
-      [text $ ms name]
+    H.div_
+      [HP.class_ "rulebox-container"]
+      [ H.button_
+          [ HP.class_ "app-button"
+          , HP.class_ "rulebox-anchor"
+          , onMouseOver (PopOpen (ms name) True)
+          , onMouseOut (PopClose (ms name))
+          ]
+          [text $ ms name]
+      , H.p_
+          [ HP.class_ "error"
+          , HP.class_ "rulebox"
+          , HP.id_ (ms name)
+          , onCreatedWith InitMathJAX
+          , textProp "popover" "manual"
+          , HP.draggable_ False
+          ]
+          [text . ms $ "\\[(" <> name <> ")" <> ruleSpecTex rs <> "\\]"]
+      ]
 
 viewExamplesAccordion :: Model -> View Model Action
 viewExamplesAccordion model =

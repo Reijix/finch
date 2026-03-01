@@ -94,6 +94,20 @@ data RuleSpec
     RuleSpec [FormulaSpec] [ProofSpec] FormulaSpec
   deriving (Show, Eq)
 
+ruleSpecTex :: RuleSpec -> Text
+ruleSpecTex (RuleSpec fs ps conclusion) = "\\frac{" <> showFsPs <> "}{" <> prettyPrint conclusion <> "}"
+ where
+  formulaSpecTex :: FormulaSpec -> Text
+  formulaSpecTex = prettyPrint
+  proofSpecTex :: ProofSpec -> Text
+  proofSpecTex (as, f) = "\\begin{array}{|l}" <> showAs <> "\\\\ \\hline \\vdots \\\\ " <> prettyPrint f <> "\\end{array}"
+   where
+    showAs = T.intercalate "\\;" (map assumptionSpecTex as)
+    assumptionSpecTex :: AssumptionSpec -> Text
+    assumptionSpecTex (FFreshVar v) = "\\boxed{" <> v <> "}"
+    assumptionSpecTex (AssumptionSpec frm) = formulaSpecTex frm
+  showFsPs = T.intercalate "\\quad" (map formulaSpecTex fs <> map proofSpecTex ps)
+
 type Name = Text
 
 -- | A term in first-order logics consists either of a variable or a function applied to terms.
@@ -155,13 +169,13 @@ instance PrettyPrint FormulaSpec where
     go _ (FPred p []) = p
     go _ (FPred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go _ (FPlaceholder n) = n
-    go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " -> " <> t <> "]"
+    go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " ↦ " <> t <> "]"
     go True f = "(" <> go False f <> ")"
     go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
-    go False (FOpr op fs)
-      | null fs = op
-      | length fs == 2 = T.intercalate (" " <> op <> " ") (map (go True) fs)
-      | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
+    go False (FOpr op []) = op
+    go False (FOpr op [f]) = op <> go True f
+    go False (FOpr op [f1, f2]) = go True f1 <> " " <> op <> " " <> go True f2
+    go False (FOpr op fs) = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f
 
 instance PrettyPrint AssumptionSpec where

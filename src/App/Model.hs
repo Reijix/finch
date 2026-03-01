@@ -29,6 +29,7 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
+  InitMathJAX :: DOMRef -> Action
   PopOpen :: MisoString -> Bool -> Action
   PopClose :: MisoString -> Action
   SetProof :: Proof -> Action

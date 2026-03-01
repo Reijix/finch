@@ -342,6 +342,19 @@ Proof containers
   font-size: var(--error-text-size);
 }
 
+.rulebox-container {
+  anchor-scope: --rulebox-anchor;
+}
+
+.rulebox {
+  position-area: right;
+  position-anchor: --rulebox-anchor;
+}
+
+.rulebox-anchor {
+  anchor-name: --rulebox-anchor;
+}
+
 .empty-assumptions {
   height: 2px;
   margin: 0px;

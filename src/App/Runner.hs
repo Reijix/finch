@@ -30,6 +30,7 @@ import Miso (
   PointerEvent (client),
   ROOT,
   Schedule,
+  ToJSVal (toJSVal),
   URI (uriQueryString),
   View,
   addEventListener,
@@ -71,6 +72,7 @@ import Miso (
  )
 import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
+import Miso.FFI.QQ (js)
 import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
 import Miso.Lens (Lens, use, (%=), (.=), (<~), (^.))
@@ -239,6 +241,7 @@ hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 updateModel Setup = proofReparse >> checkProof
+updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
 updateModel (SetProof p) = do
   proof .= p
   proofReparse
