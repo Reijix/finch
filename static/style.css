@@ -307,6 +307,7 @@ Proof containers
   height: var(--line-height);
   background-color: var(--proof-color);
   width: 100%;
+  anchor-scope: --error-anchor;
 }
 
 .line-no {
@@ -325,6 +326,7 @@ Proof containers
   font-size: var(--normal-text-size);
   font-family: inherit;
   /* font-family: var(--font-math); */
+  anchor-name: --error-anchor;
 }
 
 .formula-container {
@@ -342,11 +344,9 @@ Proof containers
 }
 
 .error {
-  visibility: hidden;
-  opacity: 0;
   position: absolute;
-  top: -100%;
-  /* right: 20vw; */
+  position-area: bottom;
+  position-anchor: --error-anchor;
   border: 1px solid;
   border-radius: 2px;
   width: fit-content;
@@ -354,14 +354,7 @@ Proof containers
   white-space: pre;
   background: #fff;
   color: #000;
-  z-index: 110;
-  transition: visibility 0s, opacity .5s;
   font-size: var(--error-text-size);
-}
-
-.has-error.can-hover:hover .error {
-  visibility: visible;
-  opacity: 1;
 }
 
 .empty-assumptions {
@@ -393,7 +386,7 @@ Proof containers
   display: grid;
 }
 
-.parse-fail {
+.has-error {
   color: rgb(255, 0, 0);
 }
 
@@ -422,6 +415,7 @@ Rule containers
   font-family: inherit;
   font-size: var(--normal-text-size);
   background-color: var(--proof-color);
+  anchor-name: --error-anchor;
 }
 
 .rule-container {
@@ -431,6 +425,7 @@ Rule containers
   height: var(--line-height);
   position: relative;
   background-color: var(--proof-color);
+  anchor-scope: --error-anchor;
 }
 
 .rules-container {

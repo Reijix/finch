@@ -29,6 +29,8 @@ data SpawnType where
   deriving (Show, Eq)
 
 data Action where
+  PopOpen :: MisoString -> Bool -> Action
+  PopClose :: MisoString -> Action
   SetProof :: Proof -> Action
   PopState :: URI -> Action
   Setup :: Action

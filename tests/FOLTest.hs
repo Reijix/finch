@@ -40,7 +40,7 @@ readProof filePath = do
     Left err ->
       assertFailure . toString $
         "Could not parse file " <> err <> "\n" <> err
-    Right p -> pure . (^. proof) $ execState checkProof (initialModel p operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
+    Right p -> pure . (^. proof) $ execState checkProof (initialModel p p operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
 
 assertValid :: Wrapper a -> Assertion
 assertValid (Unparsed _ err) =

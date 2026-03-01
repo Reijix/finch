@@ -52,6 +52,7 @@ import Miso (
   io_,
   issue,
   keyboardEvents,
+  mouseEvents,
   mouseSub,
   ms,
   newEvent,
@@ -108,7 +109,7 @@ runApp proof operators infixPreds quantifiers rules = do
     Nothing -> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
     Just p -> pure p
   let m = initialModel proof p' operators infixPreds quantifiers rules
-  startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents) $
+  startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents <> mouseEvents) $
     (component m updateModel viewModel)
       { styles = [Href "style.css" False]
       , mount = Just Setup
@@ -229,6 +230,12 @@ setFocus ea = do
     io_ $ focus str
     io_ $ select str
 
+showPopover :: MisoString -> IO ()
+showPopover name = void $ getElementById name >>= \ref -> ref # "showPopover" $ ()
+
+hidePopover :: MisoString -> IO ()
+hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ ()
+
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
 updateModel Setup = proofReparse >> checkProof
@@ -241,6 +248,12 @@ updateModel (SetProof p) = do
 updateModel (PopState uri) = do
   io_ $ consoleLog "PopState called"
   readURI uri >> proofReparse >> checkProof
+updateModel (PopOpen name True) =
+  use dragging >>= \case
+    True -> pass
+    False -> io_ $ showPopover name
+updateModel (PopOpen _ False) = pass
+updateModel (PopClose name) = io_ $ hidePopover name
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
@@ -269,6 +282,8 @@ updateModel (SpawnStart st) = do
   dragging .= True
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
+  p <- use proof
+  whenLeftM_ (pure dt) $ \na -> io_ $ hidePopover ("formula-error-" <> show (lineNoOr999 na p))
   dragging .= True
 updateModel DragEnd = do
   chl <- use currentHoverLine

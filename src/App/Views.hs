@@ -27,6 +27,8 @@ import Miso (
   textRaw,
   valueDecoder,
  )
+import Miso qualified as HP
+import Miso.CSS (styleInline_)
 import Miso.Html.Element qualified as H
 import Miso.Html.Event
 import Miso.Html.Property (value_)
@@ -138,9 +140,10 @@ viewExamplesAccordion model =
   mkExample :: (MisoString, Proof) -> View Model Action
   mkExample (name, p) =
     H.button_
-      [HP.class_ "example", HP.class_ "app-button", onClick (SetProof (model ^. emptyProof))]
+      [HP.class_ "example", HP.class_ "app-button", onClick (SetProof p)]
       [text name]
-  examples = [("Example1", undefined), ("Example2", undefined), ("Example3", undefined)]
+  -- TODO examples
+  examples = [("Example1", model ^. emptyProof), ("Example2", model ^. emptyProof), ("Example3", model ^. emptyProof)]
 
 viewBin :: View Model Action
 viewBin =
@@ -170,57 +173,68 @@ viewSpawnNode tp icon str =
     [ viewMaterialIcon icon
     , H.p_ [] [text str]
     ]
+
+viewErrorBox :: MisoString -> MisoString -> View Model Action
+viewErrorBox name err =
+  H.code_
+    [ HP.class_ "error"
+    , HP.id_ name
+    , textProp "popover" "manual"
+    , HP.draggable_ False
+    ]
+    [text err]
+
 viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
 viewLine model na e =
-  H.div_
-    [ HP.class_ "proof-line"
-    , HP.classList_ [("has-error", not parseSuccess || not semanticSuccess), ("can-hover", not (model ^. dragging))]
-    ]
-    [ H.div_
-        [ HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
-        , HP.classList_
-            [ ("draggable", (model ^. focusedLine) /= Just (Left na))
-            , ("can-hover", not (model ^. dragging))
-            ]
-        , onDragStartWithOptions stopPropagation $ DragStart (Left na)
-        , onDragEndWithOptions defaultOptions DragEnd
-        ]
-        [ H.div_
-            [ onDoubleClick $ DoubleClick (Left na)
-            , HP.class_ "formula-container"
-            ]
-            [ H.input_
-                [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
-                , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
-                , HP.classList_
-                    [ ("formula-input", True)
-                    , ("parse-fail", not parseSuccess || not semanticSuccess)
-                    , ("draggable", Just (Left na) /= model ^. focusedLine)
-                    ]
-                , HP.autocomplete_ False
-                , HP.draggable_ False
-                , onBlur Blur
-                , onChange (const Change)
-                , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-                , onCreatedWith (KeyDownStart (Left na))
-                , onBeforeDestroyed (KeyDownStop (Left na))
-                , onDragStartWithOptions preventDefault Nop
-                , value_ txt
-                ]
-            ]
-        ]
-    , H.code_ [HP.class_ "error", HP.draggable_ False, HP.hidden_ (parseSuccess && semanticSuccess)] [text err]
-    ]
+  let
+    lineno = lineNoOr999 na (model ^. proof)
+   in
+    H.div_
+      [ HP.class_ "proof-line"
+      , HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
+      , HP.classList_
+          [ ("draggable", (model ^. focusedLine) /= Just (Left na))
+          ]
+      , onDragStartWithOptions stopPropagation $ DragStart (Left na)
+      , onDragEndWithOptions defaultOptions DragEnd
+      , onMouseOver (PopOpen ("formula-error-" <> show lineno) hasError)
+      , onMouseOut (PopClose ("formula-error-" <> show lineno))
+      ]
+      [ H.div_
+          [ onDoubleClick $ DoubleClick (Left na)
+          , HP.class_ "formula-container"
+          ]
+          [ H.input_
+              [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
+              , HP.id_ . ms $ "proof-line" ++ show (lineNoOr999 na (model ^. proof))
+              , HP.classList_
+                  [ ("formula-input", True)
+                  , ("has-error", hasError)
+                  , ("draggable", Just (Left na) /= model ^. focusedLine)
+                  ]
+              , HP.autocomplete_ False
+              , HP.draggable_ False
+              , onBlur Blur
+              , onChange (const Change)
+              , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+              , onCreatedWith (KeyDownStart (Left na))
+              , onBeforeDestroyed (KeyDownStop (Left na))
+              , onDragStartWithOptions preventDefault Nop
+              , value_ txt
+              ]
+          ]
+      , viewErrorBox ("formula-error-" <> show lineno) err
+      ]
  where
-  (semanticSuccess, parseSuccess, txt, err) = case e of
+  (hasError, txt, err) = case e of
     Left (a, _) -> case a of
-      ParsedValid str a' -> (True, True, ms str, "")
-      ParsedInvalid str err a' -> (False, True, ms str, ms err)
-      Unparsed str err -> (False, False, ms str, ms err)
+      ParsedValid str a' -> (False, ms str, "")
+      ParsedInvalid str err a' -> (True, ms str, ms err)
+      Unparsed str err -> (True, ms str, ms err)
     Right (Derivation f r) -> case f of
-      (ParsedValid str f') -> (True, True, ms str, "")
-      (ParsedInvalid str err f') -> (False, True, ms str, ms err)
-      (Unparsed str err) -> (False, False, ms str, ms err)
+      (ParsedValid str f') -> (False, ms str, "")
+      (ParsedInvalid str err f') -> (True, ms str, ms err)
+      (Unparsed str err) -> (True, ms str, ms err)
 
 viewLineNos :: Model -> View Model Action
 viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id (model ^. proof)
@@ -274,38 +288,38 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
     goC = goDerivation (na NAConclusion) c
   goDerivation :: NodeAddr -> Derivation -> View Model Action
   goDerivation na (Derivation _ p) =
-    H.div_
-      [ onDoubleClick $ DoubleClick (Right na)
-      , HP.class_ "rule-container"
-      , HP.classList_
-          [ ("non-selectable", Just (Right na) /= model ^. focusedLine)
-          , ("has-error", not parseSuccess || not semanticSuccess)
-          , ("can-hover", not (model ^. dragging))
-          ]
-      ]
-      [ H.code_ [HP.class_ "error", HP.draggable_ False] [text err]
-      , H.input_
-          [ HP.class_ "rule-input"
-          , HP.id_ . ms $ "proof-line-rule" ++ show (lineNoOr999 na (model ^. proof))
-          , HP.classList_
-              [("parse-fail", not parseSuccess || not semanticSuccess)]
-          , HP.autocomplete_ False
-          , HP.draggable_ False
-          , HP.inert_ (Just (Right na) /= model ^. focusedLine)
-          , onBlur Blur
-          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-          , onChange (const Change)
-          , onCreatedWith (KeyDownStart (Right na))
-          , onBeforeDestroyed (KeyDownStop (Right na))
-          , onDragStartWithOptions preventDefault Nop
-          , value_ ruleTxt
-          ]
-      ]
+    let
+      lineno = lineNoOr999 na (model ^. proof)
+     in
+      H.div_
+        [ onDoubleClick $ DoubleClick (Right na)
+        , onMouseOver (PopOpen ("rule-error-" <> show lineno) hasError)
+        , onMouseOut (PopClose ("rule-error-" <> show lineno))
+        , HP.class_ "rule-container"
+        ]
+        [ viewErrorBox ("rule-error-" <> show lineno) err
+        , H.input_
+            [ HP.class_ "rule-input"
+            , HP.id_ . ms $ "proof-line-rule" ++ show (lineNoOr999 na (model ^. proof))
+            , HP.classList_
+                [("has-error", hasError)]
+            , HP.autocomplete_ False
+            , HP.draggable_ False
+            , HP.inert_ (Just (Right na) /= model ^. focusedLine)
+            , onBlur Blur
+            , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+            , onChange (const Change)
+            , onCreatedWith (KeyDownStart (Right na))
+            , onBeforeDestroyed (KeyDownStop (Right na))
+            , onDragStartWithOptions preventDefault Nop
+            , value_ ruleTxt
+            ]
+        ]
    where
-    (semanticSuccess, parseSuccess, ruleTxt, err) = case p of
-      (ParsedValid str _) -> (True, True, ms str, "")
-      (ParsedInvalid str err _) -> (False, True, ms str, ms err)
-      (Unparsed str err) -> (False, False, ms str, ms err)
+    (hasError, ruleTxt, err) = case p of
+      (ParsedValid str _) -> (False, ms str, "")
+      (ParsedInvalid str err _) -> (True, ms str, ms err)
+      (Unparsed str err) -> (True, ms str, ms err)
 
 -- TODO can use _viewProof with na = id
 viewProof :: Model -> View Model Action
