@@ -113,18 +113,31 @@ Button containers
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.7vh 0.7vw;
+  padding: .5vh .5vw;
 
 }
 
-.sidebar-content {
+.row-sidebar-content {
   width: 100%;
-  padding: .7vh .7vw;
-  gap: .7vh;
+  padding: .5vh .5vw;
+  gap: .5vh;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+  justify-content: center;
   font-size: var(--sidebar-header-text-size);
+}
+
+.column-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: .5vh .5vw;
+  gap: .5vh;
+}
+
+.symbol-button {
+  width: 2em;
 }
 
 .icon-container {
@@ -135,13 +148,12 @@ Button containers
   text-align: center;
 }
 
-.examples {
+.example-container {
   display: flex;
-  flex-direction: column;
-  width: 100%;
+  justify-content: center;
 }
 
-.example {
+.example-button {
   width: 100%;
   display: flex !important;
   justify-self: left;
@@ -173,7 +185,7 @@ Button containers
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  gap: .7vw;
+  gap: .5vw;
 }
 
 .spawn-button {
@@ -328,36 +340,46 @@ Proof containers
   width: 75%;
 }
 
-.error {
+.tooltip {
   position: absolute;
   position-area: bottom;
   position-anchor: --error-anchor;
   border: 1px solid;
   border-radius: 2px;
   width: fit-content;
-  padding: 3px;
+  padding: 0.5vh 0.5vw;
   white-space: pre;
   background: #fff;
   color: #000;
   font-size: var(--error-text-size);
 }
 
-.rulebox-container {
-  anchor-scope: --rulebox-anchor;
-  width: 25%;
+.anchor-container {
+  anchor-scope: --anchor;
 }
 
-.rulebox {
+.anchored {
   position-area: right;
-  position-anchor: --rulebox-anchor;
+  position-anchor: --anchor;
 }
 
-.rulebox-anchor {
+.anchor {
+  anchor-name: --anchor;
+}
+
+.rulebox-container {
+  width: 4rem;
+}
+
+.rule-button {
   font-size: var(--sidebar-content-text-size);
   font-family: var(--font-math);
-  /* font-weight: 500; */
+  width: 100%;
   letter-spacing: 0.1em;
-  anchor-name: --rulebox-anchor;
+}
+
+.symbol-button {
+  width: 2rem;
 }
 
 .empty-assumptions {

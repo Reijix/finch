@@ -7,7 +7,14 @@ import Fitch.Proof (
  )
 
 operatorsProp :: [(Text, Text, Int)]
-operatorsProp = [("false", "⊥", 0), ("true", "⊤", 0), ("~", "¬", 1), ("/\\", "∧", 2), ("\\/", "∨", 2), ("->", "→", 2)]
+operatorsProp =
+  [ ("top", "⊥", 0)
+  , ("bot", "⊤", 0)
+  , ("~", "¬", 1)
+  , ("/\\", "∧", 2)
+  , ("\\/", "∨", 2)
+  , ("->", "→", 2)
+  ]
 
 rulesProp :: Map Text RuleSpec
 rulesProp =

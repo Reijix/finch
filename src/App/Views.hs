@@ -58,25 +58,41 @@ viewModel model =
     ]
 
 viewNewProof :: Model -> View Model Action
-viewNewProof model = H.button_ [HP.class_ "app-button", onClick (SetProof (model ^. emptyProof))] [text "New Proof"]
+viewNewProof model =
+  H.button_
+    [ HP.class_ "app-button"
+    , onClick (SetProof (model ^. emptyProof))
+    ]
+    [text "New Proof"]
 
 viewHeader :: Model -> View Model Action
-viewHeader model = H.header_ [HP.class_ "header"] [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewNewProof model]
+viewHeader model =
+  H.header_
+    [HP.class_ "header"]
+    [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewNewProof model]
 
 viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
     [HP.class_ "sidebar", onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave]
-    [viewProofActions, viewGrammarAccordion model, viewRuleAccordion model, viewExamplesAccordion model]
+    [ viewProofActions
+    , viewGrammarAccordion model
+    , viewRuleAccordion model
+    , viewExamplesAccordion model
+    ]
 
-viewAccordion :: [View Model Action] -> [View Model Action] -> View Model Action
+viewAccordion :: View Model Action -> View Model Action -> View Model Action
 viewAccordion heading content =
   H.details_
     [HP.open_ True, HP.class_ "sidebar-element"]
     [ H.summary_
         [HP.class_ "sidebar-header"]
-        (heading <> [H.span_ [HP.class_ "material-symbols-outlined", HP.class_ "summary-arrow"] ["keyboard_arrow_down"]])
-    , H.div_ [HP.class_ "sidebar-content"] content
+        [ heading
+        , H.span_
+            [HP.class_ "material-symbols-outlined", HP.class_ "summary-arrow"]
+            ["keyboard_arrow_down"]
+        ]
+    , content
     ]
 
 viewTextWithIcon :: MisoString -> MisoString -> View Model Action
@@ -94,12 +110,12 @@ viewProofActions =
         [HP.class_ "sidebar-header"]
         [viewTextWithIcon "Proof Actions" "action_key", H.span_ [] []]
     , H.div_
-        [HP.class_ "sidebar-content"]
+        [HP.class_ "row-sidebar-content"]
         [ viewBin
         , H.div_
             [HP.class_ "spawn-buttons"]
-            [ viewSpawnNode SpawnLine "add" "Add Line"
-            , viewSpawnNode SpawnProof "variable_add" "Add Subproof"
+            [ viewSpawnNode SpawnLine "Drag over proof to add a line" "add" "Add Line"
+            , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
             ]
         ]
     ]
@@ -107,38 +123,61 @@ viewProofActions =
 viewGrammarAccordion :: Model -> View Model Action
 viewGrammarAccordion model =
   viewAccordion
-    [viewTextWithIcon "Symbols" "abc"]
-    ( map
-        viewSingleSymbol
-        ( map (\(a, b, _) -> (a, b)) (model ^. operators)
-            <> model ^. quantifiers
-            <> model ^. infixPreds
+    (viewTextWithIcon "Symbols" "abc")
+    ( H.div_
+        [HP.class_ "row-sidebar-content"]
+        ( map
+            viewSingleSymbol
+            ( map (\(a, b, _) -> (a, b)) (model ^. operators)
+                <> model ^. quantifiers
+                <> model ^. infixPreds
+            )
         )
     )
  where
   viewSingleSymbol :: (Name, Name) -> View Model Action
-  viewSingleSymbol (alias, symbol) = H.button_ [HP.class_ "app-button"] [text $ ms symbol]
+  viewSingleSymbol (alias, symbol) =
+    H.div_
+      [HP.class_ "anchor-container"]
+      [ H.button_
+          [ HP.class_ "app-button"
+          , HP.class_ "anchor"
+          , HP.class_ "symbol-button"
+          , onMouseOver (PopOpen (ms alias) True)
+          , onMouseOut (PopClose (ms alias))
+          ]
+          [text $ ms symbol]
+      , H.p_
+          [ HP.class_ "tooltip"
+          , HP.class_ "anchored"
+          , HP.id_ (ms alias)
+          , textProp "popover" "manual"
+          , HP.draggable_ False
+          ]
+          [text . ms $ "Alias: " <> alias]
+      ]
 
 viewRuleAccordion :: Model -> View Model Action
 viewRuleAccordion model =
   viewAccordion
-    [viewTextWithIcon "Rules" "rule"]
-    (map viewSingleRule (toPairs $ model ^. rules))
+    (viewTextWithIcon "Rules" "rule")
+    (H.div_ [HP.class_ "row-sidebar-content"] (map viewSingleRule (toPairs $ model ^. rules)))
  where
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
   viewSingleRule (name, rs) =
     H.div_
-      [HP.class_ "rulebox-container"]
+      [HP.class_ "anchor-container", HP.class_ "rulebox-container"]
       [ H.button_
           [ HP.class_ "app-button"
-          , HP.class_ "rulebox-anchor"
+          , HP.class_ "anchor"
+          , HP.class_ "rule-button"
           , onMouseOver (PopOpen (ms name) True)
           , onMouseOut (PopClose (ms name))
           ]
           [text $ ms name]
       , H.p_
-          [ HP.class_ "error"
-          , HP.class_ "rulebox"
+          [ HP.class_ "tooltip"
+          , HP.class_ "anchored"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
           , textProp "popover" "manual"
@@ -150,16 +189,32 @@ viewRuleAccordion model =
 viewExamplesAccordion :: Model -> View Model Action
 viewExamplesAccordion model =
   viewAccordion
-    [viewTextWithIcon "Examples" "menu"]
-    $ one (H.div_ [HP.class_ "examples"] (map mkExample examples))
+    (viewTextWithIcon "Examples" "menu")
+    (H.div_ [HP.class_ "column-sidebar-content"] (map mkExample examples))
  where
   mkExample :: (MisoString, Proof) -> View Model Action
   mkExample (name, p) =
-    H.button_
-      [HP.class_ "example", HP.class_ "app-button", onClick (SetProof p)]
-      [text name]
-  -- TODO examples
-  examples = [("Example1", model ^. emptyProof), ("Example2", model ^. emptyProof), ("Example3", model ^. emptyProof)]
+    H.div_
+      [HP.class_ "anchor-container", HP.class_ "example-container"]
+      [ H.button_
+          [ HP.class_ "app-button"
+          , HP.class_ "anchor"
+          , HP.class_ "example-button"
+          , onMouseOver (PopOpen (ms name) True)
+          , onMouseOut (PopClose (ms name))
+          ]
+          [text $ ms name]
+      , H.p_
+          [ HP.class_ "tooltip"
+          , HP.class_ "anchored"
+          , HP.id_ (ms name)
+          , onCreatedWith InitMathJAX
+          , textProp "popover" "manual"
+          , HP.draggable_ False
+          ]
+          [text . ms $ proofPreviewTex p]
+      ]
+  examples = [("∀-Transitivity", model ^. emptyProof), ("=-Reflexivity", model ^. emptyProof), ("Example3", model ^. emptyProof)]
 
 viewBin :: View Model Action
 viewBin =
@@ -176,12 +231,13 @@ viewBin =
     , H.p_ [] ["Delete"]
     ]
 
-viewSpawnNode :: SpawnType -> MisoString -> MisoString -> View Model Action
-viewSpawnNode tp icon str =
+viewSpawnNode :: SpawnType -> MisoString -> MisoString -> MisoString -> View Model Action
+viewSpawnNode tp title icon str =
   H.div_
     [ HP.class_ "spawn-button"
     , HP.class_ "draggable"
     , HP.draggable_ True
+    , HP.title_ title
     , onDragStartWithOptions stopPropagation $ SpawnStart tp
     , onDragEndWithOptions defaultOptions DragEnd
     , HP.class_ "icon-container"
@@ -193,7 +249,7 @@ viewSpawnNode tp icon str =
 viewErrorBox :: MisoString -> MisoString -> View Model Action
 viewErrorBox name err =
   H.code_
-    [ HP.class_ "error"
+    [ HP.class_ "tooltip"
     , HP.id_ name
     , textProp "popover" "manual"
     , HP.draggable_ False

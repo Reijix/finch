@@ -108,6 +108,11 @@ ruleSpecTex (RuleSpec fs ps conclusion) = "\\frac{" <> showFsPs <> "}{" <> prett
     assumptionSpecTex (AssumptionSpec frm) = formulaSpecTex frm
   showFsPs = T.intercalate "\\quad" (map formulaSpecTex fs <> map proofSpecTex ps)
 
+proofPreviewTex :: Proof -> Text
+proofPreviewTex (SubProof fs _ (Derivation f _)) = T.concat viewFs <> "⊢\n" <> prettyPrint f
+ where
+  viewFs = map (\a -> prettyPrint a <> "\n") fs
+
 type Name = Text
 
 -- | A term in first-order logics consists either of a variable or a function applied to terms.
