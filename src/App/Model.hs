@@ -49,9 +49,6 @@ data Action where
   DragEnd :: Action
   Drag :: Action
   Nop :: Action
-  ProcessParens :: Either NodeAddr NodeAddr -> Int -> Int -> Action
-  KeyDownStart :: Either NodeAddr NodeAddr -> DOMRef -> Action
-  KeyDownStop :: Either NodeAddr NodeAddr -> Action
 
 -----------------------------------------------------------------------------
 

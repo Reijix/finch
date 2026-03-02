@@ -14,6 +14,7 @@ module App.Runner (
 import App.Decoder
 import App.Model
 import App.Views
+import Data.IntSet (isSubsetOf)
 import Data.Text qualified as T
 import Fitch.Proof
 import Fitch.Verification (verifyProof)
@@ -51,6 +52,7 @@ import Miso (
   getURI,
   io,
   io_,
+  isNull,
   issue,
   keyboardEvents,
   mouseEvents,
@@ -80,7 +82,7 @@ import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
 import Parser.Rule (parseRuleApplication)
-import Relude.Extra.Map (insert, (!?))
+import Relude.Extra.Map (insert, member, (!?))
 
 -----------------------------------------------------------------------------
 
@@ -107,15 +109,24 @@ runApp ::
 runApp proof operators infixPreds quantifiers rules = do
   -- read in initial URI, possibly containing an initial proof.
   uri <- getURI
+  window <- jsg "window"
   p' <- case proofFromURI uri of
-    Nothing -> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri) >> pure proof
+    Nothing ->
+      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri)
+        >> pure proof
     Just p -> pure p
   let m = initialModel proof p' operators infixPreds quantifiers rules
-  startApp (dragEvents <> fromList [("dblclick", BUBBLE)] <> keyboardEvents <> defaultEvents <> mouseEvents) $
-    (component m updateModel viewModel)
+  startApp
+    ( dragEvents
+        <> fromList [("dblclick", BUBBLE)]
+        <> keyboardEvents
+        <> defaultEvents
+        <> mouseEvents
+    )
+    $ (component m updateModel viewModel)
       { styles = [Href "style.css" False]
       , mount = Just Setup
-      , subs = [uriSub PopState]
+      , subs = [uriSub PopState, onKeyDownSub window]
       }
 
 updateProof :: Effect ROOT Model Action
@@ -307,92 +318,48 @@ updateModel (Input str ref) = do
       Just (start :: Int) <- castJSVal =<< getProperty ref "selectionStart"
       Just (end :: Int) <- castJSVal =<< getProperty ref "selectionEnd"
       pure $ ProcessInput str start end addr
-  checkProof
-updateModel (ProcessInput str start end (Left addr)) = do
+updateModel (ProcessInput str start end eaddr) = do
   m <- get
-  fLen <-
-    if isNAAssumption addr
-      then do
-        let a =
-              tryParse
-                m
-                (lineNoOr999 addr (m ^. proof))
-                (fromMisoString str) ::
-                Wrapper RawAssumption
-        proof %=? naUpdateFormula (Left (\(_, r) -> (a, r))) addr
-        pure $ T.length . getText $ a
-      else do
-        let f =
-              tryParse
-                m
-                (lineNoOr999 addr (m ^. proof))
-                (fromMisoString str) ::
-                Formula
-        proof %=? naUpdateFormula (Right $ const f) addr
-        pure $ T.length . getText $ f
+  (identifier, len) <- case eaddr of
+    Left addr -> do
+      if isNAAssumption addr
+        then do
+          let a =
+                tryParse
+                  m
+                  (lineNoOr999 addr (m ^. proof))
+                  (fromMisoString str) ::
+                  Wrapper RawAssumption
+          proof %=? naUpdateFormula (Left (\(_, r) -> (a, r))) addr
+          pure (mkFormulaInputId addr (m ^. proof), T.length . getText $ a)
+        else do
+          let f =
+                tryParse
+                  m
+                  (lineNoOr999 addr (m ^. proof))
+                  (fromMisoString str) ::
+                  Formula
+          proof %=? naUpdateFormula (Right $ const f) addr
+          pure (mkFormulaInputId addr (m ^. proof), T.length . getText $ f)
+    Right addr -> do
+      let r =
+            tryParse
+              m
+              (lineNoOr999 addr (m ^. proof))
+              (fromMisoString str) ::
+              Wrapper RuleApplication
+      proof %=? naUpdateRule (const r) addr
+      pure (mkFormulaInputId addr (m ^. proof), T.length . getText $ r)
 
   checkProof
-  let delta = T.length (fromMisoString str) - fLen
+  let delta = T.length (fromMisoString str) - len
   -- restore selectionStart and selectionEnd (delta-adjusted)
-  io_ $
-    setSelectionRange
-      ( ms $
-          "proof-line"
-            ++ show (lineNoOr999 addr (m ^. proof))
-      )
-      (start - delta)
-      (end - delta)
-updateModel (ProcessInput str start end (Right addr)) = do
-  m <- get
-  let r =
-        tryParse
-          m
-          (lineNoOr999 addr (m ^. proof))
-          (fromMisoString str) ::
-          Wrapper RuleApplication
-  proof %=? naUpdateRule (const r) addr
-  checkProof
-  let delta = T.length (fromMisoString str) - (T.length . getText $ r)
-  -- restore selectionStart and selectionEnd (delta-adjusted)
-  io_ $
-    setSelectionRange
-      ( ms $
-          "proof-line-rule"
-            ++ show (lineNoOr999 addr (m ^. proof))
-      )
-      (start - delta)
-      (end - delta)
-updateModel (ProcessParens eaddr start end) = do
-  m <- get
-  p <- use proof
-  case eaddr of
-    Left addr ->
-      proof %=? naUpdateFormula (Right $ \p -> fromLeft p $ update m (getText p)) addr
-    Right addr ->
-      proof %=? naUpdateRule (\r -> fromRight r $ update m (getText r)) addr
-  checkProof
- where
-  update :: Model -> Text -> Either Formula (Wrapper RuleApplication)
-  update m txt =
-    let (first, rest) = T.splitAt start txt
-        (second, third) = T.splitAt (end - start) rest
-        newTxt = T.concat [first, "(", second, ")", third]
-     in case eaddr of
-          Left addr ->
-            Left $
-              tryParse
-                m
-                (lineNoOr999 addr (m ^. proof))
-                newTxt
-          Right addr ->
-            Right $
-              tryParse
-                m
-                (lineNoOr999 addr (m ^. proof))
-                newTxt
--- THIS DOES NOT WORK, because addresses change!!
-updateModel (KeyDownStart addr ref) = startSub ("keyDownSub" <> show addr) (onKeyDownSub addr ref)
-updateModel (KeyDownStop addr) = stopSub ("keyDownSub" <> show addr)
+  when (delta /= 0) $
+    io_ $
+      setSelectionRange
+        identifier
+        (start - delta)
+        (end - delta)
 ------------------------------------
 updateModel Nop = pass
 
@@ -406,35 +373,39 @@ Used for detecting presses of '(' and 'Enter'.
 * On 'Enter' fires the `Blur` event,
 * On '(' inserts the closing parenthesis at the end of selection.
 -}
-onKeyDownSub :: Either NodeAddr NodeAddr -> DOMRef -> Sub Action
-onKeyDownSub addr domRef = createSub acquire (removeEventListener domRef "keydown")
+onKeyDownSub :: DOMRef -> Sub Action
+onKeyDownSub window = createSub acquire (removeEventListener window "keydown")
  where
   acquire = do
-    addEventListener domRef "keydown" $ \evt -> do
-      Just (keyCode :: Int) <- castJSVal =<< getProperty evt "keyCode"
-      Just (shiftKey :: Bool) <- castJSVal =<< getProperty evt "shiftKey"
-      Just (start :: Int) <- castJSVal =<< getProperty domRef "selectionStart"
-      Just (end :: Int) <- castJSVal =<< getProperty domRef "selectionEnd"
+    addEventListener window "keydown" $ \evt -> do
+      domRef <- jsg "document" # "querySelector" $ (".focused" :: MisoString)
+      isNull domRef >>= \case
+        True -> pass
+        False -> do
+          Just (keyCode :: Int) <- castJSVal =<< getProperty evt "keyCode"
+          Just (shiftKey :: Bool) <- castJSVal =<< getProperty evt "shiftKey"
+          Just (start :: Int) <- castJSVal =<< getProperty domRef "selectionStart"
+          Just (end :: Int) <- castJSVal =<< getProperty domRef "selectionEnd"
 
-      -- when '(' is pressed, insert closing parenthesis as well
-      when (keyCode == 57 && shiftKey && start < end) $ void $ do
-        -- prevent call of the `input` event.
-        eventPreventDefault evt
-        -- split current value into parts, to insert the parentheses
-        Just (value :: Text) <- castJSVal =<< getProperty domRef "value"
-        let (first, rest) = T.splitAt start value
-            (second, third) = T.splitAt (end - start) rest
-            newTxt = T.concat [first, "(", second, ")", third]
-        -- select all text, replace it with the new text, and adjust cursorition
-        doc <- jsg "document"
-        domRef # "select" $ ()
-        -- NOTE: execCommand is deprecated, however its use is still recommended
-        --       for inserting text to <input> while keeping the history intact.
-        doc # "execCommand" $ ("insertText", False, newTxt)
-        domRef # "setSelectionRange" $ (end + 2, end + 2, "none")
+          -- when '(' is pressed, insert closing parenthesis as well
+          when (keyCode == 57 && shiftKey && start < end) $ void $ do
+            -- prevent call of the `input` event.
+            eventPreventDefault evt
+            -- split current value into parts, to insert the parentheses
+            Just (value :: Text) <- castJSVal =<< getProperty domRef "value"
+            let (first, rest) = T.splitAt start value
+                (second, third) = T.splitAt (end - start) rest
+                newTxt = T.concat [first, "(", second, ")", third]
+            -- select all text, replace it with the new text, and adjust cursorition
+            doc <- jsg "document"
+            domRef # "select" $ ()
+            -- NOTE: execCommand is deprecated, however its use is still recommended
+            --       for inserting text to <input> while keeping the history intact.
+            doc # "execCommand" $ ("insertText", False, newTxt)
+            domRef # "setSelectionRange" $ (end + 2, end + 2, "none")
 
-      -- when 'Enter' is pressed, call blur on the element, to lose focus
-      when (keyCode == 13) $ void $ callFunction domRef "blur" ()
+          -- when 'Enter' is pressed, call blur on the element, to lose focus
+          when (keyCode == 13) $ void $ callFunction domRef "blur" ()
 
 -----------------------------------------------------------------------------
 

@@ -231,14 +231,13 @@ viewLine model na e =
               [ ("formula-input", True)
               , ("has-error", hasError)
               , ("draggable", Just (Left na) /= model ^. focusedLine)
+              , ("focused", Just (Left na) == model ^. focusedLine)
               ]
           , HP.autocomplete_ False
           , HP.draggable_ False
           , onBlur Blur
           , onChange (const Change)
           , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-          , onCreatedWith (KeyDownStart (Left na))
-          , onBeforeDestroyed (KeyDownStop (Left na))
           , onDragStartWithOptions preventDefault Nop
           , value_ txt
           ]
@@ -323,15 +322,15 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
             [ HP.class_ "rule-input"
             , HP.id_ inputId
             , HP.classList_
-                [("has-error", hasError)]
+                [ ("has-error", hasError)
+                , ("focused", Just (Left na) == model ^. focusedLine)
+                ]
             , HP.autocomplete_ False
             , HP.draggable_ False
             , HP.inert_ (Just (Right na) /= model ^. focusedLine)
             , onBlur Blur
             , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
             , onChange (const Change)
-            , onCreatedWith (KeyDownStart (Right na))
-            , onBeforeDestroyed (KeyDownStop (Right na))
             , onDragStartWithOptions preventDefault Nop
             , value_ ruleTxt
             ]
