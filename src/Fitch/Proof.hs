@@ -746,6 +746,23 @@ naLevelup2 = go id
   go _ _ = Nothing
 
 -- * Querying proofs
+proofErrors :: Proof -> Int
+proofErrors (SubProof fs ps c) =
+  foldr
+    (\e n -> either derivationErrors proofErrors e + n)
+    (foldr (\a n -> assumptionErrors a + n) 0 fs)
+    ps
+    + derivationErrors c
+ where
+  derivationErrors :: Derivation -> Int
+  derivationErrors (Derivation f r)
+    | isParseValid f && isParseValid r = 0
+    | not (isParseValid f) && not (isParseValid r) = 2
+    | otherwise = 1
+  assumptionErrors :: Assumption -> Int
+  assumptionErrors (f, _)
+    | isParseValid f = 0
+    | otherwise = 1
 
 holdsAt :: (a -> Bool) -> [a] -> Int -> Bool
 holdsAt f xs n = maybe False f (xs !!? n)

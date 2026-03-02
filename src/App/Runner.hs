@@ -130,7 +130,19 @@ runApp proof operators infixPreds quantifiers rules = do
       }
 
 updateProof :: Effect ROOT Model Action
-updateProof = checkProof >> updateURI
+updateProof = checkProof >> updateURI >> updateTitle
+
+updateTitle :: Effect ROOT Model Action
+updateTitle = do
+  p@(SubProof _ _ (Derivation f _)) <- use proof
+  let title =
+        "Finch | "
+          <> prettyPrint f
+          <> case proofErrors p of
+            0 -> mempty
+            1 -> " | " <> " 1 error"
+            n -> " | " <> show n <> " errors"
+  io_ [js| document.title = ${title} |]
 
 checkProof :: forall m. (MonadState Model m) => m ()
 checkProof = do
@@ -251,7 +263,7 @@ hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ 
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = proofReparse >> checkProof
+updateModel Setup = proofReparse >> checkProof >> updateTitle
 updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
 updateModel (SetProof p) = do
   proof .= p

@@ -233,8 +233,8 @@ Proof containers
   display: inline-block;
   outline: 0;
   cursor: pointer;
-  padding: 5px 16px;
-  font-size: 14px;
+  padding: .5vh .5vw;
+  font-size: var(--error-text-size);
   font-weight: 500;
   line-height: 20px;
   vertical-align: middle;
@@ -344,6 +344,7 @@ Proof containers
 
 .rulebox-container {
   anchor-scope: --rulebox-anchor;
+  width: 25%;
 }
 
 .rulebox {
@@ -352,6 +353,10 @@ Proof containers
 }
 
 .rulebox-anchor {
+  font-size: var(--sidebar-content-text-size);
+  font-family: var(--font-math);
+  /* font-weight: 500; */
+  letter-spacing: 0.1em;
   anchor-name: --rulebox-anchor;
 }
 
