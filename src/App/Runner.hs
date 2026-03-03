@@ -81,6 +81,7 @@ import Miso.Lens (Lens, use, (%=), (.=), (<~), (^.))
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
 import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
+import Parser.Proof (parseProof)
 import Parser.Rule (parseRuleApplication)
 import Relude.Extra.Map (insert, member, (!?))
 
@@ -94,8 +95,10 @@ Runs the fitch-editor app with a given initial @proof@,
 a list of unary operators, binary operators and quantifiers.
 -}
 runApp ::
-  -- | Initial proof
+  -- | Empty proof
   Proof ->
+  -- | Directory containing exampleProofs
+  [(Text, Proof)] ->
   -- | List of operators with aliases (alias, operator, arity)
   [(Text, Text, Int)] ->
   -- | List of quantifiers with aliases (alias, operator)
@@ -106,16 +109,17 @@ runApp ::
   Map Name RuleSpec ->
   -- | Resulting program
   IO ()
-runApp proof operators infixPreds quantifiers rules = do
+runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rules = do
   -- read in initial URI, possibly containing an initial proof.
   uri <- getURI
   window <- jsg "window"
+
   p' <- case proofFromURI uri of
     Nothing ->
-      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl proof) uri)
-        >> pure proof
+      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
+        >> pure initialP
     Just p -> pure p
-  let m = initialModel proof p' operators infixPreds quantifiers rules
+  let m = initialModel emptyP initialP examplePs operators infixPreds quantifiers rules
   startApp
     ( dragEvents
         <> fromList [("dblclick", BUBBLE)]

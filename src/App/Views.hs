@@ -190,9 +190,9 @@ viewExamplesAccordion :: Model -> View Model Action
 viewExamplesAccordion model =
   viewAccordion
     (viewTextWithIcon "Examples" "menu")
-    (H.div_ [HP.class_ "column-sidebar-content"] (map mkExample examples))
+    (H.div_ [HP.class_ "column-sidebar-content"] (map mkExample (model ^. exampleProofs)))
  where
-  mkExample :: (MisoString, Proof) -> View Model Action
+  mkExample :: (Text, Proof) -> View Model Action
   mkExample (name, p) =
     H.div_
       [HP.class_ "anchor-container", HP.class_ "example-container"]
@@ -202,6 +202,7 @@ viewExamplesAccordion model =
           , HP.class_ "example-button"
           , onMouseOver (PopOpen (ms name) True)
           , onMouseOut (PopClose (ms name))
+          , onClick (SetProof p)
           ]
           [text $ ms name]
       , H.p_
@@ -214,7 +215,6 @@ viewExamplesAccordion model =
           ]
           [text . ms $ proofPreviewTex p]
       ]
-  examples = [("∀-Transitivity", model ^. emptyProof), ("=-Reflexivity", model ^. emptyProof), ("Example3", model ^. emptyProof)]
 
 viewBin :: View Model Action
 viewBin =

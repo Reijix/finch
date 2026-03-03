@@ -57,6 +57,7 @@ type Pos = Int
 data Model = Model
   { _focusedLine :: Maybe (Either NodeAddr NodeAddr)
   -- ^ the line that is currently focused
+  , _exampleProofs :: [(Text, Proof)]
   , _emptyProof :: Proof
   , _proof :: Proof
   -- ^ the current proof
@@ -96,10 +97,12 @@ data Model = Model
 
 -- * Initial constructors
 initialModel ::
-  -- | The empty proof
+  -- | Empty proof, for the new proof button
   Proof ->
-  -- | The starting proof
+  -- | Initial proof
   Proof ->
+  -- | Example proofs
+  [(Text, Proof)] ->
   -- | A list of operators (alias, operator, arity)
   [(Text, Text, Int)] ->
   -- | A list of quantifiers (alias, quantifier)
@@ -109,11 +112,12 @@ initialModel ::
   -- | The map of rules
   Map Name RuleSpec ->
   Model
-initialModel emptyP p operators infixPreds quantifiers rules =
+initialModel emptyP initialP ps operators infixPreds quantifiers rules =
   Model
     { _focusedLine = Nothing
+    , _exampleProofs = ps
     , _emptyProof = emptyP
-    , _proof = p
+    , _proof = initialP
     , _dragTarget = Nothing
     , _spawnType = Nothing
     , _currentHoverLine = Nothing
@@ -129,6 +133,9 @@ initialModel emptyP p operators infixPreds quantifiers rules =
 -- * Lenses
 focusedLine :: Lens Model (Maybe (Either NodeAddr NodeAddr))
 focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
+
+exampleProofs :: Lens Model [(Text, Proof)]
+exampleProofs = lens (._exampleProofs) $ \model ps -> model{_exampleProofs = ps}
 
 emptyProof :: Lens Model Proof
 emptyProof = lens (._emptyProof) $ \model p -> model{_emptyProof = p}
