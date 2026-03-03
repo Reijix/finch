@@ -379,7 +379,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
             , HP.id_ inputId
             , HP.classList_
                 [ ("has-error", hasError)
-                , ("focused", Just (Left na) == model ^. focusedLine)
+                , ("focused", Just (Right na) == model ^. focusedLine)
                 ]
             , HP.autocomplete_ False
             , HP.draggable_ False

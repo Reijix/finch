@@ -365,7 +365,7 @@ updateModel (ProcessInput str start end eaddr) = do
               (fromMisoString str) ::
               Wrapper RuleApplication
       proof %=? naUpdateRule (const r) addr
-      pure (mkFormulaInputId addr (m ^. proof), T.length . getText $ r)
+      pure (mkRuleInputId addr (m ^. proof), T.length . getText $ r)
 
   checkProof
   let delta = T.length (fromMisoString str) - len

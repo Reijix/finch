@@ -64,11 +64,13 @@ pProof ind =
 
     case last proofs of
       Left d -> pure $ SubProof fs (init proofs) d
-      Right _ -> unexpected (Label $ fromList "subproof")
+      Right p -> unexpected (Label $ fromList "subproof")
     <?> "subproof"
 
 parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
-parseLine operators infixPreds quantifiers input = case evalState (runParserT' (pDerivation <* eof) initialParserState) initialState of
+parseLine operators infixPreds quantifiers input = case evalState
+  (runParserT' (pDerivation <* eof) initialParserState)
+  initialState of
   (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right d) -> Right d
  where
@@ -94,9 +96,12 @@ parseLine operators infixPreds quantifiers input = case evalState (runParserT' (
       }
 
 parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
-parseProof operators infixPreds quantifiers input = case evalState (runParserT' (pProof 1 <* eof) initialParserState) initialState of
-  (_, Left e) -> Left . toText $ errorBundlePretty e
-  (_, Right p) -> Right p
+parseProof operators infixPreds quantifiers input =
+  case evalState
+    (runParserT' (pProof 1 <* eof) initialParserState)
+    initialState of
+    (_, Left e) -> Left . toText $ errorBundlePretty e
+    (_, Right p) -> Right p
  where
   initialParserState =
     Parsec.State
