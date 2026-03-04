@@ -128,8 +128,7 @@ runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rul
         <> mouseEvents
     )
     $ (component m updateModel viewModel)
-      { styles = [Href "style.css" False]
-      , mount = Just Setup
+      { mount = Just Setup
       , subs = [uriSub PopState, onKeyDownSub window]
       }
 
@@ -274,9 +273,7 @@ updateModel (SetProof p) = do
   proofReparse
   checkProof
   updateURI
-  io_ $ consoleLog $ ms $ "SetProof called with p=\n" <> prettyPrint p
 updateModel (PopState uri) = do
-  io_ $ consoleLog "PopState called"
   readURI uri >> proofReparse >> checkProof
 updateModel (PopOpen name True) =
   use dragging >>= \case
@@ -284,6 +281,7 @@ updateModel (PopOpen name True) =
     False -> io_ $ showPopover name
 updateModel (PopOpen _ False) = pass
 updateModel (PopClose name) = io_ $ hidePopover name
+updateModel ToggleSidebar = sidebarToggle %= not
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do

@@ -31,6 +31,7 @@ data SpawnType where
 data Action where
   InitMathJAX :: DOMRef -> Action
   PopOpen :: MisoString -> Bool -> Action
+  ToggleSidebar :: Action
   PopClose :: MisoString -> Action
   SetProof :: Proof -> Action
   PopState :: URI -> Action
@@ -61,6 +62,7 @@ data Model = Model
   , _emptyProof :: Proof
   , _proof :: Proof
   -- ^ the current proof
+  , _sidebarToggle :: Bool
   , _dragTarget :: Maybe (Either NodeAddr ProofAddr)
   -- ^ the element that is currently being dragged
   , _spawnType :: Maybe SpawnType
@@ -118,6 +120,7 @@ initialModel emptyP initialP ps operators infixPreds quantifiers rules =
     , _exampleProofs = ps
     , _emptyProof = emptyP
     , _proof = initialP
+    , _sidebarToggle = False
     , _dragTarget = Nothing
     , _spawnType = Nothing
     , _currentHoverLine = Nothing
@@ -142,6 +145,9 @@ emptyProof = lens (._emptyProof) $ \model p -> model{_emptyProof = p}
 
 proof :: Lens Model Proof
 proof = lens (._proof) $ \model p -> model{_proof = p}
+
+sidebarToggle :: Lens Model Bool
+sidebarToggle = lens (._sidebarToggle) $ \model st -> model{_sidebarToggle = st}
 
 dragTarget :: Lens Model (Maybe (Either NodeAddr ProofAddr))
 dragTarget = lens (._dragTarget) $ \model dt -> model{_dragTarget = dt}

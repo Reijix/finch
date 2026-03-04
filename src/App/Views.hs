@@ -69,12 +69,26 @@ viewHeader :: Model -> View Model Action
 viewHeader model =
   H.header_
     [HP.class_ "header"]
-    [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewProofActionsHeader, viewNewProof model]
+    [ H.h1_
+        []
+        [ H.img_ [HP.src_ "favicon.svg"]
+        , "Finch"
+        , H.button_ [HP.class_ "help-button", onClick ToggleSidebar] [viewMaterialIcon "help"]
+        ]
+    , viewProofActionsHeader
+    , viewNewProof model
+    ]
 
 viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
-    [HP.class_ "sidebar", onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave]
+    [ HP.class_ "sidebar"
+    , onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave
+    , HP.classList_
+        [ ("sidebar-open", model ^. sidebarToggle)
+        , ("sidebar-closed", not (model ^. sidebarToggle))
+        ]
+    ]
     [ -- viewProofActions
       viewGrammarAccordion model
     , viewRuleAccordion model

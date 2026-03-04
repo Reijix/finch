@@ -50,7 +50,7 @@ Button containers
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 15%;
+  height: 100%;
 
   padding: 2vh 0 2vh 0;
   gap: 2vh;
@@ -62,6 +62,27 @@ Button containers
   overflow-y: auto;
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.sidebar-closed {
+  width: 0;
+  transition: 0.2s linear;
+}
+
+.sidebar-open {
+  z-index: 110;
+  width: 15%;
+  transition: 0.2s linear;
+}
+
+@media only screen and (max-width: 1200px) {
+  .sidebar {
+    position: absolute;
+  }
+
+  .sidebar-open {
+    width: 60%;
+  }
 }
 
 .sidebar-element {
@@ -234,9 +255,40 @@ Proof containers
   font-size: var(--error-text-size);
 }
 
+.header>h1 {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+
 .header>h1>img {
   height: var(--header-text-size);
   margin-right: 0.5vw;
+}
+
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 100%;
+  background: transparent;
+  cursor: pointer;
+  margin-left: 1vw;
+}
+
+.help-button>span {
+  font-size: var(--header-text-size);
+  height: var(--header-text-size);
+  width: var(--header-text-size);
+}
+
+.help-button:hover {
+  background-color: #F3F4F6;
+}
+
+.help-button:active {
+  transform: scale(0.92);
 }
 
 .app-button {
@@ -282,7 +334,7 @@ Proof containers
 }
 
 .proof-container-border {
-  width: 83%;
+  width: 95%;
   height: 100%;
 }
 
