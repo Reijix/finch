@@ -313,6 +313,11 @@ Proof containers
   anchor-scope: --error-anchor;
 }
 
+.formula-container:hover {
+  background-color: var(--bg-color);
+  transition: .1s linear;
+}
+
 .line-no {
   padding: 0;
   margin: 0;
@@ -336,7 +341,6 @@ Proof containers
 .formulae-container {
   box-sizing: border-box;
   border-left: var(--subproof-border);
-  margin-left: 5px;
   width: 75%;
 }
 
@@ -394,8 +398,8 @@ Proof containers
   margin-left: 5px;
 }
 
-.subproof:not(:has(.subproof:hover, .proof-line:hover)):hover {
-  border-left: var(--subproof-border-expanded);
+.subproof:not(:has(.subproof:hover, .formula-container:hover, .rule-container:hover, .drop-zone:not(.last-assumption):hover)):hover {
+  background-color: var(--bg-color);
   transition: .1s linear;
 }
 
@@ -453,6 +457,12 @@ Rule containers
   position: relative;
   background-color: var(--proof-color);
   anchor-scope: --error-anchor;
+  cursor: pointer;
+}
+
+.rule-container:hover {
+  background-color: var(--bg-color);
+  transition: .1s linear;
 }
 
 .rules-container {
