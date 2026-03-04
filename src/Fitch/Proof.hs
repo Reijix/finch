@@ -95,18 +95,28 @@ data RuleSpec
   deriving (Show, Eq)
 
 ruleSpecTex :: RuleSpec -> Text
-ruleSpecTex (RuleSpec fs ps conclusion) = "\\frac{" <> showFsPs <> "}{" <> prettyPrint conclusion <> "}"
+ruleSpecTex (RuleSpec fs ps conclusion) =
+  "\\frac{"
+    <> showFsPs
+    <> "}{"
+    <> prettyPrint conclusion
+    <> "}"
  where
   formulaSpecTex :: FormulaSpec -> Text
   formulaSpecTex = prettyPrint
   proofSpecTex :: ProofSpec -> Text
-  proofSpecTex (as, f) = "\\begin{array}{|l}" <> showAs <> "\\\\ \\hline \\vdots \\\\ " <> prettyPrint f <> "\\end{array}"
+  proofSpecTex (as, f) =
+    "\\begin{array}{|l}"
+      <> showAs
+      <> "\\\\ \\hline \\vdots \\\\ "
+      <> prettyPrint f
+      <> "\\end{array}"
    where
     showAs = T.intercalate "\\;" (map assumptionSpecTex as)
     assumptionSpecTex :: AssumptionSpec -> Text
     assumptionSpecTex (FFreshVar v) = "\\boxed{" <> v <> "}"
     assumptionSpecTex (AssumptionSpec frm) = formulaSpecTex frm
-  showFsPs = T.intercalate "\\quad" (map formulaSpecTex fs <> map proofSpecTex ps)
+  showFsPs = T.intercalate "\\quad " (map formulaSpecTex fs <> map proofSpecTex ps)
 
 proofPreviewTex :: Proof -> Text
 proofPreviewTex (SubProof fs _ (Derivation f _)) = T.concat viewFs <> "⊢\n" <> prettyPrint f

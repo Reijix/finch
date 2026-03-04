@@ -352,7 +352,7 @@ Proof containers
 }
 
 .proof-container-border {
-  width: 95%;
+  flex-grow: 1;
   height: 100%;
 }
 

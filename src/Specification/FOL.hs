@@ -21,12 +21,12 @@ quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 rulesFOL :: Map Text RuleSpec
 rulesFOL =
   rulesProp
-    <> [ ("=I", RuleSpec [] [] (FPred "=" [TPlaceholder "E", TPlaceholder "E"]))
+    <> [ ("=I", RuleSpec [] [] (FInfixPredicate "=" (TPlaceholder "E") (TPlaceholder "E")))
        ,
          ( "=E"
          , RuleSpec
              [ FSubst "φ" ("x" ~> "E")
-             , FPred "=" [TPlaceholder "E", TPlaceholder "D"]
+             , FInfixPredicate "=" (TPlaceholder "E") (TPlaceholder "D")
              ]
              []
              (FSubst "φ" ("x" ~> "D"))
