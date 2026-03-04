@@ -171,7 +171,7 @@ Button containers
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 100%;
+  width: 6vw;
   cursor: help;
   border: 1px solid;
   border-radius: 6px;
@@ -180,20 +180,12 @@ Button containers
   box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
 }
 
-.spawn-buttons {
-  width: 100%;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  gap: .5vw;
-}
-
 .spawn-button {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 100%;
+  width: 6vw;
   border: 1px solid;
   border-radius: 6px;
   color: #24292e;
@@ -224,16 +216,22 @@ Proof containers
 --------------------------------------------------
 */
 
-/* TODO unify header and proof colors? */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: rgba(250, 250, 250);
+  background-color: white;
   border-bottom: 1px solid #e0e0e0;
   font-size: var(--header-text-size);
   padding: 1vh;
   height: calc(var(--header-text-size) + 2vh);
+}
+
+.proof-actions-header {
+  display: flex;
+  flex-direction: row;
+  gap: 1vw;
+  font-size: var(--error-text-size);
 }
 
 .header>h1>img {

@@ -69,14 +69,14 @@ viewHeader :: Model -> View Model Action
 viewHeader model =
   H.header_
     [HP.class_ "header"]
-    [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewNewProof model]
+    [H.h1_ [] [H.img_ [HP.src_ "favicon.svg"], "Finch"], viewProofActionsHeader, viewNewProof model]
 
 viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
     [HP.class_ "sidebar", onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave]
-    [ viewProofActions
-    , viewGrammarAccordion model
+    [ -- viewProofActions
+      viewGrammarAccordion model
     , viewRuleAccordion model
     , viewExamplesAccordion model
     ]
@@ -101,6 +101,14 @@ viewTextWithIcon txt icon = H.div_ [HP.class_ "icon-text"] [viewMaterialIcon ico
 viewMaterialIcon :: MisoString -> View Model Action
 viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
 
+viewProofActionsHeader :: View Model Action
+viewProofActionsHeader =
+  H.div_
+    [HP.class_ "proof-actions-header"]
+    [ viewSpawnNode SpawnLine "Drag over proof to add a line" "add" "Add Line"
+    , viewBin
+    , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
+    ]
 viewProofActions :: View Model Action
 viewProofActions =
   H.div_
@@ -136,6 +144,12 @@ viewGrammarAccordion model =
     )
  where
   viewSingleSymbol :: (Name, Name) -> View Model Action
+  viewSingleSymbol ("", symbol) =
+    H.button_
+      [ HP.class_ "app-button"
+      , HP.class_ "symbol-button"
+      ]
+      [text $ ms symbol]
   viewSingleSymbol (alias, symbol) =
     H.div_
       [HP.class_ "anchor-container"]
@@ -228,7 +242,6 @@ viewBin =
     , HP.title_ "Drag lines or subproofs here to delete them."
     ]
     [ viewMaterialIcon "delete"
-    , H.p_ [] ["Delete"]
     ]
 
 viewSpawnNode :: SpawnType -> MisoString -> MisoString -> MisoString -> View Model Action
@@ -243,7 +256,6 @@ viewSpawnNode tp title icon str =
     , HP.class_ "icon-container"
     ]
     [ viewMaterialIcon icon
-    , H.p_ [] [text str]
     ]
 
 viewErrorBox :: MisoString -> MisoString -> View Model Action
