@@ -5,6 +5,7 @@ import Fitch.Proof (
   AssumptionSpec (..),
   FormulaSpec (..),
   Name,
+  PrettyPrint (prettyPrint),
   RawAssumption (..),
   RawFormula (Opr, Pred, Quantifier),
   Subst (..),
@@ -140,6 +141,14 @@ unifyTermsOnVariable n ts = do
   elimDeleteOccursOrient ts = foldlM once (False, ts) ts
    where
     once :: (Bool, [(Term, Term)]) -> (Term, Term) -> Maybe (Bool, [(Term, Term)])
+    -- (delete)
+    once (_, list) tup@(Var x, Var y)
+      | x == y =
+          Just (True, filter (/= tup) list)
+    -- (orient) [with special case to also orient `n`]
+    once (_, list) tup@(t, Var x)
+      | isFun t || x == n =
+          Just (True, (Var x, t) : filter (/= tup) list)
     once (b, list) tup@(Var x, t)
       -- (occurs)
       | x `member` freeVars t = Nothing
@@ -158,14 +167,6 @@ unifyTermsOnVariable n ts = do
                   )
                   (filter (/= (Var x, t)) list)
             )
-    -- (delete)
-    once (_, list) tup@(Var x, Var y)
-      | x == y =
-          Just (True, filter (/= tup) list)
-    -- (orient) [with special case to also orient `n`]
-    once (_, list) tup@(t, Var x)
-      | isFun t || x == n =
-          Just (True, (Var x, t) : filter (/= tup) list)
     once ret _ = Just ret
 
   -- Turns a list of term tuples to a unificator.

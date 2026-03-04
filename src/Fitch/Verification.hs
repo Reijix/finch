@@ -335,7 +335,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 Just (Var x') -> x'
                 _ -> "_" <> x
            in case unifyFormulaeOnVariable x' [(phiF, f)] of
-                Nothing -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
+                Nothing -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f <> "\non variable " <> x' <> "."
                 -- compare assignment of E
                 Just mgu -> case (mgu !? x', termMap !? t) of
                   _ | size mgu > 1 -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
