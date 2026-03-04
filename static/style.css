@@ -111,17 +111,17 @@ Button containers
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-.sidebar>details>summary {
+details>summary {
   list-style: none;
   cursor: pointer;
   user-select: none;
 }
 
-.sidebar>details>summary>.summary-arrow {
+details>summary>.summary-arrow {
   transition: 0.3s;
 }
 
-.sidebar>details::details-content {
+details::details-content {
   transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete;
   height: 0;
   overflow: clip;
@@ -132,17 +132,21 @@ Button containers
     interpolate-size: allow-keywords;
   }
 
-  .sidebar>details[open]::details-content {
+  details[open]::details-content {
     height: auto;
   }
 }
 
-.sidebar>details[open]>summary>.summary-arrow {
+details[open]>summary>.summary-arrow {
   transform: rotate(180deg);
 }
 
-.sidebar>details>summary::-webkit-details-marker {
+details>summary::-webkit-details-marker {
   display: none;
+}
+
+ul {
+  list-style-position: inside;
 }
 
 .sidebar-header {

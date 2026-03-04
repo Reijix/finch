@@ -93,7 +93,8 @@ viewSidebar model =
     $ H.div_
       [ HP.class_ "sidebar-content"
       ]
-      [ viewGrammarAccordion model
+      [ viewUsageAccordion
+      , viewGrammarAccordion model
       , viewRuleAccordion model
       , viewExamplesAccordion model
       ]
@@ -145,6 +146,20 @@ viewProofActions =
             ]
         ]
     ]
+
+viewUsageAccordion :: View Model Action
+viewUsageAccordion =
+  viewAccordion
+    (viewTextWithIcon "Usage Info" "info")
+    ( H.ul_
+        [HP.class_ "column-sidebar-content"]
+        [ H.li_ [] ["Use the buttons at the top of the screen to add lines and subproofs."]
+        , H.li_ [] ["Drag lines and subproofs to modify the proof."]
+        , H.li_ [] ["Drag lines and subproofs to the trash can at the top to delete them."]
+        , H.li_ [] ["Doubleclick lines to edit their contents."]
+        , H.li_ [] ["Check below how to write the symbols and how the rules are defined."]
+        ]
+    )
 
 viewGrammarAccordion :: Model -> View Model Action
 viewGrammarAccordion model =
