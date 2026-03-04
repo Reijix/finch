@@ -47,10 +47,25 @@ h1 {
 Button containers
 --------------------------------------------------
 */
+
 .sidebar {
+  display: block;
+  height: 100%;
+  background-color: var(--sidebar-color);
+  border-right: 1px solid #e0e0e0;
+  z-index: 110;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sidebar-content {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 15vw;
 
   padding: 2vh 0 2vh 0;
   gap: 2vh;
@@ -66,13 +81,12 @@ Button containers
 
 .sidebar-closed {
   width: 0;
-  transition: 0.2s linear;
+  transition: width 0.2s linear;
 }
 
 .sidebar-open {
-  z-index: 110;
-  width: 15%;
-  transition: 0.2s linear;
+  width: 15vw;
+  transition: width 0.2s linear;
 }
 
 @media only screen and (max-width: 1200px) {
@@ -81,7 +95,11 @@ Button containers
   }
 
   .sidebar-open {
-    width: 60%;
+    width: 60vw;
+  }
+
+  .sidebar-content {
+    width: 60vw;
   }
 }
 

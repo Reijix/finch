@@ -89,11 +89,14 @@ viewSidebar model =
         , ("sidebar-closed", not (model ^. sidebarToggle))
         ]
     ]
-    [ -- viewProofActions
-      viewGrammarAccordion model
-    , viewRuleAccordion model
-    , viewExamplesAccordion model
-    ]
+    $ one
+    $ H.div_
+      [ HP.class_ "sidebar-content"
+      ]
+      [ viewGrammarAccordion model
+      , viewRuleAccordion model
+      , viewExamplesAccordion model
+      ]
 
 viewAccordion :: View Model Action -> View Model Action -> View Model Action
 viewAccordion heading content =
@@ -123,6 +126,7 @@ viewProofActionsHeader =
     , viewBin
     , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
     ]
+
 viewProofActions :: View Model Action
 viewProofActions =
   H.div_
