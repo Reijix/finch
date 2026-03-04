@@ -475,16 +475,17 @@ Drag and drop related
 --------------------------------------------------
 */
 .draggable {
-  cursor: move;
+  cursor: move !important;
   /* fallback if grab cursor is unsupported */
-  cursor: grab;
-  cursor: -webkit-grab;
+  cursor: grab !important;
+  cursor: -webkit-grab !important;
 }
 
 .drop-zone {
   height: var(--drop-zone-height);
   transition: height 0.1s linear;
   background-color: var(--proof-background-color);
+  cursor: default;
 }
 
 .expanded-drop-zone {

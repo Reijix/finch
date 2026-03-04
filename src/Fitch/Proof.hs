@@ -573,19 +573,13 @@ instance Ord NodeAddr where
   compare a NAAfterConclusion = LT
 
 isNAAssumption :: NodeAddr -> Bool
-isNAAssumption (NAProof _ na) = isNAAssumption na
 isNAAssumption NAAssumption{} = True
 isNAAssumption _ = False
 
-isNAConclusion :: NodeAddr -> Bool
-isNAConclusion (NAProof _ na) = isNAConclusion na
-isNAConclusion NAConclusion = True
-isNAConclusion _ = False
-
-isNALine :: NodeAddr -> Bool
-isNALine (NAProof _ na) = isNALine na
-isNALine NALine{} = True
-isNALine _ = False
+isNestedNAAssumption :: NodeAddr -> Bool
+isNestedNAAssumption (NAProof _ na) = isNestedNAAssumption na
+isNestedNAAssumption NAAssumption{} = True
+isNestedNAAssumption _ = False
 
 naInSameProof :: NodeAddr -> NodeAddr -> Bool
 naInSameProof (NAProof n na1) (NAProof m na2) = n == m && naInSameProof na1 na2

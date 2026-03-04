@@ -271,7 +271,8 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
-      , HP.draggable_ $ (model ^. focusedLine) /= Just (Left na)
+      , HP.draggable_ $
+          (model ^. focusedLine) /= Just (Left na)
       , HP.classList_
           [("draggable", (model ^. focusedLine) /= Just (Left na))]
       , onDragStartWithOptions stopPropagation $ DragStart (Left na)
@@ -489,8 +490,10 @@ viewDropZoneAt model mclass na =
     , HP.classList_
         [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
         , (fromMaybe "" mclass, isJust mclass)
+        , ("draggable", isJust mclass && not (isNAAssumption na))
         ]
-    , HP.draggable_ False
+    , HP.draggable_ (isNothing mclass) -- true to overshadow the draggable of subproof
+    , onDragStartWithOptions (preventDefault <> stopPropagation) Nop
     , onDragOverWithOptions preventDefault Nop
     , onDragEnterWithOptions preventDefault (DragEnter na)
     , onDropWithOptions defaultOptions (Drop (LineAddr na))

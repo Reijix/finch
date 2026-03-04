@@ -338,7 +338,7 @@ updateModel (ProcessInput str start end eaddr) = do
   m <- get
   (identifier, len) <- case eaddr of
     Left addr -> do
-      if isNAAssumption addr
+      if isNestedNAAssumption addr
         then do
           let a =
                 tryParse
