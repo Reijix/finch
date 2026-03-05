@@ -449,8 +449,7 @@ viewProof model =
     [ HP.class_ "proof-container-border"
     , onDragEnterWithOptions preventDefault DragLeave
     ]
-    [ H.p_ [HP.class_ "workspace-heading"] ["Proof Workspace"]
-    , H.div_
+    [ H.div_
         [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
         [viewLineNos model, proofView, viewRules model]
     ]
