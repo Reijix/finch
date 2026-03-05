@@ -123,18 +123,8 @@ details>summary>.summary-arrow {
 
 details::details-content {
   transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete;
-  height: 0;
+  /* height: 0; */
   overflow: clip;
-}
-
-@supports (interpolate-size: allow-keywords) {
-  :root {
-    interpolate-size: allow-keywords;
-  }
-
-  details[open]::details-content {
-    height: auto;
-  }
 }
 
 details[open]>summary>.summary-arrow {

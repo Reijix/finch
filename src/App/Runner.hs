@@ -69,6 +69,7 @@ import Miso (
   startSub,
   stopSub,
   text,
+  touchEvents,
   uriSub,
   withSink,
  )
@@ -126,6 +127,7 @@ runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rul
         <> keyboardEvents
         <> defaultEvents
         <> mouseEvents
+        <> touchEvents
     )
     $ (component m updateModel viewModel)
       { mount = Just Setup
