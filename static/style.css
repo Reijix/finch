@@ -394,6 +394,7 @@ Proof containers
   font-size: var(--normal-text-size);
   /* font-family: inherit; */
   font-family: var(--font-math);
+  z-index: 110;
   anchor-name: --error-anchor;
 }
 

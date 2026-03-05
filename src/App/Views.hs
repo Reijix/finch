@@ -316,7 +316,7 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
-      , HP.draggable_ True
+      , HP.draggable_ ((model ^. focusedLine) /= Just (Left na))
       , if (model ^. focusedLine) /= Just (Left na)
           then onDragStartWithOptions stopPropagation $ DragStart (Left na)
           else onDragStartWithOptions (stopPropagation <> preventDefault) Nop
