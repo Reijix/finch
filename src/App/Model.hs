@@ -36,7 +36,7 @@ data Action where
   SetProof :: Proof -> Action
   PopState :: URI -> Action
   Setup :: Action
-  Blur :: Action
+  Blur :: Either NodeAddr NodeAddr -> Action
   Input :: MisoString -> DOMRef -> Action
   Change :: Action
   ProcessInput :: MisoString -> Int -> Int -> Either NodeAddr NodeAddr -> Action

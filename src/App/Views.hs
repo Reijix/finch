@@ -324,6 +324,7 @@ viewLine model na e =
       , onDragEndWithOptions defaultOptions DragEnd
       , onMouseOver (PopOpen errorBoxId hasError)
       , onMouseOut (PopClose errorBoxId)
+      , onTouchEndWithOptions preventDefault $ DoubleClick (Left na)
       , onClick $ DoubleClick (Left na)
       ]
       [ H.input_
@@ -337,7 +338,7 @@ viewLine model na e =
               ]
           , HP.autocomplete_ False
           , HP.draggable_ False
-          , onBlur Blur
+          , onBlur (Blur (Left na))
           , onChange (const Change)
           , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
           , onDragStartWithOptions preventDefault Nop
@@ -414,7 +415,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       errorBoxId = "rule-error-" <> show lineno
      in
       H.div_
-        [ onClick $ DoubleClick (Right na)
+        [ onTouchEndWithOptions preventDefault $ DoubleClick (Right na)
         , onMouseOver (PopOpen errorBoxId hasError)
         , onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
@@ -430,7 +431,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
             , HP.autocomplete_ False
             , HP.draggable_ False
             , HP.inert_ (Just (Right na) /= model ^. focusedLine)
-            , onBlur Blur
+            , onBlur (Blur (Right na))
             , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
             , onChange (const Change)
             , onDragStartWithOptions preventDefault Nop

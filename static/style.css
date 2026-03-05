@@ -123,7 +123,6 @@ details>summary>.summary-arrow {
 
 details::details-content {
   transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete;
-  /* height: 0; */
   overflow: clip;
 }
 

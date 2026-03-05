@@ -321,8 +321,12 @@ updateModel DragEnd = do
   clearDrag
 ------------------------------------
 -- Input related events
-updateModel (DoubleClick ea) = setFocus ea
-updateModel Blur = focusedLine .= Nothing
+updateModel (DoubleClick ea) = do
+  io_ $ consoleLog $ "DoubleClick fired with ea=" <> show ea
+  setFocus ea
+updateModel (Blur ea) = do
+  fline <- use focusedLine
+  focusedLine .= if fline == Just ea then Nothing else fline
 updateModel Change = updateProof
 updateModel (Input str ref) = do
   m <- get
