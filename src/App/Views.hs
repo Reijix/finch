@@ -128,25 +128,6 @@ viewProofActionsHeader =
     , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
     ]
 
-viewProofActions :: View Model Action
-viewProofActions =
-  H.div_
-    [ HP.class_ "sidebar-element"
-    ]
-    [ H.p_
-        [HP.class_ "sidebar-header"]
-        [viewTextWithIcon "Proof Actions" "action_key", H.span_ [] []]
-    , H.div_
-        [HP.class_ "row-sidebar-content"]
-        [ viewBin
-        , H.div_
-            [HP.class_ "spawn-buttons"]
-            [ viewSpawnNode SpawnLine "Drag over proof to add a line" "add" "Add Line"
-            , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
-            ]
-        ]
-    ]
-
 viewUsageAccordion :: View Model Action
 viewUsageAccordion =
   viewAccordion
@@ -316,8 +297,8 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
-      , HP.draggable_ ((model ^. focusedLine) /= Just (Left na))
-      , if (model ^. focusedLine) /= Just (Left na)
+      , HP.draggable_ (isNothing (model ^. focusedLine))
+      , if model ^. focusedLine /= Just (Left na)
           then onDragStartWithOptions stopPropagation $ DragStart (Left na)
           else onDragStartWithOptions (stopPropagation <> preventDefault) Nop
       , onDragEndWithOptions defaultOptions DragEnd
@@ -482,7 +463,7 @@ viewProof model =
       [ HP.class_ "subproof"
       , HP.class_ "draggable"
       , HP.id_ (show pa)
-      , HP.draggable_ True
+      , HP.draggable_ (isNothing (model ^. focusedLine))
       , onDragStartWithOptions stopPropagation $ DragStart (Right pa)
       , onDragEndWithOptions defaultOptions DragEnd
       ]

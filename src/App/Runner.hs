@@ -327,7 +327,6 @@ updateModel (FocusInput ea) = do
     then
       setFocus ea
     else pass
-  io_ $ consoleLog $ "FocusInput fired with ea=" <> show ea
 updateModel (Blur ea) = do
   fline <- use focusedLine
   focusedLine .= if fline == Just ea then Nothing else fline
