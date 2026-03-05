@@ -40,7 +40,7 @@ data Action where
   Input :: MisoString -> DOMRef -> Action
   Change :: Action
   ProcessInput :: MisoString -> Int -> Int -> Either NodeAddr NodeAddr -> Action
-  DoubleClick :: Either NodeAddr NodeAddr -> Action
+  FocusInput :: Either NodeAddr NodeAddr -> Action
   Drop :: DropLocation -> Action
   DragEnter :: NodeAddr -> Action
   DragLeave :: Action

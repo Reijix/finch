@@ -156,7 +156,7 @@ viewUsageAccordion =
         [ H.li_ [] ["Use the buttons at the top of the screen to add lines and subproofs."]
         , H.li_ [] ["Drag lines and subproofs to modify the proof."]
         , H.li_ [] ["Drag lines and subproofs to the trash can at the top to delete them."]
-        , H.li_ [] ["Doubleclick lines to edit their contents."]
+        , H.li_ [] ["Click lines to edit their contents."]
         , H.li_ [] ["Check below how to write the symbols and how the rules are defined."]
         ]
     )
@@ -316,15 +316,14 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
-      , HP.draggable_ $
-          (model ^. focusedLine) /= Just (Left na)
-      , HP.classList_
-          [("draggable", (model ^. focusedLine) /= Just (Left na))]
-      , onDragStartWithOptions stopPropagation $ DragStart (Left na)
+      , HP.draggable_ True
+      , if (model ^. focusedLine) /= Just (Left na)
+          then onDragStartWithOptions stopPropagation $ DragStart (Left na)
+          else onDragStartWithOptions (stopPropagation <> preventDefault) Nop
       , onDragEndWithOptions defaultOptions DragEnd
       , onMouseOver (PopOpen errorBoxId hasError)
       , onMouseOut (PopClose errorBoxId)
-      , onClick $ DoubleClick (Left na)
+      , onClick $ FocusInput (Left na)
       ]
       [ H.input_
           [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
@@ -417,6 +416,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
         [ onMouseOver (PopOpen errorBoxId hasError)
         , onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
+        , onClick $ FocusInput (Right na)
         ]
         [ viewErrorBox errorBoxId err
         , H.input_
