@@ -51,7 +51,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       spec <- checkExistence rules
       (conclusion, conclusionSpec) <- checkConclusion spec formula
       formulaSpecs <- unifyReferences 0 spec refs
-      termMap <- verifyTerms (collectTerms (Right (conclusion, conclusionSpec) : formulaSpecs))
+      termMap <- verifyTerms (collectTermsFormula (Right (conclusion, conclusionSpec) : formulaSpecs))
       formMap <- verifyFormulae termMap (Right (conclusion, conclusionSpec) : formulaSpecs)
       pass
    where
@@ -134,7 +134,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       prf <- lookupProofReference start end p
       fs <- handleProof (start, end) prf pSpec
       fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
-      pure (fs ++ fs')
+      pure (fs <> fs')
      where
       handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
@@ -205,35 +205,40 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     ---------------------------------------------------
     -- 4. Collect terms
-    collectTerms :: [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name [Term]
-    collectTerms (Right (Pred _ ps, FPred _ qs) : rest) =
-      M.unionWith
-        (++)
-        (collectTerms' (zip ps qs))
-        (collectTerms rest)
-     where
-      collectTerms' :: [(Term, TermSpec)] -> Map Name [Term]
-      collectTerms' [] = mempty
-      collectTerms' ((Fun _ ts, TFun _ ss) : rest) = collectTerms' (zip ts ss ++ rest)
-      collectTerms' ((t, TPlaceholder n) : rest) =
-        insertWith
-          (++)
-          n
-          [t]
-          (collectTerms' rest)
-      collectTerms' (_ : rest) = collectTerms' rest
-    collectTerms (Right (Opr _ fs, FOpr _ fs') : rest) =
-      collectTerms (zipWith (curry Right) fs fs' ++ rest)
-    collectTerms (Right (Quantifier _ v f, FQuantifier _ v' f') : rest) =
+    collectTermsTerm :: [(Term, TermSpec)] -> Map Name [Term]
+    collectTermsTerm [] = mempty
+    collectTermsTerm ((Fun _ ts, TFun _ ss) : rest) = collectTermsTerm (zip ts ss <> rest)
+    collectTermsTerm ((t, TPlaceholder n) : rest) =
       insertWith
-        (++)
+        (<>)
+        n
+        [t]
+        (collectTermsTerm rest)
+    collectTermsTerm (_ : rest) = collectTermsTerm rest
+
+    collectTermsFormula :: [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name [Term]
+    collectTermsFormula (Right (Pred _ [p1, p2], FInfixPredicate _ q1 q2) : rest) =
+      M.unionWith
+        (<>)
+        (collectTermsTerm [(p1, q1), (p2, q2)])
+        (collectTermsFormula rest)
+    collectTermsFormula (Right (Pred _ ps, FPred _ qs) : rest) =
+      M.unionWith
+        (<>)
+        (collectTermsTerm (zip ps qs))
+        (collectTermsFormula rest)
+    collectTermsFormula (Right (Opr _ fs, FOpr _ fs') : rest) =
+      collectTermsFormula (zipWith (curry Right) fs fs' <> rest)
+    collectTermsFormula (Right (Quantifier _ v f, FQuantifier _ v' f') : rest) =
+      insertWith
+        (<>)
         v'
         [Var v]
-        (collectTerms (Right (f, f') : rest))
-    collectTerms (Left (FreshVar m, FFreshVar n) : rest) = insertWith (++) n [Var m] $ collectTerms rest
-    collectTerms (Left (RawAssumption f, AssumptionSpec fSpec) : rest) = collectTerms (Right (f, fSpec) : rest)
-    collectTerms (_ : rest) = collectTerms rest
-    collectTerms [] = mempty
+        (collectTermsFormula (Right (f, f') : rest))
+    collectTermsFormula (Left (FreshVar m, FFreshVar n) : rest) = insertWith (<>) n [Var m] $ collectTermsFormula rest
+    collectTermsFormula (Left (RawAssumption f, AssumptionSpec fSpec) : rest) = collectTermsFormula (Right (f, fSpec) : rest)
+    collectTermsFormula (_ : rest) = collectTermsFormula rest
+    collectTermsFormula [] = mempty
     ---------------------------------------------------
 
     ---------------------------------------------------
@@ -277,7 +282,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
      where
       collectSimpleFormulae :: [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name (NonEmpty RawFormula)
       collectSimpleFormulae [] = mempty
-      collectSimpleFormulae (Right (Pred{}, FPred{}) : rest) =
+      collectSimpleFormulae (Right (Pred{}, (FPred{}; FInfixPredicate{})) : rest) =
         collectSimpleFormulae rest
       collectSimpleFormulae (Right (Opr _ fs, FOpr _ fSpecs) : rest) =
         collectSimpleFormulae $ zipWith (curry Right) fs fSpecs <> rest
@@ -358,7 +363,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                             <> prettyPrint e'
         Nothing -> case termMap !? t of
           -- TODO better error message
-          Nothing -> Left "Term has wrong form, RULEERROR!" -- error
+          Nothing -> Left $ "Term has wrong form, can't find " <> t <> " in termMap=\n" <> prettyPrint termMap -- error
           -- backwards
           Just t' ->
             let x' = case termMap !? x of
