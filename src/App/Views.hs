@@ -324,7 +324,7 @@ viewLine model na e =
       , onDragEndWithOptions defaultOptions DragEnd
       , onMouseOver (PopOpen errorBoxId hasError)
       , onMouseOut (PopClose errorBoxId)
-      , onDoubleClick $ DoubleClick (Left na)
+      , onClick $ DoubleClick (Left na)
       ]
       [ H.input_
           [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
@@ -414,7 +414,7 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       errorBoxId = "rule-error-" <> show lineno
      in
       H.div_
-        [ onDoubleClick $ DoubleClick (Right na)
+        [ onClick $ DoubleClick (Right na)
         , onMouseOver (PopOpen errorBoxId hasError)
         , onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
