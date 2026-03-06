@@ -166,7 +166,7 @@ data FormulaSpec
   = FSubst Name (Subst Name)
   | FPlaceholder Name
   | FPred Name [TermSpec]
-  | FInfixPredicate Name TermSpec TermSpec
+  | FInfixPred Name TermSpec TermSpec
   | FOpr Text [FormulaSpec]
   | FQuantifier Name Name FormulaSpec
   deriving (Eq, Show)
@@ -186,7 +186,7 @@ instance PrettyPrint FormulaSpec where
     go _ (FPlaceholder n) = n
     go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " ↦ " <> t <> "]"
     go True f = "(" <> go False f <> ")"
-    go False (FInfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
+    go False (FInfixPred p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
     go False (FOpr op []) = op
     go False (FOpr op [f]) = op <> go True f
     go False (FOpr op [f1, f2]) = go True f1 <> " " <> op <> " " <> go True f2
@@ -203,7 +203,7 @@ data RawFormula
   = -- | A `Pred` applied to terms.
     Pred Name [Term]
   | -- | A `Pred` applied to terms, written in infix notation.
-    InfixPredicate Name Term Term
+    InfixPred Name Term Term
   | -- | A n-ary operator, like @->@ for implication, or @~@ for negation.
     Opr Text [RawFormula]
   | -- | A quantifier, like @∀@ for universal quantification.
@@ -218,7 +218,7 @@ instance PrettyPrint RawFormula where
     go _ (Pred p []) = p
     go _ (Pred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go True f = "(" <> go False f <> ")"
-    go False (InfixPredicate p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
+    go False (InfixPred p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
     go False (Opr op fs)
       | null fs = op
       | length fs == 2 = T.intercalate op (map (go True) fs)
@@ -865,9 +865,6 @@ pIndex n p = case fromLineNo n p of
 pIndexProof :: Int -> Int -> Proof -> Maybe Proof
 pIndexProof start end p = fromLineRange start end p >>= (`paLookup` p)
 
-pCollectAllNodeAddrs :: Proof -> [NodeAddr]
-pCollectAllNodeAddrs = pSerializeLinesWithAddr const const
-
 -- | naAffectsFreshness viewer viewee expresses whether viewee is relevant for checking freshness of viewer.
 naAffectsFreshness :: NodeAddr -> NodeAddr -> Bool
 naAffectsFreshness (NAProof n na1) (NAProof m na2)
@@ -885,11 +882,13 @@ naAffectsFreshness (NAAssumption _) (NALine{}; NAConclusion) = False
 naAffectsFreshness _ _ = False
 
 pCollectFreshnessNodes ::
-  NodeAddr -> Proof -> Either Text [(NodeAddr, Either Assumption Derivation)]
-pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $
-  filter (naAffectsFreshness na) (pCollectAllNodeAddrs p) of
-  Nothing -> Left "Internal error on pCollectFreshnessNodes, should not happen!"
-  Just l -> Right l
+  Proof -> NodeAddr -> [(NodeAddr, Either Assumption Derivation)]
+pCollectFreshnessNodes p na =
+  catMaybes $
+    pSerializeLinesWithAddr
+      (\na' a -> if naAffectsFreshness na na' then Just (na', Left a) else Nothing)
+      (\na' d -> if naAffectsFreshness na na' then Just (na', Right d) else Nothing)
+      p
 
 -- * Updating proof contents
 

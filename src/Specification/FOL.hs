@@ -21,12 +21,12 @@ quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 rulesFOL :: Map Text RuleSpec
 rulesFOL =
   rulesProp
-    <> [ ("=I", RuleSpec [] [] (FInfixPredicate "=" (TPlaceholder "E") (TPlaceholder "E")))
+    <> [ ("=I", RuleSpec [] [] (FInfixPred "=" (TPlaceholder "E") (TPlaceholder "E")))
        ,
          ( "=E"
          , RuleSpec
              [ FSubst "φ" ("x" ~> "E")
-             , FInfixPredicate "=" (TPlaceholder "E") (TPlaceholder "D")
+             , FInfixPred "=" (TPlaceholder "E") (TPlaceholder "D")
              ]
              []
              (FSubst "φ" ("x" ~> "D"))
@@ -40,7 +40,13 @@ rulesFOL =
              (FQuantifier "∀" "x" phi)
          )
        , ("∃I", RuleSpec [FSubst "φ" ("x" ~> "E")] [] (FQuantifier "∃" "x" phi))
-       , ("∃E", RuleSpec [FQuantifier "∃" "x" phi] [([FFreshVar "c", AssumptionSpec $ FSubst "φ" ("x" ~> "c")], psi)] psi)
+       ,
+         ( "∃E"
+         , RuleSpec
+             [FQuantifier "∃" "x" phi]
+             [([FFreshVar "c", AssumptionSpec $ FSubst "φ" ("x" ~> "c")], psi)]
+             psi
+         )
        ]
  where
   phi = FPlaceholder "φ"

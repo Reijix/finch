@@ -228,7 +228,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     collectTermsFormula ::
       [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name [Term]
-    collectTermsFormula (Right (Pred _ [p1, p2], FInfixPredicate _ q1 q2) : rest) =
+    collectTermsFormula (Right (Pred _ [p1, p2], FInfixPred _ q1 q2) : rest) =
       M.unionWith
         (<>)
         (collectTermsTerm [(p1, q1), (p2, q2)])
@@ -298,7 +298,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] ->
         Map Name (NonEmpty RawFormula)
       collectSimpleFormulae [] = mempty
-      collectSimpleFormulae (Right (Pred{}, (FPred{}; FInfixPredicate{})) : rest) =
+      collectSimpleFormulae (Right (Pred{}, (FPred{}; FInfixPred{})) : rest) =
         collectSimpleFormulae rest
       collectSimpleFormulae (Right (Opr _ fs, FOpr _ fSpecs) : rest) =
         collectSimpleFormulae $ zipWith (curry Right) fs fSpecs <> rest
@@ -415,6 +415,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                       <$> collectMoreFormulae formMap rest
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> RawFormula -> NonEmpty RawFormula
+      substBackwardsForm s (InfixPred p t1 t2) =
+        fmap (Pred p) . allCombinations $ fmap (substBackwardsTerm s) [t1, t2]
       substBackwardsForm s (Pred p ts) =
         fmap (Pred p) . allCombinations $ fmap (substBackwardsTerm s) ts
       substBackwardsForm s (Opr o fs) =
@@ -424,7 +426,6 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       -- Thus @v@ here will be something like '_x' that does not occur naturally, i.e. not in Subst!
       substBackwardsForm s@(Subst x t) (Quantifier q v f) =
         fmap (Quantifier q v) (substBackwardsForm s f)
-      substBackwardsForm _ f = error "Internal error on substBackwardsForm: should not happen!"
       substBackwardsTerm :: Subst Term -> Term -> NonEmpty Term
       substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
       substBackwardsTerm s (Var x) = one $ Var x

@@ -208,7 +208,7 @@ formulaMatchesSpec :: RawFormula -> FormulaSpec -> Bool
 -- formulaMatchesSpec (FreshVar{}) _ = False
 formulaMatchesSpec f@(Pred p ts) fs@(FPred p' ts')
   | p == p' && length ts == length ts' = termMatchesSpec (zip ts ts')
-formulaMatchesSpec f@(Pred p [t1, t2]) fs@(FInfixPredicate p' t1' t2')
+formulaMatchesSpec f@(Pred p [t1, t2]) fs@(FInfixPred p' t1' t2')
   | p == p' = termMatchesSpec [(t1, t1')] && termMatchesSpec [(t2, t2')]
 formulaMatchesSpec (Opr op fs) (FOpr op' fs')
   | op == op' = all (uncurry formulaMatchesSpec) (zip fs fs')
