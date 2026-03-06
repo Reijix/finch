@@ -53,7 +53,10 @@ pIncompleteProof :: (Parser m) => m Proof
 pIncompleteProof = do
   chunk "\28\29"
   fs <- manyTill pIncompleteAssumption (chunk "\29")
-  ps <- manyTill (try (Right <$> pIncompleteProof) <|> (Left <$> pIncompleteDerivation)) (chunk "\29")
+  ps <-
+    manyTill
+      (try (Right <$> pIncompleteProof) <|> (Left <$> pIncompleteDerivation))
+      (chunk "\29")
   c <- pIncompleteDerivation
   chunk "\29\28"
   pure $ SubProof fs ps c

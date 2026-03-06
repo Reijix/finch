@@ -52,7 +52,11 @@ pReference = proofReference <|> lineReference
   lineReference = LineReference <$> pLine <?> "line number"
 
 pRule :: (Parser m) => m RuleApplication
-pRule = liftA2 RuleApplication (parens (try pSymbolicName <|> pure "")) (lexeme pReference `sepBy` comma)
+pRule =
+  liftA2
+    RuleApplication
+    (parens (try pSymbolicName <|> pure ""))
+    (lexeme pReference `sepBy` comma)
 
 parseRuleApplication :: Int -> Text -> Either Text RuleApplication
 parseRuleApplication lineNo input = case runParser' (pRule <* eof) initialParserState of
@@ -67,7 +71,8 @@ parseRuleApplication lineNo input = case runParser' (pRule <* eof) initialParser
           PosState
             { pstateInput = input
             , pstateOffset = 0
-            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
+            , pstateSourcePos =
+                SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
             , pstateTabWidth = defaultTabWidth
             , pstateLinePrefix = ""
             }

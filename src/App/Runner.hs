@@ -81,7 +81,11 @@ import Miso.Html.Property qualified as HP
 import Miso.Lens (Lens, use, (%=), (.=), (<~), (^.))
 import Miso.Subscription.Util (createSub)
 import Miso.Svg (text_)
-import Parser.Formula (FormulaParserState (FormulaParserState), parseAssumption, parseFormula)
+import Parser.Formula (
+  FormulaParserState (FormulaParserState),
+  parseAssumption,
+  parseFormula,
+ )
 import Parser.Proof (parseProof)
 import Parser.Rule (parseRuleApplication)
 import Relude.Extra.Map (insert, member, (!?))
@@ -450,7 +454,8 @@ instance FromText RawFormula where
 
 instance FromText RawAssumption where
   fromText :: Model -> Int -> Text -> Either Text RawAssumption
-  fromText m = parseAssumption (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
+  fromText m =
+    parseAssumption (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication

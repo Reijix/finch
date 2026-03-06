@@ -51,7 +51,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       spec <- checkExistence rules
       (conclusion, conclusionSpec) <- checkConclusion spec formula
       formulaSpecs <- unifyReferences 0 spec refs
-      termMap <- verifyTerms (collectTermsFormula (Right (conclusion, conclusionSpec) : formulaSpecs))
+      termMap <-
+        verifyTerms (collectTermsFormula (Right (conclusion, conclusionSpec) : formulaSpecs))
       formMap <- verifyFormulae termMap (Right (conclusion, conclusionSpec) : formulaSpecs)
       pass
    where
@@ -103,7 +104,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 <> ".\nBut expected a formula of the form "
                 <> prettyPrint fSpec
                 <> "."
-    handleAssumption :: Int -> Assumption -> AssumptionSpec -> Either Text (RawAssumption, AssumptionSpec)
+    handleAssumption ::
+      Int -> Assumption -> AssumptionSpec -> Either Text (RawAssumption, AssumptionSpec)
     handleAssumption line (a, _) aSpec = case a of
       Unparsed{} -> Left $ "Unparsed assumption at line " <> show line
       (ParsedInvalid txt err ra) -> handleRawAssumption ra
@@ -122,7 +124,11 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 <> ".\nBut expected a formula of the form "
                 <> prettyPrint aSpec
                 <> "."
-    unifyReferences :: Int -> RuleSpec -> [Reference] -> Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
+    unifyReferences ::
+      Int ->
+      RuleSpec ->
+      [Reference] ->
+      Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
     unifyReferences n (RuleSpec (fSpec : fSpecs) pSpecs cSpec) (LineReference refLine : refs) = do
       f <- lookupLineReference refLine p
       f' <- case f of
@@ -136,7 +142,11 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       fs' <- unifyReferences (n + 1) (RuleSpec [] pSpecs cSpec) refs
       pure (fs <> fs')
      where
-      handleProof :: (Int, Int) -> Proof -> ProofSpec -> Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
+      handleProof ::
+        (Int, Int) ->
+        Proof ->
+        ProofSpec ->
+        Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
       handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
         | length fs /= length fSpecs =
             Left
@@ -216,7 +226,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         (collectTermsTerm rest)
     collectTermsTerm (_ : rest) = collectTermsTerm rest
 
-    collectTermsFormula :: [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name [Term]
+    collectTermsFormula ::
+      [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name [Term]
     collectTermsFormula (Right (Pred _ [p1, p2], FInfixPredicate _ q1 q2) : rest) =
       M.unionWith
         (<>)
@@ -274,13 +285,18 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     ---------------------------------------------------
     -- 6. Collect formula mappings using backward substitution
-    verifyFormulae :: Map Name Term -> [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Either Text (Map Name RawFormula)
+    verifyFormulae ::
+      Map Name Term ->
+      [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] ->
+      Either Text (Map Name RawFormula)
     verifyFormulae termMap formsAndSpecs = do
       formMap <- reduceFormulae $ M.map (Left <$>) $ collectSimpleFormulae formsAndSpecs
       formMap' <- collectMoreFormulae formMap formsAndSpecs
       reduceFormulae (fmap toList <<$>> formMap')
      where
-      collectSimpleFormulae :: [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] -> Map Name (NonEmpty RawFormula)
+      collectSimpleFormulae ::
+        [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] ->
+        Map Name (NonEmpty RawFormula)
       collectSimpleFormulae [] = mempty
       collectSimpleFormulae (Right (Pred{}, (FPred{}; FInfixPredicate{})) : rest) =
         collectSimpleFormulae rest
@@ -304,7 +320,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         Either Text (Map Name RawFormula)
       reduceFormulae = M.traverseWithKey reduceHelper
        where
-        reduceHelper :: Name -> NonEmpty (Either RawFormula [RawFormula]) -> Either Text RawFormula
+        reduceHelper ::
+          Name -> NonEmpty (Either RawFormula [RawFormula]) -> Either Text RawFormula
         reduceHelper n (Left f :| rest) = go n f rest
         reduceHelper n (Right [] :| rest) = Left "Could not find match for formula."
         reduceHelper n (Right [f] :| rest) = case go n f rest of
@@ -319,7 +336,9 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           if f == f'
             then
               go n f' rest
-            else Left $ "Error, formulae:\n" <> prettyPrint f <> "\n" <> prettyPrint f' <> "\nDo not match."
+            else
+              Left $
+                "Error, formulae:\n" <> prettyPrint f <> "\n" <> prettyPrint f' <> "\nDo not match."
         go n f (Right fs' : rest) = mapFs fs'
          where
           mapFs :: [RawFormula] -> Either Text RawFormula
@@ -340,10 +359,20 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 Just (Var x') -> x'
                 _ -> "_" <> x
            in case unifyFormulaeOnVariable x' [(phiF, f)] of
-                Nothing -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f <> "\non variable " <> x' <> "."
+                Nothing ->
+                  Left $
+                    "Error unifying "
+                      <> prettyPrint phiF
+                      <> " with\n"
+                      <> prettyPrint f
+                      <> "\non variable "
+                      <> x'
+                      <> "."
                 -- compare assignment of E
                 Just mgu -> case (mgu !? x', termMap !? t) of
-                  _ | size mgu > 1 -> Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
+                  _
+                    | size mgu > 1 ->
+                        Left $ "Error unifying " <> prettyPrint phiF <> " with\n" <> prettyPrint f
                   ((Nothing, _); (_, Nothing)) ->
                     insertWith
                       (<>)
@@ -363,8 +392,9 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                             <> prettyPrint e'
         Nothing -> case termMap !? t of
           -- TODO better error message
-          Nothing -> Left $ "Term has wrong form, can't find " <> t <> " in termMap=\n" <> prettyPrint termMap -- error
-          -- backwards
+          Nothing ->
+            Left $ "Term has wrong form, can't find " <> t <> " in termMap=\n" <> prettyPrint termMap -- error
+            -- backwards
           Just t' ->
             let x' = case termMap !? x of
                   Just (Var x') -> x'
@@ -403,7 +433,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     ---------------------------------------------------
 
     -- helpers
-    refIsVisible :: (Int, NodeAddr) -> Either (Int, NodeAddr) ((Int, Int), ProofAddr) -> Maybe Text
+    refIsVisible ::
+      (Int, NodeAddr) -> Either (Int, NodeAddr) ((Int, Int), ProofAddr) -> Maybe Text
     refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr))
       | ruleLine <= refLine =
           Just $
@@ -427,7 +458,10 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     refIsVisible (ruleLine, NAProof n na1) (Right ((start, end), PANested m pa2))
       | n == m = refIsVisible (ruleLine, na1) (Right ((start, end), pa2))
     refIsVisible _ (Left (line, NAProof _ _)) =
-      Just $ "Line " <> show line <> " cannot be referenced because it is located inside of a subproof."
+      Just $
+        "Line "
+          <> show line
+          <> " cannot be referenced because it is located inside of a subproof."
     refIsVisible (ruleLine, ruleAddr) (Right ((start, end), naContainedIn ruleAddr -> True)) =
       Just $
         "Line range "

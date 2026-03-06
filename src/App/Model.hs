@@ -209,7 +209,10 @@ checkFreshness = do
             )
             ra
   goRawAssumption _ _ txt ra = ParsedValid txt ra
-  isFreshList :: Name -> [(NodeAddr, Either Assumption Derivation)] -> Maybe (NodeAddr, Either RawAssumption RawFormula)
+  isFreshList ::
+    Name ->
+    [(NodeAddr, Either Assumption Derivation)] ->
+    Maybe (NodeAddr, Either RawAssumption RawFormula)
   isFreshList v [] = Nothing
   isFreshList v ((na, Left (fromWrapper -> Nothing, _)) : rest) = isFreshList v rest
   isFreshList v ((na, Left (fromWrapper -> Just a, _)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)

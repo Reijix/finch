@@ -335,7 +335,8 @@ instance PrettyPrint Proof where
         <> T.concat psShow
         <> cShow
      where
-      (line', fsShow) = mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
+      (line', fsShow) =
+        mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
       (line'', psShow) =
         mapAccumL
           ( \ln' e ->
@@ -410,7 +411,11 @@ pSerializeLinesWithAddr = go id
   go getNA af df (SubProof fs ps d) = mappedFs ++ concat mappedPs ++ [df (getNA NAConclusion) d]
    where
     (_, mappedFs) = mapAccumL (\m frm -> (m + 1, af (getNA $ NAAssumption m) frm)) 0 fs
-    (_, mappedPs) = mapAccumL (\m e -> (m + 1, either (one . df (getNA (NALine m))) (go (getNA . NAProof m) af df) e)) 0 ps
+    (_, mappedPs) =
+      mapAccumL
+        (\m e -> (m + 1, either (one . df (getNA (NALine m))) (go (getNA . NAProof m) af df) e))
+        0
+        ps
 
 -- | `pMapLines` @af@ @df@ @p@ maps each line of the proof @p@ using functions @af@ and @df@.
 pMapLines ::
@@ -429,7 +434,11 @@ pMapLinesAccumL ::
 pMapLinesAccumL af df s (SubProof fs ps d) =
   let
     (s', fs') = mapAccumL af s fs
-    (s'', ps') = mapAccumL (\a e -> either (second Left . df a) (second Right . pMapLinesAccumL af df a) e) s' ps
+    (s'', ps') =
+      mapAccumL
+        (\a e -> either (second Left . df a) (second Right . pMapLinesAccumL af df a) e)
+        s'
+        ps
     (s''', d') = df s'' d
    in
     (s''', SubProof fs' ps' d')
@@ -462,7 +471,13 @@ pMapLinesWithAddr = go id
   go getNA af df (SubProof fs ps d) = SubProof fs' ps' d'
    where
     (_, fs') = mapAccumL (\m frm -> (m + 1, af (getNA (NAAssumption m)) frm)) 0 fs
-    (_, ps') = mapAccumL (\m e -> (m + 1, either (Left . df (getNA (NALine m))) (Right . go (getNA . NAProof m) af df) e)) 0 ps
+    (_, ps') =
+      mapAccumL
+        ( \m e ->
+            (m + 1, either (Left . df (getNA (NALine m))) (Right . go (getNA . NAProof m) af df) e)
+        )
+        0
+        ps
     d' = df (getNA NAConclusion) d
 
 -- | Like `pMapLines` but lifted to monadic results.
@@ -673,7 +688,8 @@ fromLineRange start end p = join $ go start end 0 p
     unifyNAs _ _ _ = Nothing
   go start end n (SubProof fs (Left d : ps) c) = go (start - 1) (end - 1) (n + 1) (SubProof fs ps c)
   go start end n (SubProof fs (Right p : ps) c)
-    | pLength p + length fs < start = go (start - pLength p) (end - pLength p) (n + 1) (SubProof fs ps c)
+    | pLength p + length fs < start =
+        go (start - pLength p) (end - pLength p) (n + 1) (SubProof fs ps c)
     | otherwise = case go (start - length fs) (end - length fs) 0 p of
         Nothing -> Nothing
         Just Nothing -> Just $ Just $ PAProof n
@@ -693,9 +709,14 @@ fromNodeAddr = go 1
   go 1 (NALine 0) (SubProof [] [] _) = Just 1
   go n (NALine m) (SubProof fs ps _)
     | holdsAt isLeft ps m =
-        pure $ length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)
+        pure $
+          length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)
   go n NAConclusion (SubProof fs ps _) = pure $ length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 ps
-  go n (NAProof m na) (SubProof fs ps@((!!? m) -> Just (Right p)) _) = go (length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)) na p
+  go n (NAProof m na) (SubProof fs ps@((!!? m) -> Just (Right p)) _) =
+    go
+      (length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps))
+      na
+      p
   go _ _ _ = Nothing
 
 lineNoOr999 :: NodeAddr -> Proof -> Int
@@ -862,7 +883,8 @@ naAffectsFreshness (NAAssumption n) (NAAssumption m) = m < n
 naAffectsFreshness (NAAssumption _) (NALine{}; NAConclusion) = False
 naAffectsFreshness _ _ = False
 
-pCollectFreshnessNodes :: NodeAddr -> Proof -> Either Text [(NodeAddr, Either Assumption Derivation)]
+pCollectFreshnessNodes ::
+  NodeAddr -> Proof -> Either Text [(NodeAddr, Either Assumption Derivation)]
 pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $
   filter (naAffectsFreshness na) (pCollectAllNodeAddrs p) of
   Nothing -> Left "Internal error on pCollectFreshnessNodes, should not happen!"
@@ -871,7 +893,8 @@ pCollectFreshnessNodes na p = case mapM (\na -> (na,) <$> naLookup na p) $
 -- * Updating proof contents
 
 -- | `naUpdateFormula` @f@ @addr@ @proof@ replaces the formula at @addr@ in @proof@ using @f@.
-naUpdateFormula :: Either (Assumption -> Assumption) (Formula -> Formula) -> NodeAddr -> Proof -> Maybe Proof
+naUpdateFormula ::
+  Either (Assumption -> Assumption) (Formula -> Formula) -> NodeAddr -> Proof -> Maybe Proof
 naUpdateFormula (Left f) (NAAssumption n) (SubProof fs ps l) =
   liftA3
     SubProof
@@ -908,7 +931,8 @@ naUpdateFormula _ _ _ = Nothing
 
 Fails silently
 -}
-naUpdateRule :: (Wrapper RuleApplication -> Wrapper RuleApplication) -> NodeAddr -> Proof -> Maybe Proof
+naUpdateRule ::
+  (Wrapper RuleApplication -> Wrapper RuleApplication) -> NodeAddr -> Proof -> Maybe Proof
 naUpdateRule f (NALine n) (SubProof fs ps l) =
   liftA3
     SubProof
@@ -1026,10 +1050,14 @@ naInsertBeforeRaw ::
 naInsertBeforeRaw (Left a) (NAAssumption n) (SubProof fs ps c) =
   fmap (NAAssumption n,) (liftA3 SubProof (insertAt a n fs) (pure ps) (pure c))
 naInsertBeforeRaw (Right d) (NAAssumption n) (SubProof fs ps c) =
-  fmap (NAAssumption n,) (liftA3 SubProof (insertAt (toAssumption d) n fs) (pure ps) (pure c))
+  fmap
+    (NAAssumption n,)
+    (liftA3 SubProof (insertAt (toAssumption d) n fs) (pure ps) (pure c))
 -- Inserting before NALine
 naInsertBeforeRaw (Left a) (NALine n) (SubProof fs ps c) =
-  fmap (NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left $ toDerivation a) n ps) (pure c))
+  fmap
+    (NALine n,)
+    (liftA3 SubProof (pure fs) (insertAt (Left $ toDerivation a) n ps) (pure c))
 naInsertBeforeRaw (Right d) (NALine n) (SubProof fs ps c) =
   fmap (NALine n,) (liftA3 SubProof (pure fs) (insertAt (Left d) n ps) (pure c))
 -- Inserting before NAConclusion
@@ -1048,7 +1076,12 @@ naInsertBeforeRaw e (NAProof n na) (SubProof fs ps@((!!? n) -> Just (Right p)) c
     >>= \(addr, p') ->
       fmap
         (NAProof n addr,)
-        (liftA3 SubProof (pure fs) (updateAtM n (either (const Nothing) (const . pure $ Right p')) ps) (pure c))
+        ( liftA3
+            SubProof
+            (pure fs)
+            (updateAtM n (either (const Nothing) (const . pure $ Right p')) ps)
+            (pure c)
+        )
 naInsertBeforeRaw _ _ _ = Nothing
 
 naInsertBefore ::
@@ -1268,7 +1301,12 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
   go :: ProofAddr -> Proof -> Maybe Proof
   go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
     (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
-    _ -> error $ "lineRangeFromProofAddr targetAddr' p'=" <> show (lineRangeFromProofAddr targetAddr' p') <> "\ntargetAddr'=" <> show targetAddr'
+    _ ->
+      error $
+        "lineRangeFromProofAddr targetAddr' p'="
+          <> show (lineRangeFromProofAddr targetAddr' p')
+          <> "\ntargetAddr'="
+          <> show targetAddr'
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)
@@ -1282,7 +1320,8 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
     Nothing -> ProofReference start end
     Just pa
       | start == sourceStart && end == sourceEnd -> ProofReference targetStart targetEnd
-      | paContainedIn pa sourceAddr -> ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
+      | paContainedIn pa sourceAddr ->
+          ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
       | paContainedIn sourceAddr pa && not (paContainedIn targetAddr pa) ->
           case compare targetAddr pa of
             LT; EQ -> ProofReference (start + proofLen) end

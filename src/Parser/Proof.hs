@@ -12,7 +12,13 @@ import Fitch.Proof (
   Wrapper (ParsedValid),
   mkAssumption,
  )
-import Parser.Formula (FormulaParser, FormulaParserState (..), pFreshVariable, pRawAssumption, pRawFormula)
+import Parser.Formula (
+  FormulaParser,
+  FormulaParserState (..),
+  pFreshVariable,
+  pRawAssumption,
+  pRawFormula,
+ )
 import Parser.Rule (pRule)
 import Parser.Util (Parser, lexeme, symbol)
 import Text.Megaparsec (
@@ -60,14 +66,16 @@ pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
   do
     fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
-    proofs <- some1 . try $ lexeme (eitherP (try $ withIndent ind pDerivation) (pProof (ind + 1)))
+    proofs <-
+      some1 . try $ lexeme (eitherP (try $ withIndent ind pDerivation) (pProof (ind + 1)))
 
     case last proofs of
       Left d -> pure $ SubProof fs (init proofs) d
       Right p -> unexpected (Label $ fromList "subproof")
     <?> "subproof"
 
-parseLine :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
+parseLine ::
+  [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
 parseLine operators infixPreds quantifiers input = case evalState
   (runParserT' (pDerivation <* eof) initialParserState)
   initialState of
@@ -95,7 +103,8 @@ parseLine operators infixPreds quantifiers input = case evalState
       , quantifiers
       }
 
-parseProof :: [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
+parseProof ::
+  [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
 parseProof operators infixPreds quantifiers input =
   case evalState
     (runParserT' (pProof 1 <* eof) initialParserState)

@@ -51,7 +51,9 @@ pFreshVariable :: (FormulaParser m) => m RawAssumption
 pFreshVariable = lexeme $ FreshVar <$> brackets pLowerName
 
 pPredicate :: (FormulaParser m) => m RawFormula
-pPredicate = lexeme (liftA2 Pred pUpperName (parens (pTerm `sepBy` comma) <|> pure []) <?> "predicate symbol")
+pPredicate =
+  lexeme
+    (liftA2 Pred pUpperName (parens (pTerm `sepBy` comma) <|> pure []) <?> "predicate symbol")
 
 pPropAtom :: (FormulaParser m) => m RawFormula
 pPropAtom = lexeme $ (`Pred` []) <$> pUpperName
@@ -64,11 +66,18 @@ pQuantifierName = do
 pConstant :: (FormulaParser m) => m RawFormula
 pConstant = do
   ops <- gets operators
-  op <- foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
+  op <-
+    foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
   lexeme . pure $ Opr op []
 
 pQuantifier :: (FormulaParser m) => m RawFormula
-pQuantifier = lexeme $ liftA3 Quantifier (lexeme pQuantifierName) (lexeme (pLowerName <?> "variable")) (lexeme (symbol ".") >> lexeme pRawFormula)
+pQuantifier =
+  lexeme $
+    liftA3
+      Quantifier
+      (lexeme pQuantifierName)
+      (lexeme (pLowerName <?> "variable"))
+      (lexeme (symbol ".") >> lexeme pRawFormula)
 
 pInfixPredName :: (FormulaParser m) => m Name
 pInfixPredName = do
@@ -83,14 +92,26 @@ pInfixPred = do
   pure $ Pred op [t1, t2]
 
 pFormulaAtomic :: (FormulaParser m) => m RawFormula
-pFormulaAtomic = (pQuantifier <|> try pInfixPred <|> parens pRawFormula <|> pConstant <|> pPredicate) <?> "formula"
+pFormulaAtomic =
+  (pQuantifier <|> try pInfixPred <|> parens pRawFormula <|> pConstant <|> pPredicate)
+    <?> "formula"
 
 pRawFormula :: (FormulaParser m) => m RawFormula
 pRawFormula = do
   ops <- gets operators
   let operatorTable =
-        [ concatMap (\(alias, u, arity) -> if arity == 1 then [prefix alias (\f -> Opr u [f]), prefix u (\f -> Opr u [f])] else []) ops
-        , concatMap (\(alias, b, arity) -> if arity == 2 then [binary alias (\f1 f2 -> Opr b [f1, f2]), binary b (\f1 f2 -> Opr b [f1, f2])] else []) ops
+        [ concatMap
+            ( \(alias, u, arity) ->
+                if arity == 1 then [prefix alias (\f -> Opr u [f]), prefix u (\f -> Opr u [f])] else []
+            )
+            ops
+        , concatMap
+            ( \(alias, b, arity) ->
+                if arity == 2
+                  then [binary alias (\f1 f2 -> Opr b [f1, f2]), binary b (\f1 f2 -> Opr b [f1, f2])]
+                  else []
+            )
+            ops
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
@@ -106,7 +127,8 @@ initialParserState lineNo input =
         PosState
           { pstateInput = input
           , pstateOffset = 0
-          , pstateSourcePos = SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
+          , pstateSourcePos =
+              SourcePos{sourceName = "", sourceLine = mkPos lineNo, sourceColumn = pos1}
           , pstateTabWidth = defaultTabWidth
           , pstateLinePrefix = ""
           }
