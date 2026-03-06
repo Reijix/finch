@@ -121,10 +121,11 @@ runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rul
 
   p' <- case proofFromURI uri of
     Nothing ->
-      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
+      consoleLog "did not find proof in uri!"
+        >> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
         >> pure initialP
-    Just p -> pure p
-  let m = initialModel emptyP initialP examplePs operators infixPreds quantifiers rules
+    Just p -> consoleLog (ms $ "found Proof in URI:\n" <> prettyPrint p) >> pure p
+  let m = initialModel emptyP p' examplePs operators infixPreds quantifiers rules
   startApp
     ( dragEvents
         <> fromList [("dblclick", BUBBLE)]

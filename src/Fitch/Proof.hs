@@ -1099,11 +1099,11 @@ naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
     | lineNo > line = LineReference line
     | lineNo <= line = LineReference $ line + 1
   goRef p na lineNo (ProofReference start end) = case fromLineRange start end p of
-    Nothing -> ProofReference start end
     Just pa
       | lineNo > end -> ProofReference start end
       | naContainedIn na pa -> ProofReference start (end + 1)
       | lineNo <= start -> ProofReference (start + 1) (end + 1)
+    _ -> ProofReference start end
 
 paInsertBeforeRaw ::
   Proof ->
@@ -1135,11 +1135,11 @@ paInsertBefore p pa prf = case paInsertBeforeRaw p pa prf of
     | lineNo > line = LineReference line
     | lineNo <= line = LineReference $ line + offset
   goRef p pa offset lineNo (ProofReference start end) = case fromLineRange start end p of
-    Nothing -> ProofReference start end
     Just pa'
       | lineNo > end -> ProofReference start end
       | paContainedIn pa pa' -> ProofReference start (end + offset)
       | lineNo <= start -> ProofReference (start + offset) (end + offset)
+    _ -> ProofReference start end
 
 {- | `naMoveBefore` @target@ @source@ @p@ moves the line at the source address
 before the target line.
