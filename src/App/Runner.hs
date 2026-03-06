@@ -256,13 +256,8 @@ setFocus ea = do
   focusedLine .= Just ea
   p <- use proof
   case ea of
-    Left na -> selectFocus (mkFormulaInputId na p)
-    Right na -> selectFocus (mkRuleInputId na p)
- where
-  selectFocus :: MisoString -> Effect ROOT Model Action
-  selectFocus str = do
-    io_ $ focus str
-    io_ $ select str
+    Left na -> io_ $ focus (mkFormulaInputId na p)
+    Right na -> io_ $ focus (mkRuleInputId na p)
 
 showPopover :: MisoString -> IO ()
 showPopover name = void $ getElementById name >>= \ref -> ref # "showPopover" $ ()

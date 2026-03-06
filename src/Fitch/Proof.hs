@@ -1157,9 +1157,9 @@ naMoveBeforeRaw targetAddr sourceAddr p =
       -- we might need to decrement `e` by one, if sourceAddr is in the same proof.
       let
         naDecrementWhenOnSameLevel :: NodeAddr -> NodeAddr -> NodeAddr
-        naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} = NAAssumption (n - 1)
-        naDecrementWhenOnSameLevel (NALine n) NALine{} = NALine (n - 1)
-        naDecrementWhenOnSameLevel (NAProof n na) NALine{} = NAProof (n - 1) na
+        naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} | n > 0 = NAAssumption (n - 1)
+        naDecrementWhenOnSameLevel (NALine n) NALine{} | n > 0 = NALine (n - 1)
+        naDecrementWhenOnSameLevel (NAProof n na) NALine{} | n > 0 = NAProof (n - 1) na
         naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
         naDecrementWhenOnSameLevel na _ = na
       pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
@@ -1183,17 +1183,16 @@ naMoveBefore targetAddr sourceAddr p =
   go targetAddr' p' =
     case (fromNodeAddr targetAddr' p', fromNodeAddr sourceAddr p) of
       (Just target, Just source) -> pure $ pMapRefs (pure . goRef target source) p'
-      _ ->
-        -- Nothing
-        error $
-          "targetAddr'="
-            <> show targetAddr'
-            <> "\nsourceAddr="
-            <> show sourceAddr
-            <> "\np=\n"
-            <> prettyPrint p
-            <> "\np'=\n"
-            <> prettyPrint p'
+      _ -> Nothing
+  -- error $
+  --   "targetAddr'="
+  --     <> show targetAddr'
+  --     <> "\nsourceAddr="
+  --     <> show sourceAddr
+  --     <> "\np=\n"
+  --     <> prettyPrint p
+  --     <> "\np'=\n"
+  --     <> prettyPrint p'
   goRef :: Int -> Int -> Reference -> Reference
   goRef target source (LineReference line)
     | line == source = LineReference target
@@ -1283,8 +1282,8 @@ paMoveBeforeRaw targetAddr sourceAddr p = case (compare targetAddr sourceAddr, p
     p'' <- paRemoveRaw sourceAddr p'
     let
       paDecrementWhenOnSameLevel :: ProofAddr -> ProofAddr -> ProofAddr
-      paDecrementWhenOnSameLevel (PAProof n) PAProof{} = PAProof (n - 1)
-      paDecrementWhenOnSameLevel (PANested n pa) PAProof{} = PANested (n - 1) pa
+      paDecrementWhenOnSameLevel (PAProof n) PAProof{} | n > 0 = PAProof (n - 1)
+      paDecrementWhenOnSameLevel (PANested n pa) PAProof{} | n > 0 = PANested (n - 1) pa
       paDecrementWhenOnSameLevel (PANested n pa1) (PANested m pa2) | n == m = PANested n $ paDecrementWhenOnSameLevel pa1 pa2
       paDecrementWhenOnSameLevel na _ = na
     pure (paDecrementWhenOnSameLevel pa sourceAddr, p'')
@@ -1301,12 +1300,12 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
   go :: ProofAddr -> Proof -> Maybe Proof
   go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
     (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
-    _ ->
-      error $
-        "lineRangeFromProofAddr targetAddr' p'="
-          <> show (lineRangeFromProofAddr targetAddr' p')
-          <> "\ntargetAddr'="
-          <> show targetAddr'
+    _ -> Nothing
+  -- error $
+  --   "lineRangeFromProofAddr targetAddr' p'="
+  --     <> show (lineRangeFromProofAddr targetAddr' p')
+  --     <> "\ntargetAddr'="
+  --     <> show targetAddr'
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)

@@ -8,8 +8,8 @@ import Fitch.Proof (
 
 operatorsProp :: [(Text, Text, Int)]
 operatorsProp =
-  [ ("top", "⊥", 0)
-  , ("bot", "⊤", 0)
+  [ ("bot", "⊥", 0)
+  , ("top", "⊤", 0)
   , ("~", "¬", 1)
   , ("/\\", "∧", 2)
   , ("\\/", "∨", 2)
@@ -29,7 +29,10 @@ rulesProp =
   , ("R", RuleSpec [phi] [] phi)
   , ("∨I1", RuleSpec [phi] [] (phi ∨ psi))
   , ("∨I2", RuleSpec [psi] [] (phi ∨ psi))
-  , ("∨E", RuleSpec [phi ∨ psi] [([AssumptionSpec phi], chi), ([AssumptionSpec psi], chi)] chi)
+  ,
+    ( "∨E"
+    , RuleSpec [phi ∨ psi] [([AssumptionSpec phi], chi), ([AssumptionSpec psi], chi)] chi
+    )
   , ("⊤I", RuleSpec [] [] (FOpr "⊤" []))
   , ("⊥E", RuleSpec [FOpr "⊥" []] [] phi)
   ]

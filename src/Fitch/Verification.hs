@@ -482,7 +482,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     lookupProofReference :: Int -> Int -> Proof -> Either Text Proof
     lookupProofReference start end p = case (pIndexProof start end p, fromLineRange start end p, fromLineNo ruleLine p) of
-      (_, _, Nothing) -> error "Should not happen!"
+      (_, _, Nothing) -> Left "Internal error on lookupProofReference: Should not happen!"
       ((Nothing, _, _); (_, Nothing, _)) ->
         Left $
           "Line range "
