@@ -258,7 +258,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     verifyTerms m = fromList <$> mapM makeUnique (toPairs m)
      where
       makeUnique :: (Name, [Term]) -> Either Text (Name, Term)
-      makeUnique (_, []) = Left "INTERNAL ERROR, makeUnique got empty list of Terms!"
+      makeUnique (_, []) = Left "Internal error on makeUnique: should not happen!"
       makeUnique (v, t : ts) = do
         foldlM
           ( \lastTerm currTerm ->
@@ -424,7 +424,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       -- Thus @v@ here will be something like '_x' that does not occur naturally, i.e. not in Subst!
       substBackwardsForm s@(Subst x t) (Quantifier q v f) =
         fmap (Quantifier q v) (substBackwardsForm s f)
-      substBackwardsForm _ f = error "tried substBackwardsForm on FreshVar"
+      substBackwardsForm _ f = error "Internal error on substBackwardsForm: should not happen!"
       substBackwardsTerm :: Subst Term -> Term -> NonEmpty Term
       substBackwardsTerm s@(Subst n e) t | t == e = [Var n, t]
       substBackwardsTerm s (Var x) = one $ Var x
@@ -482,7 +482,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     lookupProofReference :: Int -> Int -> Proof -> Either Text Proof
     lookupProofReference start end p = case (pIndexProof start end p, fromLineRange start end p, fromLineNo ruleLine p) of
-      (_, _, Nothing) -> Left "Internal error on lookupProofReference: Should not happen!"
+      (_, _, Nothing) -> Left "Internal error on lookupProofReference: should not happen!"
       ((Nothing, _, _); (_, Nothing, _)) ->
         Left $
           "Line range "
@@ -494,13 +494,20 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
             <> " should mark the start of a subproof and line "
             <> show end
             <> " should be its conclusion."
+      -- <> "\nDEBUG:\n"
+      -- <> "pIndexProof start end p=\n"
+      -- <> prettyPrint (pIndexProof start end p)
+      -- <> "\nfromLineRange start end p=\n"
+      -- <> show (fromLineRange start end p)
+      -- <> "\np=\n"
+      -- <> prettyPrint p
       (Just prf, Just refAddr, Just ruleAddr) -> case refIsVisible (ruleLine, ruleAddr) (Right ((start, end), refAddr)) of
         Nothing -> Right prf
         Just err -> Left err
 
     lookupLineReference :: Int -> Proof -> Either Text (Either Assumption Formula)
     lookupLineReference refLine p = case (pIndex refLine p, fromLineNo refLine p, fromLineNo ruleLine p) of
-      (_, _, Nothing) -> error "Should not happen!"
+      (_, _, Nothing) -> Left "Internal error on lookupLineReference: should not happen!"
       ((Nothing, _, _); (_, Nothing, _)) ->
         Left $
           "Can not reference line "

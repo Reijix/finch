@@ -667,9 +667,10 @@ fromLineRange start end p = join $ go start end 0 p
  where
   go :: Int -> Int -> Int -> Proof -> Maybe (Maybe ProofAddr)
   go start end _ _ | start < 1 || end < start = Nothing
-  go 1 end n p = do
+  go 1 end currentOffset p = do
     first <- fromLineNo 1 p
     last <- fromLineNo end p
+    -- error $ "first=" <> show first <> "\nlast=" <> show last <> "\np=\n" <> prettyPrint p
     unifyNAs first last p
    where
     unifyNAs :: NodeAddr -> NodeAddr -> Proof -> Maybe (Maybe ProofAddr)
@@ -683,7 +684,7 @@ fromLineRange start end p = join $ go start end 0 p
       isFirstLineIn _ _ = False
     unifyNAs (NAProof n na1) (NAProof m na2) (SubProof _ ((!!? n) -> Just (Right p)) _) | n == m = case unifyNAs na1 na2 p of
       Nothing -> Nothing
-      Just Nothing -> Just $ Just $ PAProof n
+      Just Nothing -> Just $ Just $ PAProof currentOffset
       Just (Just pa) -> Just $ Just $ PANested n pa
     unifyNAs _ _ _ = Nothing
   go start end n (SubProof fs (Left d : ps) c) = go (start - 1) (end - 1) (n + 1) (SubProof fs ps c)

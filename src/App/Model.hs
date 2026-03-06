@@ -193,7 +193,7 @@ checkFreshness = do
   goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
   -- TODO refactor pCollectFreshnessNodes, it does not need to throw errors!!
   goRawAssumption p na txt ra@(FreshVar v) = case pCollectFreshnessNodes na p of
-    Left err -> error "pCollectFreshnessNodes failed"
+    Left err -> error "Internal error on pCollectFreshnessNodes: should not happen!"
     Right nodes ->
       case isFreshList v nodes of
         Nothing -> ParsedValid txt ra

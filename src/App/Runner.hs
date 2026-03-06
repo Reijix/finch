@@ -38,7 +38,6 @@ import Miso (
   callFunction,
   castJSVal,
   component,
-  consoleLog,
   defaultEvents,
   defaultOptions,
   dispatchEvent,
@@ -121,10 +120,9 @@ runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rul
 
   p' <- case proofFromURI uri of
     Nothing ->
-      consoleLog "did not find proof in uri!"
-        >> replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
+      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
         >> pure initialP
-    Just p -> consoleLog (ms $ "found Proof in URI:\n" <> prettyPrint p) >> pure p
+    Just p -> pure p
   let m = initialModel emptyP p' examplePs operators infixPreds quantifiers rules
   startApp
     ( dragEvents
@@ -211,22 +209,22 @@ dropBeforeLine targetAddr = do
   use dragTarget >>= \case
     Nothing -> pass
     Just (Left na) -> do
-      io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
+      -- io_ $ consoleLog $ "Moving " <> show na <> " into " <> show targetAddr
       use proof >>= \p -> case naMoveBefore targetAddr na p of
         Nothing -> pass
         Just (ta, p) -> do
           proof %= const p
           naReparseLine ta
     Just (Right pa) -> do
-      io_ $ consoleLog $ "Moving " <> show pa <> " into " <> show targetAddr
-      use proof >>= \p -> io_ $ consoleLog $ "paFromNA=" <> show (paFromNA targetAddr p)
+      -- io_ $ consoleLog $ "Moving " <> show pa <> " into " <> show targetAddr
+      -- use proof >>= \p -> io_ $ consoleLog $ "paFromNA=" <> show (paFromNA targetAddr p)
       proof %=? \p -> do
         paTarget <- paFromNA targetAddr p
         snd <$> paMoveBefore paTarget pa p
   use spawnType >>= \case
     Nothing -> pass
     Just SpawnLine -> do
-      io_ $ consoleLog $ "Spawning in " <> show targetAddr
+      -- io_ $ consoleLog $ "Spawning in " <> show targetAddr
       use proof
         >>= \p ->
           case naInsertBefore
