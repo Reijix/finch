@@ -1,5 +1,5 @@
 cabal-version: 3.0
-name: fitch-editor
+name: finch
 version: 0.1.0.0
 synopsis: Editing fitch-style natural deduction proofs.
 description: A web application for editing fitch-style natural deduction proofs with builtin checker.
@@ -13,7 +13,7 @@ build-type: Simple
 
 source-repository head
   type: git
-  location: https://github.com/Reijix/fitch-editor.git
+  location: https://github.com/Reijix/finch.git
 
 common warnings
   ghc-options:
@@ -57,7 +57,7 @@ test-suite test
     base >=4.21.0 && <4.22,
     containers,
     directory,
-    fitch-editor-lib,
+    finch-lib,
     miso >=1.9 && <1.9.1,
     relude,
     tasty >=1.5.2 && <1.6,
@@ -66,12 +66,12 @@ test-suite test
     tasty-quickcheck >=0.11.1 && <0.12,
     text >=2.1.2 && <2.2,
 
-executable fitch-editor-FOL
+executable finch
   import:
-    javascript
+    javascript, warnings
 
   hs-source-dirs:
-    apps
+    .
 
   default-extensions:
     OverloadedStrings
@@ -79,7 +79,8 @@ executable fitch-editor-FOL
   build-depends:
     base >=4.21.0 && <5,
     containers >=0.7 && <0.9,
-    fitch-editor-lib,
+    finch-lib,
+    miso,
     relude,
     text >=2.1.2 && <2.2,
 
@@ -89,38 +90,16 @@ executable fitch-editor-FOL
     relude,
 
   main-is:
-    FOL.hs
+    Main.hs
 
   default-language:
     GHC2024
 
-executable fitch-editor-Prop
-  import:
-    javascript
-
-  hs-source-dirs:
-    apps
-
-  default-extensions:
-    OverloadedStrings
-
-  build-depends:
-    base >=4.21.0 && <5,
-    containers >=0.7 && <0.9,
-    fitch-editor-lib,
-    text >=2.1.2 && <2.2,
-
-  main-is:
-    Prop.hs
-
-  default-language:
-    GHC2024
-
-library fitch-editor-lib
+library finch-lib
   exposed-modules:
     App.Decoder
     App.Model
-    App.Runner
+    App.Update
     App.Views
     Fitch.Proof
     Fitch.Unification

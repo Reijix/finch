@@ -9,9 +9,9 @@ update:
 	cabal update $(CABAL_OPTIONS)
 
 build:
-	cabal build $(CABAL_OPTIONS) fitch-editor-FOL
+	cabal build $(CABAL_OPTIONS) finch
 	rm -rf public
-	cp -r $(shell cabal list-bin fitch-editor-FOL --verbose=0 $(CABAL_OPTIONS)).jsexe public
+	cp -r $(shell cabal list-bin finch --verbose=0 $(CABAL_OPTIONS)).jsexe public
 	cp static/* public
 
 serve1:

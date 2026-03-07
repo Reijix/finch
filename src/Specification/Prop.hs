@@ -1,10 +1,20 @@
-module Specification.Prop where
+module Specification.Prop (
+  operatorsProp,
+  rulesProp,
+  emptyProofProp,
+  exampleProofsProp,
+  initialModelProp,
+) where
 
+import App.Model (Model)
+import App.Update (initialModel)
 import Fitch.Proof (
   AssumptionSpec (..),
   FormulaSpec (FOpr, FPlaceholder),
+  Proof (..),
   RuleSpec (..),
  )
+import Parser.Proof
 
 operatorsProp :: [(Text, Text, Int)]
 operatorsProp =
@@ -46,3 +56,57 @@ rulesProp =
   f1 ∧ f2 = FOpr "∧" [f1, f2]
   f1 ∨ f2 = FOpr "∨" [f1, f2]
   f1 ↝ f2 = FOpr "→" [f1, f2]
+
+readProof :: Text -> Proof
+readProof proofText = case parseProof operatorsProp [] [] proofText of
+  Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
+  Right p -> p
+
+emptyProofProp :: Proof
+emptyProofProp =
+  readProof
+    """
+    |---
+    |⊤ (⊤I)
+    """
+
+exampleProofsProp :: [(Text, Proof)]
+exampleProofsProp =
+  [
+    ( "∧-Symmetry"
+    , readProof
+        """
+        |A ∧ B
+        |---
+        |B     (∧E2) 1
+        |A     (∧E1) 1
+        |B ∧ A (∧I) 2,3
+        """
+    )
+  ,
+    ( "→-Weakening"
+    , readProof
+        """
+        |A → B ∧ C
+        |---
+        ||A
+        ||---
+        ||B ∧ C (→E) 1,2
+        ||B     (∧E1) 3
+        |A → B  (→I) 2-4
+        """
+    )
+  ]
+
+initialModelProp :: Maybe Proof -> Model
+initialModelProp mp =
+  initialModel
+    emptyProofProp
+    (fromMaybe initialP mp)
+    exampleProofsProp
+    operatorsProp
+    []
+    []
+    rulesProp
+ where
+  (_, initialP) : _ = exampleProofsProp

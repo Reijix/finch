@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
-module App.Runner (
-  runApp,
+module App.Update (
   initialModel,
+  updateModel,
   checkProof,
   tryParse,
   Proof (..),
@@ -92,51 +92,6 @@ import Relude.Extra.Map (insert, member, (!?))
 -----------------------------------------------------------------------------
 
 -- * Application Loop
-
-{- | `runApp` @proof@ @unaryOperators@ @binaryOperators@ @quantifiers@
-
-Runs the fitch-editor app with a given initial @proof@,
-a list of unary operators, binary operators and quantifiers.
--}
-runApp ::
-  -- | Empty proof
-  Proof ->
-  -- | Directory containing exampleProofs
-  [(Text, Proof)] ->
-  -- | List of operators with aliases (alias, operator, arity)
-  [(Text, Text, Int)] ->
-  -- | List of quantifiers with aliases (alias, operator)
-  [(Text, Text)] ->
-  -- | List of infix predicates with aliases (alias, predicate)
-  [(Text, Text)] ->
-  -- | A map that contains all rules, mapping their names to their specification
-  Map Name RuleSpec ->
-  -- | Resulting program
-  IO ()
-runApp emptyP examplePs@((_, initialP) : _) operators infixPreds quantifiers rules = do
-  -- read in initial URI, possibly containing an initial proof.
-  uri <- getURI
-  window <- jsg "window"
-
-  p' <- case proofFromURI uri of
-    Nothing ->
-      replaceURI (replaceQueryString "proof" (ms $ encodeForUrl initialP) uri)
-        >> pure initialP
-    Just p -> pure p
-  let m = initialModel emptyP p' examplePs operators infixPreds quantifiers rules
-  startApp
-    ( dragEvents
-        <> fromList [("dblclick", BUBBLE)]
-        <> keyboardEvents
-        <> defaultEvents
-        <> mouseEvents
-        <> touchEvents
-    )
-    $ (component m updateModel viewModel)
-      { mount = Just Setup
-      , subs = [uriSub PopState, onKeyDownSub window]
-      }
-
 updateProof :: Effect ROOT Model Action
 updateProof = checkProof >> updateURI >> updateTitle
 
@@ -168,11 +123,6 @@ clearDrag = do
 
 replaceQueryString :: MisoString -> MisoString -> URI -> URI
 replaceQueryString name value uri = uri{uriQueryString = insert name (Just value) (uriQueryString uri)}
-
-proofFromURI :: URI -> Maybe Proof
-proofFromURI uri = case uriQueryString uri !? "proof" of
-  Just (Just str) -> decodeFromUrl (fromMisoString str :: Text)
-  _ -> Nothing
 
 readURI :: URI -> Effect ROOT Model Action
 readURI uri = do
@@ -383,50 +333,6 @@ updateModel (ProcessInput str start end eaddr) = do
         (end - delta)
 ------------------------------------
 updateModel Nop = pass
-
------------------------------------------------------------------------------
-
--- * Subscriptions
-
-{- | Subscription for the 'onkeydown' event.
-
-Used for detecting presses of '(' and 'Enter'.
-* On 'Enter' fires the `Blur` event,
-* On '(' inserts the closing parenthesis at the end of selection.
--}
-onKeyDownSub :: DOMRef -> Sub Action
-onKeyDownSub window = createSub acquire (removeEventListener window "keydown")
- where
-  acquire = do
-    addEventListener window "keydown" $ \evt -> do
-      domRef <- jsg "document" # "querySelector" $ (".focused" :: MisoString)
-      isNull domRef >>= \case
-        True -> pass
-        False -> do
-          Just (keyCode :: Int) <- castJSVal =<< getProperty evt "keyCode"
-          Just (shiftKey :: Bool) <- castJSVal =<< getProperty evt "shiftKey"
-          Just (start :: Int) <- castJSVal =<< getProperty domRef "selectionStart"
-          Just (end :: Int) <- castJSVal =<< getProperty domRef "selectionEnd"
-
-          -- when '(' is pressed, insert closing parenthesis as well
-          when (keyCode == 57 && shiftKey && start < end) $ void $ do
-            -- prevent call of the `input` event.
-            eventPreventDefault evt
-            -- split current value into parts, to insert the parentheses
-            Just (value :: Text) <- castJSVal =<< getProperty domRef "value"
-            let (first, rest) = T.splitAt start value
-                (second, third) = T.splitAt (end - start) rest
-                newTxt = T.concat [first, "(", second, ")", third]
-            -- select all text, replace it with the new text, and adjust cursorition
-            doc <- jsg "document"
-            domRef # "select" $ ()
-            -- NOTE: execCommand is deprecated, however its use is still recommended
-            --       for inserting text to <input> while keeping the history intact.
-            doc # "execCommand" $ ("insertText", False, newTxt)
-            domRef # "setSelectionRange" $ (end + 2, end + 2, "none")
-
-          -- when 'Enter' is pressed, call blur on the element, to lose focus
-          when (keyCode == 13) $ void $ callFunction domRef "blur" ()
 
 -----------------------------------------------------------------------------
 
