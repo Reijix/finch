@@ -99,12 +99,12 @@ updateTitle :: Effect ROOT Model Action
 updateTitle = do
   p@(SubProof _ _ (Derivation f _)) <- use proof
   let title =
-        "Finch | "
-          <> prettyPrint f
-          <> case proofErrors p of
+        ( case proofErrors p of
             0 -> mempty
-            1 -> " | " <> " 1 error"
-            n -> " | " <> show n <> " errors"
+            1 -> "(1) "
+            n -> "(" <> show n <> ") "
+        )
+          <> prettyPrint f
   io_ [js| document.title = ${title} |]
 
 checkProof :: forall m. (MonadState Model m) => m ()
