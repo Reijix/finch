@@ -1,13 +1,13 @@
 cabal-version: 3.0
-name: finch
+name: Finch
 version: 0.1.0.0
 synopsis: Editing fitch-style natural deduction proofs.
 description: A web application for editing fitch-style natural deduction proofs with builtin checker.
 license: BSD-3-Clause
 license-file: LICENSE
-author: Reijix
-maintainer: Reijix
-copyright: Leon Vatthauer @ 2025
+author: Reijix <leon.vatthauer@fau.de>
+maintainer: Reijix <leon.vatthauer@fau.de>
+copyright: Leon Vatthauer @ 2026
 category: Web
 build-type: Simple
 
@@ -54,10 +54,10 @@ test-suite test
     relude,
 
   build-depends:
+    Finch,
     base >=4.21.0 && <4.22,
     containers,
     directory,
-    finch-lib,
     miso >=1.9 && <1.9.1,
     relude,
     tasty >=1.5.2 && <1.6,
@@ -77,9 +77,9 @@ executable finch
     OverloadedStrings
 
   build-depends:
+    Finch,
     base >=4.21.0 && <5,
     containers >=0.7 && <0.9,
-    finch-lib,
     miso,
     relude,
     text >=2.1.2 && <2.2,
@@ -95,7 +95,7 @@ executable finch
   default-language:
     GHC2024
 
-library finch-lib
+library
   exposed-modules:
     App.Decoder
     App.Model

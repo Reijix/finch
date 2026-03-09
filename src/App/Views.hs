@@ -1,3 +1,13 @@
+{- |
+Module      : App.Views
+Copyright   : (C) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (GHCJS)
+
+This module defines the Miso t'View's of the application.
+-}
 module App.Views where
 
 import App.Model
@@ -37,15 +47,16 @@ import Miso.Lens
 import Miso.Property (boolProp, textProp)
 import Miso.Router (URI (..), prettyURI)
 import Relude.Extra (toPairs)
+import Relude.Unsafe (fromJust)
 import Util (interleave)
 
 -----------------------------------------------------------------------------
 
 -- * Views
 
------------------------------------------------------------------------------
-
--- | Takes a `Model` and returns the corresponding `View`.
+{- | Takes a 'Model' and returns the corresponding 'View'
+containing a sidebar, the proof workspace and a header.
+-}
 viewModel :: Model -> View Model Action
 viewModel model =
   H.div_
@@ -58,14 +69,11 @@ viewModel model =
         ]
     ]
 
-viewNewProof :: Model -> View Model Action
-viewNewProof model =
-  H.button_
-    [ HP.class_ "app-button"
-    , onClick (SetProof (model ^. emptyProof))
-    ]
-    [text "New Proof"]
+-----------------------------------------------------------------------------
 
+-- ** Header
+
+-- | Returns the header of the application.
 viewHeader :: Model -> View Model Action
 viewHeader model =
   H.header_
@@ -77,9 +85,78 @@ viewHeader model =
         , H.button_ [HP.class_ "help-button", onClick ToggleSidebar] [viewMaterialIcon "help"]
         ]
     , viewProofActionsHeader
-    , viewNewProof model
+    , viewNewProofButton model
     ]
 
+{- | For use in 'viewHeader',
+returns buttons for spawning lines/subproofs and a trash can.
+-}
+viewProofActionsHeader :: View Model Action
+viewProofActionsHeader =
+  H.div_
+    [HP.class_ "proof-actions-header"]
+    [ viewSpawnNode SpawnLine "Drag over proof to add a line" "add"
+    , viewBin
+    , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add"
+    ]
+
+{- | For use in 'viewProofActionsHeader',
+returns a trash can, where elements can be deleted.
+-}
+viewBin :: View Model Action
+viewBin =
+  H.div_
+    [ onDragOverWithOptions preventDefault Nop
+    , onDragEnterWithOptions preventDefault Nop
+    , onDragLeaveWithOptions preventDefault Nop
+    , onDropWithOptions defaultOptions (Drop LocationBin)
+    , HP.class_ "bin"
+    , HP.class_ "icon-container"
+    , HP.title_ "Drag lines or subproofs here to delete them."
+    ]
+    [ viewMaterialIcon "delete"
+    ]
+
+{- | For use in 'viewProofActionsHeader',
+returns a button for spawning a node.
+-}
+viewSpawnNode ::
+  -- | Type of node to be spawned.
+  SpawnType ->
+  -- | Tooltip of the button
+  MisoString ->
+  -- | The buttons icon.
+  MisoString ->
+  View Model Action
+viewSpawnNode tp title icon =
+  H.div_
+    [ HP.class_ "spawn-button"
+    , HP.class_ "draggable"
+    , HP.draggable_ True
+    , HP.title_ title
+    , onDragStartWithOptions stopPropagation $ SpawnStart tp
+    , onDragEndWithOptions defaultOptions DragEnd
+    , HP.class_ "icon-container"
+    ]
+    [ viewMaterialIcon icon
+    ]
+
+{- | For use in 'viewHeader',
+returns a button for starting a new proof.
+-}
+viewNewProofButton :: Model -> View Model Action
+viewNewProofButton model =
+  H.button_
+    [ HP.class_ "app-button"
+    , onClick (SetProof (model ^. emptyProof))
+    ]
+    [text "New Proof"]
+
+-----------------------------------------------------------------------------
+
+-- ** Sidebar
+
+-- | Returns the sidebar of the application
 viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
@@ -94,20 +171,28 @@ viewSidebar model =
     $ H.div_
       [ HP.class_ "sidebar-content"
       ]
-      [ viewUsageAccordion
-      , viewGrammarAccordion model
-      , viewRuleAccordion model
-      , viewExamplesAccordion model
-      , viewLogicsAccordion model
+      [ viewUsage
+      , viewGrammar model
+      , viewRules model
+      , viewExamples model
+      , viewLogics model
       ]
 
-viewAccordion :: View Model Action -> View Model Action -> View Model Action
-viewAccordion heading content =
+-- | Wrapper for creating @<details>@ elements in the sidebar.
+viewDetails ::
+  -- | Icon of the <details> summary.
+  MisoString ->
+  -- | Text of the <details> summary.
+  MisoString ->
+  -- | Content of the <details> element.
+  View Model Action ->
+  View Model Action
+viewDetails icon txt content =
   H.details_
     [HP.open_ True, HP.class_ "sidebar-element"]
     [ H.summary_
         [HP.class_ "sidebar-header"]
-        [ heading
+        [ H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, text txt]
         , H.span_
             [HP.class_ "material-symbols-outlined", HP.class_ "summary-arrow"]
             ["keyboard_arrow_down"]
@@ -115,25 +200,14 @@ viewAccordion heading content =
     , content
     ]
 
-viewTextWithIcon :: MisoString -> MisoString -> View Model Action
-viewTextWithIcon txt icon = H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, text txt]
-
-viewMaterialIcon :: MisoString -> View Model Action
-viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
-
-viewProofActionsHeader :: View Model Action
-viewProofActionsHeader =
-  H.div_
-    [HP.class_ "proof-actions-header"]
-    [ viewSpawnNode SpawnLine "Drag over proof to add a line" "add" "Add Line"
-    , viewBin
-    , viewSpawnNode SpawnProof "Drag over proof to add a subproof" "variable_add" "Add Subproof"
-    ]
-
-viewUsageAccordion :: View Model Action
-viewUsageAccordion =
-  viewAccordion
-    (viewTextWithIcon "Usage Info" "info")
+{- | For use in 'viewSidebar',
+returns usage instructions.
+-}
+viewUsage :: View Model Action
+viewUsage =
+  viewDetails
+    "Usage Info"
+    "info"
     ( H.ul_
         [HP.class_ "column-sidebar-content"]
         [ H.li_ [] ["Use the buttons at the top of the screen to add lines and subproofs."]
@@ -144,10 +218,14 @@ viewUsageAccordion =
         ]
     )
 
-viewLogicsAccordion :: Model -> View Model Action
-viewLogicsAccordion model =
-  viewAccordion
-    (viewTextWithIcon "Logics" "schema")
+{- | For use in 'viewSidebar',
+returns a list of buttons that enable the user to change the underlying logic of the proof checker.
+-}
+viewLogics :: Model -> View Model Action
+viewLogics model =
+  viewDetails
+    "Logics"
+    "schema"
     ( H.div_
         [HP.class_ "column-sidebar-content"]
         (map mkLogic [("First-order logic", "fol"), ("Propositional Logic", "prop")])
@@ -158,14 +236,24 @@ viewLogicsAccordion model =
     H.a_
       [ HP.class_ "app-button"
       , HP.class_ "example-button"
-      , HP.href_ $ prettyURI $ (model ^. uri){uriQueryString = one ("logic", Just alias)}
+      , HP.href_ $
+          prettyURI $
+            URI
+              { uriPath = uriPath (model ^. uri)
+              , uriFragment = ""
+              , uriQueryString = one ("logic", Just alias)
+              }
       ]
       [text $ ms name]
 
-viewGrammarAccordion :: Model -> View Model Action
-viewGrammarAccordion model =
-  viewAccordion
-    (viewTextWithIcon "Symbols" "function")
+{- | For use in 'viewSidebar',
+returns a list of symbols that can be used, and on hover shows their aliases.
+-}
+viewGrammar :: Model -> View Model Action
+viewGrammar model =
+  viewDetails
+    "Symbols"
+    "function"
     ( H.div_
         [HP.class_ "row-sidebar-content"]
         ( map
@@ -205,10 +293,14 @@ viewGrammarAccordion model =
           [text . ms $ "Alias: " <> alias]
       ]
 
-viewRuleAccordion :: Model -> View Model Action
-viewRuleAccordion model =
-  viewAccordion
-    (viewTextWithIcon "Rules" "rule")
+{- | For use in 'viewSidebar',
+returns a list of the logics' rules, on hover shows the rule definition.
+-}
+viewRules :: Model -> View Model Action
+viewRules model =
+  viewDetails
+    "Rules"
+    "rule"
     (H.div_ [HP.class_ "row-sidebar-content"] (map viewSingleRule (toPairs $ model ^. rules)))
  where
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
@@ -234,10 +326,14 @@ viewRuleAccordion model =
           [text . ms $ "\\[(\\mathrm{" <> name <> "})" <> ruleSpecTex rs <> "\\]"]
       ]
 
-viewExamplesAccordion :: Model -> View Model Action
-viewExamplesAccordion model =
-  viewAccordion
-    (viewTextWithIcon "Examples" "menu")
+{- | For use in 'viewSidebar',
+returns a list of example proofs, on hover shows the assumptions and conclusion of the proof.
+-}
+viewExamples :: Model -> View Model Action
+viewExamples model =
+  viewDetails
+    "Examples"
+    "menu"
     (H.div_ [HP.class_ "column-sidebar-content"] (map mkExample (model ^. exampleProofs)))
  where
   mkExample :: (Text, Proof) -> View Model Action
@@ -264,98 +360,90 @@ viewExamplesAccordion model =
           [text . ms $ proofPreviewTex p]
       ]
 
-viewBin :: View Model Action
-viewBin =
+-----------------------------------------------------------------------------
+
+-- ** Proof
+
+{- | Shows the proof workspace of the application, containing a list of linenumbers,
+a list of formula inputs and a list of rule inputs.
+-}
+viewProof :: Model -> View Model Action
+viewProof model =
   H.div_
-    [ onDragOverWithOptions preventDefault Nop
-    , onDragEnterWithOptions preventDefault Nop
-    , onDragLeaveWithOptions preventDefault Nop
-    , onDropWithOptions defaultOptions (Drop LocationBin)
-    , HP.class_ "bin"
-    , HP.class_ "icon-container"
-    , HP.title_ "Drag lines or subproofs here to delete them."
+    [ HP.class_ "proof-container-border"
+    , onDragEnterWithOptions preventDefault DragLeave
     ]
-    [ viewMaterialIcon "delete"
+    [ H.div_
+        [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
+        [viewLineNos model, proofView, viewRuleApplications model]
     ]
-
-viewSpawnNode :: SpawnType -> MisoString -> MisoString -> MisoString -> View Model Action
-viewSpawnNode tp title icon str =
-  H.div_
-    [ HP.class_ "spawn-button"
-    , HP.class_ "draggable"
-    , HP.draggable_ True
-    , HP.title_ title
-    , onDragStartWithOptions stopPropagation $ SpawnStart tp
-    , onDragEndWithOptions defaultOptions DragEnd
-    , HP.class_ "icon-container"
-    ]
-    [ viewMaterialIcon icon
-    ]
-
-viewErrorBox :: MisoString -> MisoString -> View Model Action
-viewErrorBox name err =
-  H.code_
-    [ HP.class_ "tooltip"
-    , HP.id_ name
-    , textProp "popover" "manual"
-    , HP.draggable_ False
-    ]
-    [text err]
-
-mkFormulaInputId :: NodeAddr -> Proof -> MisoString
-mkFormulaInputId na p = "formula-input-" <> show (lineNoOr999 na p)
-
-mkRuleInputId :: NodeAddr -> Proof -> MisoString
-mkRuleInputId na p = "rule-input-" <> show (lineNoOr999 na p)
-
-viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
-viewLine model na e =
-  let
-    lineno = lineNoOr999 na (model ^. proof)
-    errorBoxId = "formula-error-" <> show lineno
-    inputId = mkFormulaInputId na (model ^. proof)
-   in
-    H.div_
-      [ HP.class_ "formula-container"
-      , HP.draggable_ (isNothing (model ^. focusedLine))
-      , if model ^. focusedLine /= Just (Left na)
-          then onDragStartWithOptions stopPropagation $ DragStart (Left na)
-          else onDragStartWithOptions (stopPropagation <> preventDefault) Nop
-      , onDragEndWithOptions defaultOptions DragEnd
-      , onMouseOver (PopOpen errorBoxId hasError)
-      , onMouseOut (PopClose errorBoxId)
-      , onClick $ FocusInput (Left na)
-      ]
-      [ H.input_
-          [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
-          , HP.id_ inputId
-          , HP.classList_
-              [ ("formula-input", True)
-              , ("has-error", hasError)
-              , ("draggable", Just (Left na) /= model ^. focusedLine)
-              , ("focused", Just (Left na) == model ^. focusedLine)
-              ]
-          , HP.autocomplete_ False
-          , HP.draggable_ False
-          , onBlur (Blur (Left na))
-          , onChange (const Change)
-          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
-          , onDragStartWithOptions preventDefault Nop
-          , value_ txt
-          ]
-      , viewErrorBox errorBoxId err
-      ]
  where
-  (hasError, txt, err) = case e of
-    Left (a, _) -> case a of
-      ParsedValid str a' -> (False, ms str, "")
-      ParsedInvalid str err a' -> (True, ms str, ms err)
-      Unparsed str err -> (True, ms str, ms err)
-    Right (Derivation f r) -> case f of
-      (ParsedValid str f') -> (False, ms str, "")
-      (ParsedInvalid str err f') -> (True, ms str, ms err)
-      (Unparsed str err) -> (True, ms str, ms err)
+  proofView =
+    H.div_
+      [HP.class_ "formulae-container"]
+      [_viewProof Nothing id (model ^. proof)]
+  _viewProof :: Maybe ProofAddr -> (NodeAddr -> NodeAddr) -> Proof -> View Model Action
+  _viewProof pa na (SubProof fs ps d) =
+    optionalAttrs
+      H.div_
+      [ HP.class_ "subproof"
+      , HP.id_ (show pa)
+      ]
+      (isJust pa)
+      [ HP.class_ "draggable"
+      , HP.draggable_ (isNothing (model ^. focusedLine))
+      , onDragStartWithOptions stopPropagation $ DragStart (Right (fromJust pa))
+      , onDragEndWithOptions defaultOptions DragEnd
+      ]
+      ( interleaveWithDropZones
+          model
+          (Just "last-assumption")
+          Nothing
+          (na . NAAssumption)
+          viewAssumptions
+          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) viewProofs
+          <> drop
+            1
+            ( interleaveWithDropZones
+                model
+                Nothing
+                (Just (na NAAfterConclusion))
+                (const $ na NAAfterConclusion)
+                (one viewConclusion)
+            )
+      )
+   where
+    viewAssumptions =
+      snd $
+        L.mapAccumL
+          ( \m f ->
+              ( m + 1
+              , viewLine
+                  model
+                  (na (NAAssumption m))
+                  (Left f)
+              )
+          )
+          0
+          fs
+    viewProofs =
+      snd $
+        L.mapAccumL
+          ( \m e ->
+              ( m + 1
+              , either
+                  (viewLine model (na $ NALine m) . Right)
+                  (_viewProof (maybe id paProofToNested pa <$> Just (PAProof m)) (na . NAProof m))
+                  e
+              )
+          )
+          0
+          ps
+    viewConclusion = viewLine model (na NAConclusion) (Right d)
 
+{- | For use in 'viewProof',
+returns a list of linenumbers that are shown to the left of the proof.
+-}
 viewLineNos :: Model -> View Model Action
 viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id (model ^. proof)
  where
@@ -399,8 +487,12 @@ viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id 
   goDerivation :: Int -> NodeAddr -> Derivation -> View Model Action
   goDerivation lineNo _ _ = lineNoFor lineNo
 
-viewRules :: Model -> View Model Action
-viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. proof)
+{- | For use in 'viewProof',
+returns a list of 'RuleApplication's (judgements),
+that are shown to the right of the proof.
+-}
+viewRuleApplications :: Model -> View Model Action
+viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. proof)
  where
   go :: (NodeAddr -> NodeAddr) -> Proof -> View Model Action
   go na (SubProof fs ps c) =
@@ -469,118 +561,106 @@ viewRules model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. p
       (ParsedInvalid str err _) -> (True, ms str, ms err)
       (Unparsed str err) -> (True, ms str, ms err)
 
--- TODO can use _viewProof with na = id
-viewProof :: Model -> View Model Action
-viewProof model =
-  H.div_
-    [ HP.class_ "proof-container-border"
-    , onDragEnterWithOptions preventDefault DragLeave
+{- | Returns a errorbox that is shown on hover, containing proof errors
+written in a @<code>@ element to get monospacing.
+-}
+viewErrorBox ::
+  -- | @id@ of the errorbox.
+  MisoString ->
+  -- | Error message.
+  MisoString ->
+  View Model Action
+viewErrorBox name err =
+  H.code_
+    [ HP.class_ "tooltip"
+    , HP.id_ name
+    , textProp "popover" "manual"
+    , HP.draggable_ False
     ]
-    [ H.div_
-        [HP.class_ "proof-container", onDragEnterWithOptions stopPropagation Nop]
-        [viewLineNos model, proofView, viewRules model]
-    ]
- where
-  proofView =
+    [text err]
+
+-- | Helper for turning a 'NodeAddr' to a formula inputfield id.
+mkFormulaInputId :: NodeAddr -> Proof -> MisoString
+mkFormulaInputId na p = "formula-input-" <> show (lineNoOr999 na p)
+
+-- | Helper for turning a 'NodeAddr' to a rule inputfield id.
+mkRuleInputId :: NodeAddr -> Proof -> MisoString
+mkRuleInputId na p = "rule-input-" <> show (lineNoOr999 na p)
+
+{- | For use in 'viewProof', shows a single line of the proof,
+specified by its 'NodeAddr'.
+-}
+viewLine :: Model -> NodeAddr -> Either Assumption Derivation -> View Model Action
+viewLine model na e =
+  let
+    lineno = lineNoOr999 na (model ^. proof)
+    errorBoxId = "formula-error-" <> show lineno
+    inputId = mkFormulaInputId na (model ^. proof)
+   in
     H.div_
-      [HP.class_ "formulae-container"]
-      ( interleaveWithDropZones
-          model
-          (Just "last-assumption")
-          Nothing
-          NAAssumption
-          viewAssumptions
-          <> interleaveWithDropZones model Nothing (Just NAConclusion) NALine viewProofs
-          <> drop
-            1
-            ( interleaveWithDropZones
-                model
-                Nothing
-                (Just NAAfterConclusion)
-                (const NAAfterConclusion)
-                (one viewConclusion)
-            )
-      )
-   where
-    (SubProof fs ps d) = model ^. proof
-    viewAssumptions =
-      snd $
-        L.mapAccumL
-          (\n f -> (n + 1, viewLine model (NAAssumption n) (Left f)))
-          0
-          fs
-    viewProofs =
-      snd $
-        L.mapAccumL
-          ( \n e ->
-              (n + 1, either (viewLine model (NALine n) . Right) (_viewProof (PAProof n) (NAProof n)) e)
-          )
-          0
-          ps
-    viewConclusion = viewLine model NAConclusion (Right d)
-  _viewProof :: ProofAddr -> (NodeAddr -> NodeAddr) -> Proof -> View Model Action
-  _viewProof pa na (SubProof fs ps d) =
-    H.div_
-      [ HP.class_ "subproof"
-      , HP.class_ "draggable"
-      , HP.id_ (show pa)
+      [ HP.class_ "formula-container"
       , HP.draggable_ (isNothing (model ^. focusedLine))
-      , onDragStartWithOptions stopPropagation $ DragStart (Right pa)
+      , if model ^. focusedLine /= Just (Left na)
+          then onDragStartWithOptions stopPropagation $ DragStart (Left na)
+          else onDragStartWithOptions (stopPropagation <> preventDefault) Nop
       , onDragEndWithOptions defaultOptions DragEnd
+      , onMouseOver (PopOpen errorBoxId hasError)
+      , onMouseOut (PopClose errorBoxId)
+      , onClick $ FocusInput (Left na)
       ]
-      ( interleaveWithDropZones
-          model
-          (Just "last-assumption")
-          Nothing
-          (na . NAAssumption)
-          viewAssumptions
-          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) viewProofs
-          <> drop
-            1
-            ( interleaveWithDropZones
-                model
-                Nothing
-                (Just (na NAAfterConclusion))
-                (const $ na NAAfterConclusion)
-                (one viewConclusion)
-            )
-      )
-   where
-    viewAssumptions =
-      snd $
-        L.mapAccumL
-          ( \m f ->
-              ( m + 1
-              , viewLine
-                  model
-                  (na (NAAssumption m))
-                  (Left f)
-              )
-          )
-          0
-          fs
-    viewProofs =
-      snd $
-        L.mapAccumL
-          ( \m e ->
-              ( m + 1
-              , either
-                  (viewLine model (na $ NALine m) . Right)
-                  (_viewProof (paProofToNested pa $ PAProof m) (na . NAProof m))
-                  e
-              )
-          )
-          0
-          ps
-    viewConclusion = viewLine model (na NAConclusion) (Right d)
+      [ H.input_
+          [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
+          , HP.id_ inputId
+          , HP.classList_
+              [ ("formula-input", True)
+              , ("has-error", hasError)
+              , ("draggable", Just (Left na) /= model ^. focusedLine)
+              , ("focused", Just (Left na) == model ^. focusedLine)
+              ]
+          , HP.autocomplete_ False
+          , HP.draggable_ False
+          , onBlur (Blur (Left na))
+          , onChange (const Change)
+          , onWithOptions BUBBLE defaultOptions "input" valueDecoder Input
+          , onDragStartWithOptions preventDefault Nop
+          , value_ txt
+          ]
+      , viewErrorBox errorBoxId err
+      ]
+ where
+  (hasError, txt, err) = case e of
+    Left (a, _) -> case a of
+      ParsedValid str a' -> (False, ms str, "")
+      ParsedInvalid str err a' -> (True, ms str, ms err)
+      Unparsed str err -> (True, ms str, ms err)
+    Right (Derivation f r) -> case f of
+      (ParsedValid str f') -> (False, ms str, "")
+      (ParsedInvalid str err f') -> (True, ms str, ms err)
+      (Unparsed str err) -> (True, ms str, ms err)
 
 -----------------------------------------------------------------------------
 
 -- * Utilities
 
------------------------------------------------------------------------------
+{- | Helper for viewing material icons based on their name,
+see <https://fonts.google.com/icons>
+-}
+viewMaterialIcon :: MisoString -> View Model Action
+viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
 
-viewDropZoneAt :: Model -> Maybe MisoString -> NodeAddr -> View Model Action
+{- |
+Shows a dropzone for the given 'NodeAddr', i.e. a small empty div, where nodes can be dropped.
+
+Expands, if a node can be dropped inside.
+-}
+viewDropZoneAt ::
+  -- | The model.
+  Model ->
+  -- | Optional class for the dropzone.
+  Maybe MisoString ->
+  -- | The corresponding 'NodeAddr'.
+  NodeAddr ->
+  View Model Action
 viewDropZoneAt model mclass na =
   H.div_
     [ HP.class_ "drop-zone"
@@ -598,11 +678,17 @@ viewDropZoneAt model mclass na =
     ]
     []
 
+-- | Interleaves the list @views@ with dropzones of the corresponding @na@.
 interleaveWithDropZones ::
+  -- | The model.
   Model ->
+  -- | Optionally a class for the last dropzone.
   Maybe MisoString ->
+  -- | Optionally a differing 'NodeAddr' for the last dropzone.
   Maybe NodeAddr ->
+  -- | A function for generating 'NodeAddr' from a number (e.g. turn @n@ into @'NAAssumption' n@).
   (Int -> NodeAddr) ->
+  -- | The list of views to be interleaved.
   [View Model Action] ->
   [View Model Action]
 interleaveWithDropZones model mclass lastNA na views = interleave dropzones views
@@ -617,3 +703,5 @@ interleaveWithDropZones model mclass lastNA na views = interleave dropzones view
             (if n == length views then fromMaybe (na n) lastNA else na n)
       )
       [0 .. length views]
+
+-----------------------------------------------------------------------------

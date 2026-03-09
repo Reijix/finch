@@ -5,3 +5,4 @@ public
 .direnv/
 .hpc
 *.tix
+haddock/

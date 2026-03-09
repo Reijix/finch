@@ -1,4 +1,4 @@
-/* 
+/*
 --------------------------------------------------
 Variables
 --------------------------------------------------
@@ -23,8 +23,8 @@ Variables
   --header-text-size: clamp(1.5rem, 2.5vw + 1rem, 2.25rem);
   --subproof-border: 0.2rem solid rgba(193, 201, 204);
   --subproof-border-expanded: 0.3rem solid rgba(193, 201, 204);
-  --font-ui: 'Fira Sans', system-ui, -apple-system, sans-serif;
-  --font-math: 'Fira Sans', monospace;
+  --font-ui: "Fira Sans", system-ui, -apple-system, sans-serif;
+  --font-math: "Fira Sans", monospace;
 }
 
 body {
@@ -41,7 +41,7 @@ h1 {
   font-size: var(--header-text-size);
 }
 
-/* 
+/*
 --------------------------------------------------
 Button containers
 --------------------------------------------------
@@ -110,26 +110,40 @@ Button containers
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
-details>summary {
+details > summary {
   list-style: none;
   cursor: pointer;
   user-select: none;
 }
 
-details>summary>.summary-arrow {
+details > summary > .summary-arrow {
   transition: 0.3s;
 }
 
-details::details-content {
-  transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete;
+::details-content {
+  transition:
+    height 0.5s ease,
+    content-visibility 0.5s ease allow-discrete;
+  height: 0;
   overflow: clip;
 }
 
-details[open]>summary>.summary-arrow {
+[open]::details-content {
+  height: auto;
+}
+
+/* allow-keywords if supported, this makes <details> animted. Not supported in firefox and safari! */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+}
+
+details[open] > summary > .summary-arrow {
   transform: rotate(180deg);
 }
 
-details>summary::-webkit-details-marker {
+details > summary::-webkit-details-marker {
   display: none;
 }
 
@@ -144,27 +158,27 @@ ul {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: .5vh .5vw;
-
+  padding: 0.5vh 0.5vw;
 }
 
 .row-sidebar-content {
   width: 100%;
-  padding: .5vh .5vw;
-  gap: .5vh;
+  padding: 0.5vh 0.5vw;
+  gap: 0.5vh;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: center;
-  font-size: var(--sidebar-header-text-size);
+  font-size: var(--sidebar-content-text-size);
 }
 
 .column-sidebar-content {
   display: flex;
   flex-direction: column;
   width: 100%;
-  padding: .5vh .5vw;
-  gap: .5vh;
+  padding: 0.5vh 0.5vw;
+  gap: 0.5vh;
+  font-size: var(--sidebar-content-text-size);
 }
 
 .symbol-button {
@@ -190,11 +204,15 @@ ul {
   justify-self: left;
 }
 
+.math-content {
+  font-family: var(--font-math);
+}
+
 .icon-text {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  gap: .5vw;
+  gap: 0.5vw;
 }
 
 .bin {
@@ -208,7 +226,9 @@ ul {
   border-radius: 6px;
   color: #24292e;
   border-color: #1b1f2326;
-  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
+  box-shadow:
+    rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,
+    rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
 }
 
 .spawn-button {
@@ -221,10 +241,12 @@ ul {
   border-radius: 6px;
   color: #24292e;
   border-color: #1b1f2326;
-  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
+  box-shadow:
+    rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,
+    rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
 }
 
-/* 
+/*
 --------------------------------------------------
 Line number containers
 --------------------------------------------------
@@ -241,7 +263,7 @@ Line number containers
   margin-bottom: 2px;
 }
 
-/* 
+/*
 --------------------------------------------------
 Proof containers
 --------------------------------------------------
@@ -265,13 +287,13 @@ Proof containers
   font-size: var(--error-text-size);
 }
 
-.header>h1 {
+.header > h1 {
   display: flex;
   flex-direction: row;
   justify-content: center;
 }
 
-.header>h1>img {
+.header > h1 > img {
   height: var(--header-text-size);
   margin-right: 0.5vw;
 }
@@ -287,14 +309,14 @@ Proof containers
   margin-left: 1vw;
 }
 
-.help-button>span {
+.help-button > span {
   font-size: var(--header-text-size);
   height: var(--header-text-size);
   width: var(--header-text-size);
 }
 
 .help-button:hover {
-  background-color: #F3F4F6;
+  background-color: #f3f4f6;
 }
 
 .help-button:active {
@@ -305,7 +327,7 @@ Proof containers
   display: inline-block;
   outline: 0;
   cursor: pointer;
-  padding: .5vh .5vw;
+  padding: 0.5vh 0.5vw;
   font-size: var(--error-text-size);
   font-weight: 500;
   line-height: 20px;
@@ -315,9 +337,12 @@ Proof containers
   color: #24292e;
   background-color: #fafbfc;
   border-color: #1b1f2326;
-  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
+  box-shadow:
+    rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,
+    rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
   transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1);
   transition-property: color, background-color, border-color;
+  text-decoration: none;
 }
 
 .app-button:hover {
@@ -374,7 +399,7 @@ Proof containers
 
 .formula-container:hover {
   background-color: var(--bg-color);
-  transition: .1s linear;
+  transition: 0.1s linear;
 }
 
 .line-no {
@@ -458,9 +483,17 @@ Proof containers
   margin-left: 5px;
 }
 
-.subproof:not(:has(.subproof:hover, .formula-container:hover, .rule-container:hover, .drop-zone:not(.last-assumption):hover)):hover {
+.subproof
+  > .subproof:not(
+    :has(
+      .subproof:hover,
+      .formula-container:hover,
+      .rule-container:hover,
+      .drop-zone:not(.last-assumption):hover
+    )
+  ):hover {
   background-color: var(--bg-color);
-  transition: .1s linear;
+  transition: 0.1s linear;
 }
 
 .last-assumption {
@@ -479,7 +512,7 @@ Proof containers
   color: rgb(255, 0, 0);
 }
 
-/* 
+/*
 --------------------------------------------------
 Rule containers
 --------------------------------------------------
@@ -522,14 +555,14 @@ Rule containers
 
 .rule-container:hover {
   background-color: var(--bg-color);
-  transition: .1s linear;
+  transition: 0.1s linear;
 }
 
 .rules-container {
   width: 20%;
 }
 
-/* 
+/*
 --------------------------------------------------
 Drag and drop related
 --------------------------------------------------
@@ -554,8 +587,8 @@ Drag and drop related
 
 .material-symbols-outlined {
   font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
 }
