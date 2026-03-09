@@ -8,6 +8,8 @@ module Specification.FOL (
   initialModelFOL,
 ) where
 
+import Miso.Router (URI)
+
 import App.Update (Model, initialModel)
 import Fitch.Proof (
   AssumptionSpec (..),
@@ -164,8 +166,8 @@ exampleProofsFOL =
     )
   ]
 
-initialModelFOL :: Maybe Proof -> Model
-initialModelFOL mp =
+initialModelFOL :: URI -> Maybe Proof -> Model
+initialModelFOL uri mp =
   initialModel
     emptyProofFOL
     (fromMaybe initialP mp)
@@ -174,5 +176,6 @@ initialModelFOL mp =
     infixPredsFOL
     quantifiersFOL
     rulesFOL
+    uri
  where
   (_, initialP) : _ = exampleProofsFOL

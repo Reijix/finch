@@ -6,6 +6,7 @@ import App.Model
 import App.Update
 import Fitch.Proof
 import Fitch.Verification (verifyProof)
+import Miso.Router (URI (..))
 import Parser.Formula (parseFormula)
 import Parser.Proof (parseProof)
 import Specification.FOL
@@ -44,7 +45,7 @@ readProof filePath = do
       pure . (^. proof) $
         execState
           checkProof
-          (initialModel p p [] operatorsFOL infixPredsFOL quantifiersFOL rulesFOL)
+          (initialModel p p [] operatorsFOL infixPredsFOL quantifiersFOL rulesFOL (URI "" "" mempty))
 
 assertValid :: Wrapper a -> Assertion
 assertValid (Unparsed _ err) =

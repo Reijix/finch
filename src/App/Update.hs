@@ -216,15 +216,14 @@ hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ 
 
 -- | Main execution loop of the application.
 updateModel :: Action -> Effect ROOT Model Action
-updateModel Setup = proofReparse >> checkProof >> updateTitle
+updateModel Setup = proofReparse >> updateProof
 updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
 updateModel (SetProof p) = do
   proof .= p
   proofReparse
-  checkProof
-  updateURI
+  updateProof
 updateModel (PopState uri) = do
-  readURI uri >> proofReparse >> checkProof
+  readURI uri >> proofReparse >> checkProof >> updateTitle
 updateModel (PopOpen name True) =
   use dragging >>= \case
     True -> pass

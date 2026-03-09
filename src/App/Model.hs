@@ -94,6 +94,7 @@ data Model = Model
   -}
   , _rules :: Map Name RuleSpec
   -- ^ A map that contains all rules, mapping their names to their specification
+  , _uri :: URI
   }
   deriving (Show, Eq)
 
@@ -113,8 +114,9 @@ initialModel ::
   [(Text, Text)] ->
   -- | The map of rules
   Map Name RuleSpec ->
+  URI ->
   Model
-initialModel emptyP initialP ps operators infixPreds quantifiers rules =
+initialModel emptyP initialP ps operators infixPreds quantifiers rules uri =
   Model
     { _focusedLine = Nothing
     , _exampleProofs = ps
@@ -131,6 +133,7 @@ initialModel emptyP initialP ps operators infixPreds quantifiers rules =
     , _functionSymbols = mempty
     , _predicateSymbols = mempty
     , _rules = rules
+    , _uri = uri
     }
 
 -- * Lenses
@@ -178,6 +181,9 @@ predicateSymbols = lens (._predicateSymbols) $ \model ps -> model{_predicateSymb
 
 rules :: Lens Model (Map Name RuleSpec)
 rules = lens (._rules) $ \model rs -> model{_rules = rs}
+
+uri :: Lens Model URI
+uri = lens (._uri) $ \model u -> model{_uri = u}
 
 -- * Semantic checking
 

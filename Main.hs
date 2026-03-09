@@ -1,9 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE OrPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
-
 module Main where
 
 import App.Decoder
@@ -36,14 +30,16 @@ startAppWrapper window model =
 main :: IO ()
 main = do
   window <- jsg "window"
-  uri <- getURI
-  model <- case uriQueryString uri !? "logic" of
+  url <- getURI
+  model <- case uriQueryString url !? "logic" of
     Just (Just "prop") ->
-      pure $ initialModelProp $ decodeFromUrl . show =<< join (uriQueryString uri !? "proof")
-    Just (Just "fol") -> pure $ initialModelFOL $ decodeFromUrl . show =<< join (uriQueryString uri !? "proof")
+      pure $
+        initialModelProp url $
+          decodeFromUrl . show =<< join (uriQueryString url !? "proof")
+    Just (Just "fol") ->
+      pure $ initialModelFOL url $ decodeFromUrl . show =<< join (uriQueryString url !? "proof")
     _ -> do
-      -- TODO setURI!
-      pure $ initialModelFOL $ decodeFromUrl . show =<< join (uriQueryString uri !? "proof")
+      pure $ initialModelFOL url $ decodeFromUrl . show =<< join (uriQueryString url !? "proof")
   startAppWrapper window model
 
 -----------------------------------------------------------------------------

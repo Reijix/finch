@@ -35,6 +35,7 @@ import Miso.Html.Property (value_)
 import Miso.Html.Property qualified as HP
 import Miso.Lens
 import Miso.Property (boolProp, textProp)
+import Miso.Router (URI (..), prettyURI)
 import Relude.Extra (toPairs)
 import Util (interleave)
 
@@ -97,6 +98,7 @@ viewSidebar model =
       , viewGrammarAccordion model
       , viewRuleAccordion model
       , viewExamplesAccordion model
+      , viewLogicsAccordion model
       ]
 
 viewAccordion :: View Model Action -> View Model Action -> View Model Action
@@ -142,10 +144,28 @@ viewUsageAccordion =
         ]
     )
 
+viewLogicsAccordion :: Model -> View Model Action
+viewLogicsAccordion model =
+  viewAccordion
+    (viewTextWithIcon "Logics" "schema")
+    ( H.div_
+        [HP.class_ "column-sidebar-content"]
+        (map mkLogic [("First-order logic", "fol"), ("Propositional Logic", "prop")])
+    )
+ where
+  mkLogic :: (Text, MisoString) -> View Model Action
+  mkLogic (name, alias) =
+    H.a_
+      [ HP.class_ "app-button"
+      , HP.class_ "example-button"
+      , HP.href_ $ prettyURI $ (model ^. uri){uriQueryString = one ("logic", Just alias)}
+      ]
+      [text $ ms name]
+
 viewGrammarAccordion :: Model -> View Model Action
 viewGrammarAccordion model =
   viewAccordion
-    (viewTextWithIcon "Symbols" "abc")
+    (viewTextWithIcon "Symbols" "function")
     ( H.div_
         [HP.class_ "row-sidebar-content"]
         ( map

@@ -14,6 +14,7 @@ import Fitch.Proof (
   Proof (..),
   RuleSpec (..),
  )
+import Miso.Router (URI)
 import Parser.Proof
 
 operatorsProp :: [(Text, Text, Int)]
@@ -98,8 +99,8 @@ exampleProofsProp =
     )
   ]
 
-initialModelProp :: Maybe Proof -> Model
-initialModelProp mp =
+initialModelProp :: URI -> Maybe Proof -> Model
+initialModelProp uri mp =
   initialModel
     emptyProofProp
     (fromMaybe initialP mp)
@@ -108,5 +109,6 @@ initialModelProp mp =
     []
     []
     rulesProp
+    uri
  where
   (_, initialP) : _ = exampleProofsProp
