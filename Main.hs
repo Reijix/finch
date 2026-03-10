@@ -12,6 +12,11 @@ import Specification.FOL
 import Specification.Prop
 
 -----------------------------------------------------------------------------
+-- | WASM export, required when compiling w/ the WASM backend.
+#ifdef WASM
+foreign export javascript "hs_start" main :: IO ()
+#endif
+
 startAppWrapper :: DOMRef -> Model -> IO ()
 startAppWrapper window model =
   startApp

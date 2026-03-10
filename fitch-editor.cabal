@@ -23,7 +23,16 @@ common warnings
     -fspecialise-aggressively
     -Wall
 
-common javascript
+common options
+  if arch(wasm32)
+    ghc-options:
+      -no-hs-main
+      -optl-mexec-model=reactor
+      "-optl-Wl,--export=hs_start"
+
+    cpp-options:
+      -DWASM
+
   if arch(javascript)
     ld-options:
       -sEXPORTED_RUNTIME_METHODS=HEAP8
@@ -68,12 +77,13 @@ test-suite test
 
 executable finch
   import:
-    javascript, warnings
+    options, warnings
 
   hs-source-dirs:
     .
 
   default-extensions:
+    CPP
     OverloadedStrings
 
   build-depends:
