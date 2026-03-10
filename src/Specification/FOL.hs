@@ -171,7 +171,7 @@ initialModelFOL :: URI -> Maybe Proof -> Model
 initialModelFOL uri mp =
   initialModel
     emptyProofFOL
-    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤)" (RuleApplication "⊤" [])))
+    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤I)" (RuleApplication "⊤I" [])))
     (fromMaybe initialP mp)
     exampleProofsFOL
     operatorsFOL

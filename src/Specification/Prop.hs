@@ -106,7 +106,7 @@ initialModelProp :: URI -> Maybe Proof -> Model
 initialModelProp uri mp =
   initialModel
     emptyProofProp
-    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤)" (RuleApplication "⊤" [])))
+    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤I)" (RuleApplication "⊤I" [])))
     (fromMaybe initialP mp)
     exampleProofsProp
     operatorsProp
