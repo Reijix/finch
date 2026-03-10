@@ -23,7 +23,8 @@ Variables
   --normal-text-size: clamp(1.125rem, 2vw + 0.75rem, 1.5rem);
   --header-text-size: clamp(1.5rem, 2.5vw + 1rem, 2.25rem);
   --header-height: calc(var(--header-text-size) + 2vh);
-  --subproof-border: 0.2rem solid rgba(193, 201, 204);
+  --subproof-border-size: 0.2rem;
+  --subproof-border: var(--subproof-border-size) solid rgba(193, 201, 204);
   --subproof-border-expanded: 0.3rem solid rgba(193, 201, 204);
   --font-ui: "Fira Sans", system-ui, -apple-system, sans-serif;
   --font-math: "Fira Sans", monospace;
@@ -388,7 +389,8 @@ Proof containers
 }
 
 .formula-container {
-  height: fit-content;
+  display: flex;
+  align-items: center;
   background-color: var(--proof-color);
   width: calc(100% - var(--formula-left-margin));
   anchor-scope: --error-anchor;
@@ -403,7 +405,6 @@ Proof containers
 .line-no {
   padding: 0;
   margin: 0;
-  height: fit-content;
   font-size: var(--normal-text-size);
   font-family: var(--font-math);
 }
@@ -415,7 +416,6 @@ Proof containers
   background-color: var(--proof-color);
   margin: 0;
   font-size: var(--normal-text-size);
-  /* font-family: inherit; */
   font-family: var(--font-math);
   z-index: 110;
   anchor-name: --error-anchor;
@@ -500,7 +500,7 @@ Proof containers
 }
 
 .empty-last-assumption {
-  padding-bottom: 7px;
+  margin-bottom: 5px;
 }
 
 .proof-view {
@@ -542,10 +542,11 @@ Rule containers
 }
 
 .rule-container {
+  display: flex;
+  align-items: center;
   width: 100%;
   padding: 0;
   margin: 0;
-  height: fit-content;
   position: relative;
   background-color: var(--proof-color);
   anchor-scope: --error-anchor;
