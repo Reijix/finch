@@ -545,6 +545,7 @@ viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id 
             , HP.id_ inputId
             , HP.classList_
                 [ ("has-error", hasError)
+                , ("focused", Just (Right na) == model ^. focusedLine)
                 ]
             , HP.autocomplete_ False
             , HP.draggable_ False
@@ -618,6 +619,7 @@ viewLine model na e =
               , ("has-error", hasError)
               , ("drag-target", Just (Left na) == model ^. dragTarget)
               , ("draggable", Just (Left na) /= model ^. focusedLine)
+              , ("focused", Just (Left na) == model ^. focusedLine)
               ]
           , HP.autocomplete_ False
           , HP.draggable_ False

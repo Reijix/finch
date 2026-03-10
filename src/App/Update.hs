@@ -151,7 +151,9 @@ updateModel (SpawnStart st) = do
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   p <- use proof
-  whenLeftM_ (pure dt) $ \na -> io_ $ hidePopover ("formula-error-" <> show (lineNoOr999 na p))
+  whenLeftM_ (pure dt) $ \na ->
+    io_ $
+      hidePopover ("formula-error-" <> show (lineNoOr999 na p))
   dragging .= True
 updateModel DragEnd = do
   chl <- use currentHoverLine
@@ -244,8 +246,7 @@ updateTitle = do
   let title =
         ( case proofErrors p of
             0 -> mempty
-            1 -> "(1) "
-            n -> "(" <> show n <> ") "
+            n -> show n <> " ✖ | "
         )
           <> prettyPrint f
   io_ [js| document.title = ${title} |]
@@ -290,7 +291,11 @@ updateURI = do
   p <- use proof
   io_ $ do
     uri <- getURI
-    let newURI = uri{uriQueryString = insert "proof" (Just . ms $ encodeForUrl p) (uriQueryString uri)}
+    let newURI =
+          uri
+            { uriQueryString =
+                insert "proof" (Just . ms $ encodeForUrl p) (uriQueryString uri)
+            }
     if uri /= newURI then pushURI newURI else pass
 
 -- | Re-parses every line of the current 'Proof'
@@ -377,12 +382,23 @@ class FromText a where
 
 instance FromText RawFormula where
   fromText :: Model -> Int -> Text -> Either Text RawFormula
-  fromText m = parseFormula (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
+  fromText m =
+    parseFormula
+      ( FormulaParserState
+          (m ^. operators)
+          (m ^. infixPreds)
+          (m ^. quantifiers)
+      )
 
 instance FromText RawAssumption where
   fromText :: Model -> Int -> Text -> Either Text RawAssumption
   fromText m =
-    parseAssumption (FormulaParserState (m ^. operators) (m ^. infixPreds) (m ^. quantifiers))
+    parseAssumption
+      ( FormulaParserState
+          (m ^. operators)
+          (m ^. infixPreds)
+          (m ^. quantifiers)
+      )
 
 instance FromText RuleApplication where
   fromText :: Model -> Int -> Text -> Either Text RuleApplication
@@ -430,5 +446,9 @@ reparse m n w = tryParse m n (getText w)
 reparseProof :: Model -> Proof -> Proof
 reparseProof model = pMapLinesWithLineNo reparseAssumption reparseDerivation
  where
-  reparseDerivation line (Derivation f r) = Derivation (reparse model line f) (reparse model line r)
-  reparseAssumption line (a, r) = (reparse model line a, reparse model line r)
+  reparseDerivation line (Derivation f r) =
+    Derivation
+      (reparse model line f)
+      (reparse model line r)
+  reparseAssumption line (a, r) =
+    (reparse model line a, reparse model line r)
