@@ -10,6 +10,7 @@
         name = "ghcjs";
       };
       devShells.test = inputs.miso.outputs.devShells.${system}.default;
+      devShells.wasm = inputs.miso.outputs.devShells.${system}.wasm;
     });
 
 }

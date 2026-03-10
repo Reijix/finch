@@ -1,37 +1,31 @@
 
-CABAL_OPTIONS = --allow-newer --with-compiler=javascript-unknown-ghcjs-ghc --with-hc-pkg=javascript-unknown-ghcjs-ghc-pkg --with-hsc2hs=javascript-unknown-ghcjs-hsc2hs
+.PHONY= update build optim
 
-.PHONY: update build serve haddock
-
-all: build
+all: update build optim serve
 
 update:
-	cabal update $(CABAL_OPTIONS)
+	wasm32-wasi-cabal update
 
 build:
-	cabal build $(CABAL_OPTIONS) finch
+	wasm32-wasi-cabal build
 	rm -rf public
-	cp -r $(shell cabal list-bin finch --verbose=0 $(CABAL_OPTIONS)).jsexe public
-	cp static/* public
+	cp -r static public
+	$(eval my_wasm=$(shell wasm32-wasi-cabal list-bin fitch-editor-FOL | tail -n 1))
+	$(shell wasm32-wasi-ghc --print-libdir)/post-link.mjs --input $(my_wasm) --output public/ghc_wasm_jsffi.js
+	cp -v $(my_wasm) public/
 
-serve1:
+optim:
+	wasm-opt -all -O2 public/fitch-editor-FOL.wasm -o public/fitch-editor-FOL.wasm
+	wasm-tools strip -o public/fitch-editor-FOL.wasm public/fitch-editor-FOL.wasm
+
+serve:
 	http-server public
-
-serve: all serve1
 
 clean:
 	rm -rf dist-newstyle public
 
 test:
-# no CABAL_OPTIONS because ghcjs backend does not work with tests...
-	cabal update
 	cabal test
 
 report:
 	cabal test --enable-coverage
-
-haddock:
-	cabal haddock --html --hyperlinked-source --haddock-quickjump --haddock-output-dir haddock
-
-haddock-serve: haddock
-	xdg-open haddock/Finch/index.html
