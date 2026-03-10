@@ -1,3 +1,13 @@
+{- |
+Module      : App.Model
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (GHCJS)
+
+This module defines the application 'Model'.
+-}
 module App.Model where
 
 import Fitch.Proof
@@ -9,6 +19,7 @@ import Miso (
  )
 import Miso.CSS qualified as CSS
 import Miso.Lens (Lens, lens, use, (%=), (.=), (<~))
+import Miso.Lens.TH (makeLenses)
 import Miso.Svg.Element qualified as S
 import Miso.Svg.Property qualified as SP
 import Relude.Extra.Map (DynamicMap (insert), (!?))
@@ -27,6 +38,12 @@ data SpawnType where
   SpawnLine :: SpawnType
   SpawnProof :: SpawnType
   deriving (Show, Eq)
+
+canSpawnIn :: NodeAddr -> SpawnType -> Bool
+canSpawnIn (NAProof n na) st = canSpawnIn na st
+canSpawnIn (NALine{}; NAAssumption{}; NAConclusion; NAAfterConclusion) SpawnLine = True
+canSpawnIn (NALine{}; NAConclusion) SpawnProof = True
+canSpawnIn _ _ = False
 
 data Action where
   InitMathJAX :: DOMRef -> Action
@@ -60,6 +77,7 @@ data Model = Model
   -- ^ the line that is currently focused
   , _exampleProofs :: [(Text, Proof)]
   , _emptyProof :: Proof
+  , _emptyDerivation :: Derivation
   , _proof :: Proof
   -- ^ the current proof
   , _sidebarToggle :: Bool
@@ -98,10 +116,14 @@ data Model = Model
   }
   deriving (Show, Eq)
 
+$(makeLenses ''Model)
+
 -- * Initial constructors
 initialModel ::
   -- | Empty proof, for the new proof button
   Proof ->
+  -- | Empty derivation, used for inserting lines and 'SubProof's
+  Derivation ->
   -- | Initial proof
   Proof ->
   -- | Example proofs
@@ -116,11 +138,12 @@ initialModel ::
   Map Name RuleSpec ->
   URI ->
   Model
-initialModel emptyP initialP ps operators infixPreds quantifiers rules uri =
+initialModel emptyP emptyD initialP ps operators infixPreds quantifiers rules uri =
   Model
     { _focusedLine = Nothing
     , _exampleProofs = ps
     , _emptyProof = emptyP
+    , _emptyDerivation = emptyD
     , _proof = initialP
     , _sidebarToggle = False
     , _dragTarget = Nothing
@@ -135,209 +158,3 @@ initialModel emptyP initialP ps operators infixPreds quantifiers rules uri =
     , _rules = rules
     , _uri = uri
     }
-
--- * Lenses
-focusedLine :: Lens Model (Maybe (Either NodeAddr NodeAddr))
-focusedLine = lens (._focusedLine) $ \model a -> model{_focusedLine = a}
-
-exampleProofs :: Lens Model [(Text, Proof)]
-exampleProofs = lens (._exampleProofs) $ \model ps -> model{_exampleProofs = ps}
-
-emptyProof :: Lens Model Proof
-emptyProof = lens (._emptyProof) $ \model p -> model{_emptyProof = p}
-
-proof :: Lens Model Proof
-proof = lens (._proof) $ \model p -> model{_proof = p}
-
-sidebarToggle :: Lens Model Bool
-sidebarToggle = lens (._sidebarToggle) $ \model st -> model{_sidebarToggle = st}
-
-dragTarget :: Lens Model (Maybe (Either NodeAddr ProofAddr))
-dragTarget = lens (._dragTarget) $ \model dt -> model{_dragTarget = dt}
-
-spawnType :: Lens Model (Maybe SpawnType)
-spawnType = lens (._spawnType) $ \model st -> model{_spawnType = st}
-
-currentHoverLine :: Lens Model (Maybe NodeAddr)
-currentHoverLine = lens (._currentHoverLine) $ \model chl -> model{_currentHoverLine = chl}
-
-dragging :: Lens Model Bool
-dragging = lens (._dragging) $ \model d -> model{_dragging = d}
-
-operators :: Lens Model [(Text, Text, Int)]
-operators = lens (._operators) $ \model op -> model{_operators = op}
-
-infixPreds :: Lens Model [(Text, Text)]
-infixPreds = lens (._infixPreds) $ \model p -> model{_infixPreds = p}
-
-quantifiers :: Lens Model [(Text, Text)]
-quantifiers = lens (._quantifiers) $ \model q -> model{_quantifiers = q}
-
-functionSymbols :: Lens Model (Map Text (Int, Pos))
-functionSymbols = lens (._functionSymbols) $ \model fs -> model{_functionSymbols = fs}
-
-predicateSymbols :: Lens Model (Map Text (Int, Pos))
-predicateSymbols = lens (._predicateSymbols) $ \model ps -> model{_predicateSymbols = ps}
-
-rules :: Lens Model (Map Name RuleSpec)
-rules = lens (._rules) $ \model rs -> model{_rules = rs}
-
-uri :: Lens Model URI
-uri = lens (._uri) $ \model u -> model{_uri = u}
-
--- * Semantic checking
-
-checkFreshness :: forall m. (MonadState Model m) => m ()
-checkFreshness = do
-  p <- use proof
-  proof .= pMapLinesWithAddr (goAssumption p) (const id) p
- where
-  goAssumption :: Proof -> NodeAddr -> Assumption -> Assumption
-  goAssumption _ _ a@(Unparsed{}, _) = a
-  goAssumption p na a@(ParsedInvalid txt _ ra, r) = (goRawAssumption p na txt ra, r)
-  goAssumption p na a@(ParsedValid txt ra, r) = (goRawAssumption p na txt ra, r)
-  goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
-  -- TODO refactor pCollectFreshnessNodes, it does not need to throw errors!!
-  goRawAssumption p (pCollectFreshnessNodes p -> nodes) txt ra@(FreshVar v) =
-    case isFreshList v nodes of
-      Nothing -> ParsedValid txt ra
-      Just (naf', f') ->
-        ParsedInvalid
-          txt
-          ( "Could not verify freshness of "
-              <> v
-              <> "\nIt appears in formula:\n"
-              <> show (lineNoOr999 naf' p)
-              <> "|"
-              <> prettyPrint f'
-          )
-          ra
-  goRawAssumption _ _ txt ra = ParsedValid txt ra
-  isFreshList ::
-    Name ->
-    [(NodeAddr, Either Assumption Derivation)] ->
-    Maybe (NodeAddr, Either RawAssumption RawFormula)
-  isFreshList v [] = Nothing
-  isFreshList v ((na, Left (fromWrapper -> Nothing, _)) : rest) = isFreshList v rest
-  isFreshList v ((na, Left (fromWrapper -> Just a, _)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)
-  isFreshList v ((na, Right (Derivation (fromWrapper -> Nothing) _)) : rest) = isFreshList v rest
-  isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
-
-{- | Recalculates the list of functionsymbols and predicatesymbols in the model.
-
-This is done by iterating over the proof and collecting all symbols.
-The first occurence of a symbol fixes its arity, and all following symbols with the same name are compared to this arity.
--}
-regenerateSymbols :: forall m. (MonadState Model m) => m ()
-regenerateSymbols = do
-  functionSymbols .= mempty
-  predicateSymbols .= mempty
-  proof <~ (use proof >>= pMapLinesMAccumL goAssumption goLine 1 <&> snd)
- where
-  goAssumption :: Int -> Assumption -> m (Int, Assumption)
-  goAssumption n a@(Unparsed{}, _) = pure (n + 1, a)
-  goAssumption n a@(ParsedInvalid txt err (RawAssumption f), r) = second ((,r) . (RawAssumption <$>)) <$> goFormula n (ParsedInvalid txt err f)
-  goAssumption n a@(ParsedInvalid _ _ (FreshVar{}), _) = pure (n + 1, a)
-  goAssumption n a@(ParsedValid txt (RawAssumption f), r) = second ((,r) . (RawAssumption <$>)) <$> goFormula n (ParsedValid txt f)
-  goAssumption n a@(ParsedValid _ (FreshVar{}), _) = pure (n + 1, a)
-
-  -- collect symbols inside a formula
-  goFormula :: Int -> Formula -> m (Int, Formula)
-  -- skip unparsed formulae
-  goFormula n a@(Unparsed{}) = pure (n + 1, a)
-  goFormula n a =
-    let (formula, txt) = case a of
-          (ParsedInvalid txt _ f) -> (f, txt)
-          (ParsedValid txt f) -> (f, txt)
-     in do
-          -- fetch current lists of symbols
-          fsyms <- use functionSymbols
-          psyms <- use predicateSymbols
-          a' <- go n fsyms psyms txt formula
-          pure (n + 1, a')
-   where
-    goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> m (Maybe Text)
-    goArgs n fsyms = foldlM (\mErr t -> if isJust mErr then pure mErr else goTerm n fsyms t) Nothing
-     where
-      goTerm :: Int -> Map Text (Int, Pos) -> Term -> m (Maybe Text)
-      goTerm _ _ (Var{}) = pure Nothing
-      goTerm n fsyms (Fun name args) = do
-        -- first check inner symbols
-        mTermError <- goArgs n fsyms args
-        case mTermError of
-          Just termError -> pure $ Just termError
-          Nothing ->
-            -- then check the function symbol
-            case fsyms !? name of
-              Nothing -> do
-                functionSymbols %= insert name (length args, n)
-                pure Nothing
-              Just (expLen, pos) ->
-                pure $
-                  if expLen == length args
-                    then Nothing
-                    else
-                      Just $
-                        "Function symbol "
-                          <> show name
-                          <> " has "
-                          <> show (length args)
-                          <> " arguments,\nbut in line "
-                          <> show pos
-                          <> " it appears with "
-                          <> show expLen
-                          <> " arguments."
-    -- proccesses a single formula.
-    go :: Int -> Map Text (Int, Pos) -> Map Text (Int, Pos) -> Text -> RawFormula -> m Formula
-    go n fsyms psyms txt formula@(Pred name args) = do
-      -- first check function symbols
-      mTermError <- goArgs n fsyms args
-      case mTermError of
-        Just termError -> pure $ ParsedInvalid txt termError formula
-        -- then check the predicate symbol
-        Nothing ->
-          case psyms !? name of
-            Nothing -> do
-              predicateSymbols %= insert name (length args, n)
-              pure (ParsedValid txt formula)
-            Just (expLen, pos) ->
-              pure $
-                if expLen == length args
-                  then ParsedValid txt formula
-                  -- TODO singular/plural!
-                  else
-                    ParsedInvalid
-                      txt
-                      ( "Predicate symbol "
-                          <> name
-                          <> " has "
-                          <> show (length args)
-                          <> " arguments,\nbut in line "
-                          <> show pos
-                          <> " it appears with "
-                          <> show expLen
-                          <> " argument(s)."
-                      )
-                      formula
-    go n fsyms psyms txt form@(Opr name fs) = foldlM (\r f -> go n fsyms psyms txt f <&> combineWrappers r) (ParsedValid txt form) fs
-     where
-      combineWrappers :: Wrapper RawFormula -> Wrapper RawFormula -> Wrapper RawFormula
-      combineWrappers (Unparsed _ err) _ = Unparsed txt err
-      combineWrappers (ParsedInvalid{}) (Unparsed _ err) = Unparsed txt err
-      combineWrappers (ParsedInvalid _ err _) (ParsedInvalid{}) = ParsedInvalid txt err form
-      combineWrappers (ParsedInvalid _ err _) (ParsedValid{}) = ParsedInvalid txt err form
-      combineWrappers (ParsedValid{}) (Unparsed _ err) = Unparsed txt err
-      combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
-      combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
-    go n fsyms psyms txt (Quantifier name variable formula) = go n fsyms psyms txt formula <&> (Quantifier name variable <$>)
-  -- proccesses a single line, by proccessing its formula.
-  goLine :: Int -> Derivation -> m (Int, Derivation)
-  goLine n (Derivation f r) = do
-    (n', f') <- goFormula n f
-    pure (n', Derivation f' r)
-
-canSpawnIn :: NodeAddr -> SpawnType -> Bool
-canSpawnIn (NAProof n na) st = canSpawnIn na st
-canSpawnIn (NALine{}; NAAssumption{}; NAConclusion; NAAfterConclusion) SpawnLine = True
-canSpawnIn (NALine{}; NAConclusion) SpawnProof = True
-canSpawnIn _ _ = False

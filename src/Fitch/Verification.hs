@@ -1,6 +1,6 @@
 module Fitch.Verification where
 
-import App.Model (Model)
+import App.Model
 import Data.Map qualified as M
 import Data.Traversable (mapAccumM)
 import Fitch.Proof
@@ -516,3 +516,175 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
             <> " because it does not exist."
       (Just (Left a), Just refAddr, Just ruleAddr) -> maybeToLeft (Left a) (refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr)))
       (Just (Right (Derivation f _)), Just refAddr, Just ruleAddr) -> maybeToLeft (Right f) (refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr)))
+
+-- * Semantic checking
+
+checkFreshness :: Proof -> Proof
+checkFreshness p = pMapLinesWithAddr (goAssumption p) (const id) p
+ where
+  goAssumption :: Proof -> NodeAddr -> Assumption -> Assumption
+  goAssumption _ _ a@(Unparsed{}, _) = a
+  goAssumption p na a@(ParsedInvalid txt _ ra, r) = (goRawAssumption p na txt ra, r)
+  goAssumption p na a@(ParsedValid txt ra, r) = (goRawAssumption p na txt ra, r)
+  goRawAssumption :: Proof -> NodeAddr -> Text -> RawAssumption -> Wrapper RawAssumption
+  goRawAssumption p (pCollectFreshnessNodes p -> nodes) txt ra@(FreshVar v) =
+    case isFreshList v nodes of
+      Nothing -> ParsedValid txt ra
+      Just (naf', f') ->
+        ParsedInvalid
+          txt
+          ( "Could not verify freshness of "
+              <> v
+              <> "\nIt appears in formula:\n"
+              <> show (lineNoOr999 naf' p)
+              <> "|"
+              <> prettyPrint f'
+          )
+          ra
+  goRawAssumption _ _ txt ra = ParsedValid txt ra
+  isFreshList ::
+    Name ->
+    [(NodeAddr, Either Assumption Derivation)] ->
+    Maybe (NodeAddr, Either RawAssumption RawFormula)
+  isFreshList v [] = Nothing
+  isFreshList v ((na, Left (fromWrapper -> Nothing, _)) : rest) = isFreshList v rest
+  isFreshList v ((na, Left (fromWrapper -> Just a, _)) : rest) = if isFresh v a then isFreshList v rest else Just (na, Left a)
+  isFreshList v ((na, Right (Derivation (fromWrapper -> Nothing) _)) : rest) = isFreshList v rest
+  isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
+
+type RegenState = (Int, Map Text (Int, Pos), Map Text (Int, Pos))
+
+{- | Recalculates the list of functionsymbols and predicatesymbols in the model.
+
+This is done by iterating over the proof and collecting all symbols.
+The first occurence of a symbol fixes its arity, and all following symbols with the same name are compared to this arity.
+-}
+regenerateSymbols :: Proof -> (Map Text (Int, Pos), Map Text (Int, Pos), Proof)
+regenerateSymbols p =
+  let
+    ((_, fsymbs, psymbs), p') = pMapLinesAccumL goAssumption goLine (1, mempty, mempty) p
+   in
+    (fsymbs, psymbs, p')
+ where
+  goAssumption :: RegenState -> Assumption -> (RegenState, Assumption)
+  goAssumption (n, fsymbs, psymbs) a@(Unparsed{}, _) =
+    ((n + 1, fsymbs, psymbs), a)
+  goAssumption (n, fsymbs, psymbs) a@(ParsedInvalid txt err (RawAssumption f), r) =
+    let ((n', fsymbs', psymbs'), f') = goFormula (n, fsymbs, psymbs) (ParsedInvalid txt err f)
+     in ((n', fsymbs', psymbs'), (RawAssumption <$> f', r))
+  goAssumption (n, fsymbs, psymbs) a@(ParsedValid txt (RawAssumption f), r) =
+    let ((n', fsymbs', psymbs'), f') = goFormula (n, fsymbs, psymbs) (ParsedValid txt f)
+     in ((n', fsymbs', psymbs'), (RawAssumption <$> f', r))
+  goAssumption (n, fsymbs, psymbs) a@(ParsedInvalid _ _ (FreshVar{}), _) =
+    ((n + 1, fsymbs, psymbs), a)
+  goAssumption (n, fsymbs, psymbs) a@(ParsedValid _ (FreshVar{}), _) =
+    ((n + 1, fsymbs, psymbs), a)
+
+  -- collect symbols inside a formula
+  goFormula :: RegenState -> Formula -> (RegenState, Formula)
+  -- skip unparsed formulae
+  goFormula (n, fsymbs, psymbs) a@(Unparsed{}) = ((n + 1, fsymbs, psymbs), a)
+  goFormula (n, fsymbs, psymbs) a =
+    let
+      (formula, txt) = case a of
+        (ParsedInvalid txt _ f) -> (f, txt)
+        (ParsedValid txt f) -> (f, txt)
+      (fsymbs', psymbs', a') = go n fsymbs psymbs txt formula
+     in
+      ((n + 1, fsymbs', psymbs'), a')
+   where
+    goArgs :: Int -> Map Text (Int, Pos) -> [Term] -> Either Text (Map Text (Int, Pos))
+    goArgs n = foldlM (\fsymbs' t -> goTerm n fsymbs' t)
+     where
+      goTerm :: Int -> Map Text (Int, Pos) -> Term -> Either Text (Map Text (Int, Pos))
+      goTerm _ fsymbs (Var{}) = Right fsymbs
+      goTerm n fsymbs (Fun name args) = do
+        -- first check inner symbols
+        fsymbs' <- goArgs n fsymbs args
+        -- then check the function symbol
+        case fsymbs' !? name of
+          Nothing -> Right $ insert name (length args, n) fsymbs'
+          Just (expLen, pos) ->
+            if expLen == length args
+              then Right fsymbs'
+              else
+                Left $
+                  "Function symbol "
+                    <> show name
+                    <> " has "
+                    <> show (length args)
+                    <> " argument"
+                    <> (if length args == 1 then "" else "s")
+                    <> ",\nbut in line "
+                    <> show pos
+                    <> " it appears with "
+                    <> show expLen
+                    <> " argument"
+                    <> (if expLen == 1 then "" else "s")
+                    <> "."
+    -- proccesses a single formula.
+    go ::
+      Int ->
+      Map Text (Int, Pos) ->
+      Map Text (Int, Pos) ->
+      Text ->
+      RawFormula ->
+      (Map Text (Int, Pos), Map Text (Int, Pos), Formula)
+    go n fsymbs psymbs txt formula@(Pred name args) =
+      let
+        -- first check function symbols
+        mTermError = goArgs n fsymbs args
+       in
+        case mTermError of
+          Left termError -> (fsymbs, psymbs, ParsedInvalid txt termError formula)
+          -- then check the predicate symbol
+          Right fsymbs' ->
+            case psymbs !? name of
+              Nothing ->
+                let
+                  psymbs' = insert name (length args, n) psymbs
+                 in
+                  (fsymbs', psymbs', ParsedValid txt formula)
+              Just (expLen, pos) ->
+                if expLen == length args
+                  then (fsymbs', psymbs, ParsedValid txt formula)
+                  else
+                    ( fsymbs'
+                    , psymbs
+                    , ParsedInvalid
+                        txt
+                        ( "Predicate symbol "
+                            <> name
+                            <> " has "
+                            <> show (length args)
+                            <> " argument"
+                            <> (if length args == 1 then "" else "s")
+                            <> ",\nbut in line "
+                            <> show pos
+                            <> " it appears with "
+                            <> show expLen
+                            <> " argument"
+                            <> (if expLen == 1 then "" else "s")
+                            <> "."
+                        )
+                        formula
+                    )
+    go n fsymbs psymbs txt form@(Opr name fs) =
+      foldlM (\r f -> go n fsymbs psymbs txt f <&> combineWrappers r) (ParsedValid txt form) fs
+     where
+      combineWrappers :: Wrapper RawFormula -> Wrapper RawFormula -> Wrapper RawFormula
+      combineWrappers (Unparsed _ err) _ = Unparsed txt err
+      combineWrappers (ParsedInvalid{}) (Unparsed _ err) = Unparsed txt err
+      combineWrappers (ParsedInvalid _ err _) (ParsedInvalid{}) = ParsedInvalid txt err form
+      combineWrappers (ParsedInvalid _ err _) (ParsedValid{}) = ParsedInvalid txt err form
+      combineWrappers (ParsedValid{}) (Unparsed _ err) = Unparsed txt err
+      combineWrappers (ParsedValid{}) (ParsedInvalid _ err _) = ParsedInvalid txt err form
+      combineWrappers (ParsedValid{}) (ParsedValid{}) = ParsedValid txt form
+    go n fsymbs psymbs txt (Quantifier name variable formula) = go n fsymbs psymbs txt formula <&> (Quantifier name variable <$>)
+  -- proccesses a single line, by proccessing its formula.
+  goLine :: RegenState -> Derivation -> (RegenState, Derivation)
+  goLine (n, fsymbs, psymbs) (Derivation f r) =
+    let
+      ((n', fsymbs', psymbs'), f') = goFormula (n, fsymbs, psymbs) f
+     in
+      ((n', fsymbs', psymbs'), Derivation f' r)

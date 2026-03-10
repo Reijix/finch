@@ -10,7 +10,8 @@ module Specification.FOL (
 
 import Miso.Router (URI)
 
-import App.Update (Model, initialModel)
+import App.Model
+import Fitch.Proof
 import Fitch.Proof (
   AssumptionSpec (..),
   FormulaSpec (..),
@@ -170,6 +171,7 @@ initialModelFOL :: URI -> Maybe Proof -> Model
 initialModelFOL uri mp =
   initialModel
     emptyProofFOL
+    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤)" (RuleApplication "⊤" [])))
     (fromMaybe initialP mp)
     exampleProofsFOL
     operatorsFOL

@@ -45,7 +45,7 @@ readProof filePath = do
       pure . (^. proof) $
         execState
           checkProof
-          (initialModel p p [] operatorsFOL infixPredsFOL quantifiersFOL rulesFOL (URI "" "" mempty))
+          (initialModelFOL (URI "" "" mempty) (Just p))
 
 assertValid :: Wrapper a -> Assertion
 assertValid (Unparsed _ err) =

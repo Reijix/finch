@@ -1,5 +1,7 @@
 module Util where
 
+import Miso.Lens (Lens, (%=))
+
 {- | Returns all combinations of a list of list.
 Taken from package 'liquid-fixpoint' and adjusted to use `NonEmpty`.
 
@@ -44,3 +46,6 @@ updateAtM :: (MonadFail m) => Int -> (a -> m a) -> [a] -> m [a]
 updateAtM _ _ [] = fail ""
 updateAtM 0 f (a : as) = f a <&> (: as)
 updateAtM n f (a : as) = (a :) <$> updateAtM (n - 1) f as
+
+(%=?) :: (MonadState record m) => Lens record field -> (field -> Maybe field) -> m ()
+(%=?) _lens f = _lens %= (\x -> fromMaybe x (f x))

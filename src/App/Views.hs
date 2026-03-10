@@ -1,6 +1,6 @@
 {- |
 Module      : App.Views
-Copyright   : (C) Leon Vatthauer, 2026
+Copyright   : (c) Leon Vatthauer, 2026
 License     : GPL-3
 Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
 Stability   : experimental
@@ -10,6 +10,7 @@ This module defines the Miso t'View's of the application.
 -}
 module App.Views where
 
+-----------------------------------------------------------------------------
 import App.Model
 import Data.Either (isLeft)
 import Data.List qualified as L
@@ -180,14 +181,14 @@ viewSidebar model =
 
 -- | Wrapper for creating @<details>@ elements in the sidebar.
 viewDetails ::
-  -- | Icon of the <details> summary.
-  MisoString ->
   -- | Text of the <details> summary.
+  MisoString ->
+  -- | Icon of the <details> summary.
   MisoString ->
   -- | Content of the <details> element.
   View Model Action ->
   View Model Action
-viewDetails icon txt content =
+viewDetails txt icon content =
   H.details_
     [HP.open_ True, HP.class_ "sidebar-element"]
     [ H.summary_

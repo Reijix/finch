@@ -6,13 +6,16 @@ module Specification.Prop (
   initialModelProp,
 ) where
 
-import App.Model (Model)
-import App.Update (initialModel)
+import App.Model (Model, initialModel)
 import Fitch.Proof (
   AssumptionSpec (..),
+  Derivation (..),
   FormulaSpec (FOpr, FPlaceholder),
   Proof (..),
+  RawFormula (..),
+  RuleApplication (..),
   RuleSpec (..),
+  Wrapper (..),
  )
 import Miso.Router (URI)
 import Parser.Proof
@@ -103,6 +106,7 @@ initialModelProp :: URI -> Maybe Proof -> Model
 initialModelProp uri mp =
   initialModel
     emptyProofProp
+    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤)" (RuleApplication "⊤" [])))
     (fromMaybe initialP mp)
     exampleProofsProp
     operatorsProp
