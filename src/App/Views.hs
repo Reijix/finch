@@ -393,6 +393,7 @@ viewProof model =
       (isJust pa)
       [ HP.class_ "draggable"
       , HP.draggable_ (isNothing (model ^. focusedLine))
+      , HP.classList_ [("drag-target", (Right <$> pa) == model ^. dragTarget)]
       , onDragStartWithOptions stopPropagation $ DragStart (Right (fromJust pa))
       , onDragEndWithOptions defaultOptions DragEnd
       ]
@@ -544,7 +545,6 @@ viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id 
             , HP.id_ inputId
             , HP.classList_
                 [ ("has-error", hasError)
-                , ("focused", Just (Right na) == model ^. focusedLine)
                 ]
             , HP.autocomplete_ False
             , HP.draggable_ False
@@ -600,6 +600,7 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
+      , HP.class_ "draggable"
       , HP.draggable_ (isNothing (model ^. focusedLine))
       , if model ^. focusedLine /= Just (Left na)
           then onDragStartWithOptions stopPropagation $ DragStart (Left na)
@@ -615,8 +616,8 @@ viewLine model na e =
           , HP.classList_
               [ ("formula-input", True)
               , ("has-error", hasError)
+              , ("drag-target", Just (Left na) == model ^. dragTarget)
               , ("draggable", Just (Left na) /= model ^. focusedLine)
-              , ("focused", Just (Left na) == model ^. focusedLine)
               ]
           , HP.autocomplete_ False
           , HP.draggable_ False

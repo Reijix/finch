@@ -1,7 +1,7 @@
 
 .PHONY= update build optim
 
-all: update build optim serve
+all: build optim serve
 
 update:
 	wasm32-wasi-cabal update

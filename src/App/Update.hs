@@ -42,6 +42,7 @@ import Miso (
   callFunction,
   castJSVal,
   component,
+  consoleLog,
   defaultEvents,
   defaultOptions,
   dispatchEvent,
@@ -332,9 +333,7 @@ dropBeforeLine targetAddr = do
             (Right $ _get emptyDerivation m)
             targetAddr
             p of
-            Just (na, p) -> do
-              proof .= p
-              setFocus (Left na)
+            Just (na, p) -> proof .= p
             _ -> pass
     Just SpawnProof ->
       use proof
@@ -344,9 +343,7 @@ dropBeforeLine targetAddr = do
             (pure $ SubProof [] [] (_get emptyDerivation m))
             (paFromNA targetAddr p)
             (pure p) of
-          Just (pa, p) -> do
-            proof .= p
-            setFocus (Left $ naFromPA pa NAConclusion)
+          Just (pa, p) -> proof .= p
           _ -> pass
   clearDrag >> updateProof
 
