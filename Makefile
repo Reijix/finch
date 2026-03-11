@@ -29,7 +29,7 @@ test:
 	cabal test
 
 haddock:
-	wasm32-wasi-cabal haddock --html --hyperlinked-source --haddock-quickjump --haddock-output-dir haddock
+	wasm32-wasi-cabal haddock --haddock-option="--html --hyperlinked-source" --haddock-quickjump --haddock-output-dir haddock
 
 haddock-serve: haddock
 	xdg-open haddock/Finch/index.html

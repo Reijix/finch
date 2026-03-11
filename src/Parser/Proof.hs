@@ -1,26 +1,21 @@
+{- |
+Module      : Parser.Proof
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module defines parsers for t'Derivation's and full t'Proof's.
+-}
 module Parser.Proof where
 
 import Data.List.NonEmpty (some1)
 import Data.Text qualified as T
-import Fitch.Proof (
-  Assumption,
-  Derivation (..),
-  Formula,
-  Proof (..),
-  RawAssumption (..),
-  RawFormula,
-  Wrapper (ParsedValid),
-  mkAssumption,
- )
-import Parser.Formula (
-  FormulaParser,
-  FormulaParserState (..),
-  pFreshVariable,
-  pRawAssumption,
-  pRawFormula,
- )
-import Parser.Rule (pRule)
-import Parser.Util (Parser, lexeme, symbol)
+import Fitch.Proof
+import Parser.Formula
+import Parser.Rule
+import Parser.Util
 import Text.Megaparsec (
   ErrorItem (..),
   PosState (..),
@@ -39,15 +34,19 @@ import Text.Megaparsec (
  )
 import Text.Megaparsec qualified as Parsec
 
-matchNoSpaces :: (Parser m) => m a -> m (Text, a)
-matchNoSpaces p = first T.strip <$> match p
+-----------------------------------------------------------------------------
 
+-- * Line parsers
+
+-- | Parses a t'Formula', capturing the source text and wrapping the result in 'ParsedValid'.
 pFormula :: (FormulaParser m) => m Formula
 pFormula = matchNoSpaces (lexeme pRawFormula) <&> uncurry ParsedValid
 
+-- | Parses an t'Assumption', capturing the source text and wrapping the result in 'ParsedValid'.
 pAssumption :: (FormulaParser m) => m Assumption
 pAssumption = mkAssumption <$> (matchNoSpaces (lexeme pRawAssumption) <&> uncurry ParsedValid)
 
+-- | Parses a t'Derivation': a t'Formula' followed by a t'RuleApplication'.
 pDerivation :: (FormulaParser m) => m Derivation
 pDerivation =
   liftA2
@@ -55,13 +54,29 @@ pDerivation =
     pFormula
     (matchNoSpaces (lexeme pRule) <&> uncurry ParsedValid)
 
-pFormulaSep :: (Parser m) => Int -> m ()
-pFormulaSep ind = void . withIndent ind $ symbol "---"
+-----------------------------------------------------------------------------
 
+-- * Proof structure parsers
+
+-- | Combinator that gates a parser behind @n@ leading @|@ symbols.
 withIndent :: (Parser m) => Int -> m a -> m a
 withIndent 0 p = p
 withIndent n p = symbol "|" *> withIndent (n - 1) p
 
+{- | Parses the @---@ separator that divides t'Assumption's from t'Derivation's
+in a t'Proof', respecting the current indentation depth.
+-}
+pFormulaSep :: (Parser m) => Int -> m ()
+pFormulaSep ind = void . withIndent ind $ symbol "---"
+
+{- | Parses a t'Proof' at the given indentation depth.
+
+The structure is:
+
+1. Zero or more t'Assumption's, collected up to the @---@ separator.
+2. One or more t'Derivation's or nested v'SubProof's.
+3. The final element must be a t'Derivation'.
+-}
 pProof :: (FormulaParser m) => Int -> m Proof
 pProof ind =
   do
@@ -74,8 +89,24 @@ pProof ind =
       Right p -> unexpected (Label $ fromList "subproof")
     <?> "subproof"
 
+-----------------------------------------------------------------------------
+
+-- * Entry points
+
+{- | Parses a single t'Derivation' line from a t'Text'.
+Returns 'Left' with a human-readable error message on failure,
+or 'Right' with the parsed t'Derivation' on success.
+-}
 parseLine ::
-  [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Derivation
+  -- | List of operators as (alias, operator, arity).
+  [(Text, Text, Int)] ->
+  -- | List of infix predicates as (alias, predicate).
+  [(Text, Text)] ->
+  -- | List of quantifiers as (alias, quantifier).
+  [(Text, Text)] ->
+  -- | Input t'Text' to parse.
+  Text ->
+  Either Text Derivation
 parseLine operators infixPreds quantifiers input = case evalState
   (runParserT' (pDerivation <* eof) initialParserState)
   initialState of
@@ -103,8 +134,20 @@ parseLine operators infixPreds quantifiers input = case evalState
       , quantifiers
       }
 
+{- | Parses a full t'Proof' from a t'Text'.
+Returns 'Left' with a human-readable error message on failure,
+or 'Right' with the parsed t'Proof' on success.
+-}
 parseProof ::
-  [(Text, Text, Int)] -> [(Text, Text)] -> [(Text, Text)] -> Text -> Either Text Proof
+  -- | List of operators as (alias, operator, arity).
+  [(Text, Text, Int)] ->
+  -- | List of infix predicates as (alias, predicate).
+  [(Text, Text)] ->
+  -- | List of quantifiers as (alias, quantifier).
+  [(Text, Text)] ->
+  -- | Input t'Text' to parse.
+  Text ->
+  Either Text Proof
 parseProof operators infixPreds quantifiers input =
   case evalState
     (runParserT' (pProof 1 <* eof) initialParserState)
