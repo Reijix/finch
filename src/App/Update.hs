@@ -4,15 +4,16 @@ Copyright   : (c) Leon Vatthauer, 2026
 License     : GPL-3
 Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
 Stability   : experimental
-Portability : non-portable (GHCJS)
+Portability : non-portable (ghc-wasm-meta)
 
 The update loop of the application, basically all of its logic.
 -}
 module App.Update where
 
 -----------------------------------------------------------------------------
-import App.Decoder
+
 import App.Model
+import App.URLDecoder
 import App.Views
 import Data.Text qualified as T
 import Fitch.Proof

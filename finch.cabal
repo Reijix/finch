@@ -107,8 +107,8 @@ executable finch
 
 library
   exposed-modules:
-    App.Decoder
     App.Model
+    App.URLDecoder
     App.Update
     App.Views
     Fitch.Proof

@@ -1,7 +1,7 @@
 module Main where
 
-import App.Decoder
 import App.Model
+import App.URLDecoder
 import App.Update
 import App.Views
 import Data.Text qualified as T
@@ -12,6 +12,7 @@ import Specification.FOL
 import Specification.Prop
 
 -----------------------------------------------------------------------------
+
 -- | WASM export, required when compiling w/ the WASM backend.
 #ifdef WASM
 foreign export javascript "hs_start" main :: IO ()

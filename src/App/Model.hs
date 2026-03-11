@@ -4,7 +4,7 @@ Copyright   : (c) Leon Vatthauer, 2026
 License     : GPL-3
 Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
 Stability   : experimental
-Portability : non-portable (GHCJS)
+Portability : non-portable (ghc-wasm-meta)
 
 This module defines the application t'Model'.
 -}
