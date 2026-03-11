@@ -11,6 +11,7 @@ natural deduction t'Proof's. Given a map of t'RuleSpec's, it checks each
 t'Derivation' line by verifying that its t'RuleApplication' is applied correctly.
 
 Phases of proof verification:
+
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
   3. Match references to lines/proof, concretely:
