@@ -682,7 +682,7 @@ interleaveWithDropZones ::
   Maybe MisoString ->
   -- | Optionally a differing t'NodeAddr' for the last dropzone.
   Maybe NodeAddr ->
-  -- | A function for generating t'NodeAddr' from a number (e.g. turn @n@ into @t'NAAssumption' n@).
+  -- | A function for generating t'NodeAddr' from a number (e.g. turn @n@ into @v'NAAssumption' n@).
   (Int -> NodeAddr) ->
   -- | The list of views to be interleaved.
   [View Model Action] ->

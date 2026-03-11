@@ -68,7 +68,7 @@ ruleSpecTex (RuleSpec fs ps conclusion) =
 
 -- | A substitution of a named placeholder by some value.
 data Subst a
-  = -- | @'Subst' name value@ replaces the placeholder @name@ with @value@.
+  = -- | @v'Subst' name value@ replaces the placeholder @name@ with @value@.
     Subst Name a
   deriving (Show, Eq)
 

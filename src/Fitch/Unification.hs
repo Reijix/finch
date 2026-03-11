@@ -83,8 +83,8 @@ instance FreeVars RawAssumption where
 -- | Type class for substitution.
 class Substitute a b where
   {- | Takes a substitution and replaces variables occuring
-  in the structure of type `a` with elements of type `b`.
-  Of course this only makes sense if the type `a` also contains the type `b`.
+  in the structure of type @a@ with elements of type @b@.
+  Of course this only makes sense if the type @a@ also contains the type @b@.
   -}
   subst :: Subst b -> a -> a
 

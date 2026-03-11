@@ -53,8 +53,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 pLine :: (Parser m) => m Int
 pLine = lexeme L.decimal <?> "line number"
 
-{- | Parses a t'Reference': either a t'ProofReference' (a line range @m-n@)
-or a t'LineReference' (a single line number @n@).
+{- | Parses a t'Reference': either a v'ProofReference' (a line range @m-n@)
+or a v'LineReference' (a single line number @n@).
 -}
 pReference :: (Parser m) => m Reference
 pReference = proofReference <|> lineReference

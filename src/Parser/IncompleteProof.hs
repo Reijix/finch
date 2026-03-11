@@ -72,7 +72,7 @@ pIncompleteDerivation = do
   pure $ Derivation (Unparsed f "") (Unparsed r "")
 
 {- | Parses a single t'Assumption' from the serialization format produced by 'safeParsePrint'.
-Both the t'Formula' and t'Rule' fields are left as v'Unparsed' wrappers
+Both the t'Formula' and t'RuleApplication' fields are left as v'Unparsed' wrappers
 and are re-parsed later by the application.
 -}
 pIncompleteAssumption :: (Parser m) => m Assumption

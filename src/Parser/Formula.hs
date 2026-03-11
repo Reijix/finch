@@ -166,7 +166,7 @@ pRawAssumption = (pFreshVariable <|> (RawAssumption <$> pRawFormula)) <?> "assum
 
 -- * Entry points
 
-{- | Constructs an initial Megaparsec 'State' positioned at the given line number,
+{- | Constructs an initial Megaparsec t'Text.Megaparsec.State' positioned at the given line number,
 so that parse errors report the correct source location.
 -}
 initialParserState ::

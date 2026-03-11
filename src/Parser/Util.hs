@@ -11,9 +11,7 @@ used across all other @Parser.*@ modules.
 -}
 module Parser.Util where
 
-import Control.Monad.Combinators.Expr (
-  Operator (InfixL, Prefix),
- )
+import Control.Monad.Combinators.Expr
 import Data.Char (isLetter, isLowerCase, isUpperCase)
 import Data.Text qualified as T
 import Text.Megaparsec (

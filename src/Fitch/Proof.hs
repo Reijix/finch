@@ -150,7 +150,7 @@ instance PrettyPrint Term where
   prettyPrint (Fun f ts) = f <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
 
 {- | A formula of first-order logic.
-It can also represent propositional formulae by using t'Pred' without any t'Term's.
+It can also represent propositional formulae by using v'Pred' without any t'Term's.
 -}
 data RawFormula
   = -- | A predicate applied to terms.
@@ -223,7 +223,7 @@ toAssumption (Derivation (ParsedValid txt f) ra) = (ParsedValid txt (RawAssumpti
 
 {- | Converts an t'Assumption' into a t'Derivation'.
 Fresh-variable assumptions cannot be converted to formulas and are therefore turned
-into t'Unparsed'.
+into v'Unparsed'.
 -}
 toDerivation :: Assumption -> Derivation
 toDerivation (Unparsed txt err, ra) = Derivation (Unparsed txt err) ra
@@ -313,7 +313,7 @@ instance PrettyPrint Proof where
 
 -- * Folds and Maps
 
-{- | @t'pFoldLines' af df s p@ folds the proof @p@ line-wise to a value
+{- | @'pFoldLines' af df s p@ folds the proof @p@ line-wise to a value
 of type @a@ with starting value @s@.
 -}
 pFoldLines ::
@@ -324,7 +324,7 @@ pFoldLines ::
   a
 pFoldLines af df s (SubProof fs ps c) = df (foldl' (\s' -> either (df s') (pFoldLines af df s')) (foldl' af s fs) ps) c
 
--- | The t'pLength' of a t'Proof' is its total number of lines.
+-- | The 'pLength' of a t'Proof' is its total number of lines.
 pLength :: Proof -> Int
 pLength = pFoldLines (\n _ -> n + 1) (\n _ -> n + 1) 0
 
@@ -975,7 +975,7 @@ naUpdateRule _ _ p = Nothing
 {- | @'naRemoveRaw' addr proof@ removes the element at a valid @addr@ from @proof@
 without updating any t'Reference's.
 
-For the t'NAConclusion' case: if the last element of @ps@ is a t'Derivation',
+For the v'NAConclusion' case: if the last element of @ps@ is a t'Derivation',
 it is promoted to become the new conclusion. Otherwise v'Nothing' is returned.
 
 __Note:__ Use 'naRemove' if references must stay consistent.

@@ -8,7 +8,7 @@ Portability : non-portable (ghc-wasm-meta)
 
 This module implements the proof verification algorithm for Fitch-style
 natural deduction t'Proof's. Given a map of t'RuleSpec's, it checks each
-t'Derivation' line by verifying that its t'RuleApplication' is applied correctly.
+line by verifying that its t'RuleApplication' is applied correctly.
 
 Phases of proof verification:
 
@@ -578,6 +578,8 @@ checkFreshness p = pMapLinesWithAddr (goAssumption p) (const id) p
   isFreshList v ((na, Right (Derivation (fromWrapper -> Nothing) _)) : rest) = isFreshList v rest
   isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
 
+{- | State used in 'regenerateSymbols',
+contains list of functionSymbols and predicateSymbols -}
 type RegenState = (Int, Map Text (Int, Pos), Map Text (Int, Pos))
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
