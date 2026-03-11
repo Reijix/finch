@@ -12,16 +12,9 @@ import Miso.Router (URI)
 
 import App.Model
 import Fitch.Proof
-import Fitch.Proof (
-  AssumptionSpec (..),
-  FormulaSpec (..),
-  Proof (..),
-  RuleSpec (..),
-  TermSpec (TPlaceholder, TVar),
-  (~>),
- )
 import Parser.Proof (parseProof)
 import Specification.Prop
+import Specification.Types
 
 operatorsFOL :: [(Text, Text, Int)]
 operatorsFOL = operatorsProp

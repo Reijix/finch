@@ -260,7 +260,7 @@ updateURI = do
 proofReparse :: Effect ROOT Model Action
 proofReparse = get >>= \m -> proof %= reparseProof m
 
--- | Re-parses a single 'Derivation' or t'Assumption'.
+-- | Re-parses a single t'Derivation' or t'Assumption'.
 naReparseLine :: NodeAddr -> Effect ROOT Model Action
 naReparseLine na =
   get >>= \m ->

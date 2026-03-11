@@ -14,6 +14,7 @@ import Fitch.Proof
 import Miso (DOMRef, MisoString, URI)
 import Miso.Lens (Lens, lens)
 import Miso.Lens.TH (makeLenses)
+import Specification.Types
 
 -----------------------------------------------------------------------------
 

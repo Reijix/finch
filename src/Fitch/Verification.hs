@@ -7,6 +7,7 @@ import Fitch.Proof
 import Fitch.Unification
 import Relude.Extra.Map
 import Relude.Extra.Newtype
+import Specification.Types
 import Util (allCombinations)
 
 {- Phases of proof verification:

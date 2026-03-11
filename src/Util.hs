@@ -49,3 +49,7 @@ updateAtM n f (a : as) = (a :) <$> updateAtM (n - 1) f as
 
 (%=?) :: (MonadState record m) => Lens record field -> (field -> Maybe field) -> m ()
 (%=?) _lens f = _lens %= (\x -> fromMaybe x (f x))
+
+-- | Returns whether the given integer lies inside the inclusive interval.
+inRange :: (Int, Int) -> Int -> Bool
+inRange (start, end) n = n >= start && n <= end

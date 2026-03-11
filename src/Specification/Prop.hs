@@ -7,16 +7,8 @@ module Specification.Prop (
 ) where
 
 import App.Model (Model, initialModel)
-import Fitch.Proof (
-  AssumptionSpec (..),
-  Derivation (..),
-  FormulaSpec (FOpr, FPlaceholder),
-  Proof (..),
-  RawFormula (..),
-  RuleApplication (..),
-  RuleSpec (..),
-  Wrapper (..),
- )
+import Fitch.Proof
+import Specification.Types
 import Miso.Router (URI)
 import Parser.Proof
 

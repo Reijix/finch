@@ -1,19 +1,9 @@
 module Fitch.Unification where
 
 import Data.Set qualified as Set
-import Fitch.Proof (
-  AssumptionSpec (..),
-  FormulaSpec (..),
-  Name,
-  PrettyPrint (prettyPrint),
-  RawAssumption (..),
-  RawFormula (Opr, Pred, Quantifier),
-  Subst (..),
-  Term (..),
-  TermSpec (..),
-  isFun,
- )
+import Fitch.Proof
 import Relude.Extra (delete, member, notMember)
+import Specification.Types
 
 -- * Collecting variables in structures
 
