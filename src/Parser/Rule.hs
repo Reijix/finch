@@ -1,18 +1,21 @@
+{- |
+Module      : Parser.Rule
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module defines parsers for t'RuleApplication's and t'Reference's.
+-}
 module Parser.Rule where
 
 import Control.Monad.Combinators.Expr (
   Operator (InfixL, Prefix),
   makeExprParser,
  )
-import Fitch.Proof (Reference (..), RuleApplication (..))
-import Parser.Util (
-  Parser,
-  comma,
-  lexeme,
-  minus,
-  pSymbolicName,
-  parens,
- )
+import Fitch.Proof
+import Parser.Util
 import Text.Megaparsec (
   MonadParsec (eof, try),
   PosState (
@@ -42,15 +45,26 @@ import Text.Megaparsec (
 import Text.Megaparsec.Char (digitChar, letterChar, printChar, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
+-----------------------------------------------------------------------------
+
+-- * Parsers
+
+-- | Parses a positive integer as a line number.
 pLine :: (Parser m) => m Int
 pLine = lexeme L.decimal <?> "line number"
 
+{- | Parses a t'Reference': either a t'ProofReference' (a line range @m-n@)
+or a t'LineReference' (a single line number @n@).
+-}
 pReference :: (Parser m) => m Reference
 pReference = proofReference <|> lineReference
  where
   proofReference = liftA2 ProofReference (try $ pLine <* lexeme minus) pLine <?> "line range"
   lineReference = LineReference <$> pLine <?> "line number"
 
+{- | Parses a t'RuleApplication': a rule name enclosed in parentheses,
+followed by a comma-separated list of t'Reference's.
+-}
 pRule :: (Parser m) => m RuleApplication
 pRule =
   liftA2
@@ -58,7 +72,20 @@ pRule =
     (parens (try pSymbolicName <|> pure ""))
     (lexeme pReference `sepBy` comma)
 
-parseRuleApplication :: Int -> Text -> Either Text RuleApplication
+-----------------------------------------------------------------------------
+
+-- * Entry point
+
+{- | Parses a t'RuleApplication' from a t'Text'.
+Returns 'Left' with a human-readable error message on failure,
+or 'Right' with the parsed t'RuleApplication' on success.
+-}
+parseRuleApplication ::
+  -- | Line number, used to anchor error positions.
+  Int ->
+  -- | Input t'Text' to parse.
+  Text ->
+  Either Text RuleApplication
 parseRuleApplication lineNo input = case runParser' (pRule <* eof) initialParserState of
   (_, Left e) -> Left . toText $ errorBundlePretty e
   (_, Right ra) -> Right ra
