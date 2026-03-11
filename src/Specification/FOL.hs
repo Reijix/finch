@@ -1,3 +1,14 @@
+{- |
+Module      : Specification.FOL
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module provides the specification of first-order logic, i.e. its
+operators, rules and some examples. This module extends "Specification.Prop"
+-}
 module Specification.FOL (
   operatorsFOL,
   infixPredsFOL,
@@ -16,15 +27,52 @@ import Parser.Proof (parseProof)
 import Specification.Prop
 import Specification.Types
 
+-----------------------------------------------------------------------------
+
+-- * Operators
+
+{- | Operators of first-order logic.
+
+Each entry is a triple @(alias, operator, arity)@, where @alias@ is
+ASCII text the parser also accepts and the operator is usually a unicode symbol.
+
+Operators are inherited from 'operatorsProp'.
+-}
 operatorsFOL :: [(Text, Text, Int)]
 operatorsFOL = operatorsProp
 
+-----------------------------------------------------------------------------
+
+-- * Infix Predicates
+
+{- | Infix predicates of first-order logic.
+
+Each entry is a pair @(alias, predicate)@, where @alias@ is ASCII text
+the parser also accepts.
+-}
 infixPredsFOL :: [(Text, Text)]
 infixPredsFOL = [("", "=")]
 
+-----------------------------------------------------------------------------
+
+-- * Quantifiers
+
+{- | Quantifiers of first-order logic.
+
+Each entry is a pair @(alias, quantifier)@, where @alias@ is ASCII text
+the parser also accepts and @quantifier@ is a unicode symbol.
+-}
 quantifiersFOL :: [(Text, Text)]
 quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 
+-----------------------------------------------------------------------------
+
+-- * Rules
+
+{- | The standard Fitch-style natural deduction rules for first-order logic.
+
+Extends 'rulesProp' with rules for @∀@, @∃@ and @=@.
+-}
 rulesFOL :: Map Text RuleSpec
 rulesFOL =
   rulesProp
@@ -59,11 +107,24 @@ rulesFOL =
   phi = FPlaceholder "φ"
   psi = FPlaceholder "ψ"
 
+-----------------------------------------------------------------------------
+
+-- * Parser
+
+{- | Parses a t'Proof' of first-order logic.
+
+__Note:__ Should not be used outside of this module, because it uses 'error'.
+-}
 readProof :: Text -> Proof
 readProof proofText = case parseProof operatorsFOL infixPredsFOL quantifiersFOL proofText of
   Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
   Right p -> p
 
+-----------------------------------------------------------------------------
+
+-- * Examples
+
+-- | The default empty t'Proof' shown when the user starts a new proof in first-order-logic mode.
 emptyProofFOL :: Proof
 emptyProofFOL =
   readProof
@@ -72,6 +133,7 @@ emptyProofFOL =
     |⊤ (⊤I)
     """
 
+-- | A list of example t'Proof's shown in the sidebar, each paired with a display name.
 exampleProofsFOL :: [(Text, Proof)]
 exampleProofsFOL =
   [
@@ -160,7 +222,17 @@ exampleProofsFOL =
     )
   ]
 
-initialModelFOL :: URI -> Maybe Proof -> Model
+-----------------------------------------------------------------------------
+
+-- * Model
+
+-- | Constructs the initial t'Model' for first-order-logic.
+initialModelFOL ::
+  -- | The current t'URI' of the application.
+  URI ->
+  -- | An optional t'Proof' decoded from the URL; falls back to the first example proof.
+  Maybe Proof ->
+  Model
 initialModelFOL uri mp =
   initialModel
     emptyProofFOL

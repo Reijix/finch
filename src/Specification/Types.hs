@@ -1,9 +1,24 @@
+{- |
+Module      : Specification.Types
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module defines specification types that mirror t'Term', t'Formula',
+t'Assumption' and t'Proof' for describing Fitch proof rules.
+-}
 module Specification.Types where
 
 import Data.Text qualified as T
 import Fitch.Proof
 
-{- | Specification of a referenced t'Proof'
+-----------------------------------------------------------------------------
+
+-- * Rule specifications
+
+{- | Specification of a referenced t'Proof' premise,
 containing the specification of its t'Assumption's and its conclusion.
 -}
 type ProofSpec = ([AssumptionSpec], FormulaSpec)
@@ -18,7 +33,7 @@ data RuleSpec
       [FormulaSpec]
       -- | t'Proof' premises.
       [ProofSpec]
-      -- | The conclusion that is proven by the rule.
+      -- | The conclusion derived by the rule.
       FormulaSpec
   deriving (Show, Eq)
 
@@ -47,25 +62,29 @@ ruleSpecTex (RuleSpec fs ps conclusion) =
     assumptionSpecTex (AssumptionSpec frm) = formulaSpecTex frm
   showFsPs = T.intercalate "\\quad " (map formulaSpecTex fs <> map proofSpecTex ps)
 
--- | A substitution of a variable by some value.
+-----------------------------------------------------------------------------
+
+-- * Term and Formula specifications
+
+-- | A substitution of a named placeholder by some value.
 data Subst a
-  = -- | @v'Subst' name value@ replaces the placeholder @name@ with @value@.
+  = -- | @'Subst' name value@ replaces the placeholder @name@ with @value@.
     Subst Name a
   deriving (Show, Eq)
 
 infixl 9 ~>
 
--- | Alias for v'Subst'.
+-- | Smart constructor for t'Subst'.
 (~>) :: Name -> a -> Subst a
 (~>) = Subst
 
--- | A term specification used in t'RuleSpec'.
+-- | A t'Term' specification used in t'RuleSpec' specifications.
 data TermSpec
   = -- | A term variable.
     TVar Name
   | -- | A function application.
     TFun Name [TermSpec]
-  | -- | A placeholder t'Term' like @T@.
+  | -- | A placeholder for t'Term's @T@.
     TPlaceholder Name
   deriving (Eq, Show)
 
@@ -75,11 +94,11 @@ instance PrettyPrint TermSpec where
   prettyPrint (TFun f ts) = f <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
   prettyPrint (TPlaceholder n) = n
 
--- | A t'Formula' specification used in t'RuleSpec'.
+-- | A t'Formula' specification used in t'RuleSpec' specifications.
 data FormulaSpec
   = -- | A substitution @φ[n ↦ t]@: formula @φ@ with variable @n@ replaced by term @t@.
     FSubst Name (Subst Name)
-  | -- | A placeholder t'Formula' like @φ@.
+  | -- | A placeholder for t'Formula'e @φ@.
     FPlaceholder Name
   | -- | A predicate.
     FPred Name [TermSpec]
@@ -91,7 +110,7 @@ data FormulaSpec
     FQuantifier Name Name FormulaSpec
   deriving (Eq, Show)
 
--- | An t'Assumption' specification used in t'RuleSpec'.
+-- | An t'Assumption' specification used in t'RuleSpec' specifications.
 data AssumptionSpec
   = -- | Regular t'FormulaSpec'.
     AssumptionSpec FormulaSpec

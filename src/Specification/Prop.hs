@@ -1,3 +1,14 @@
+{- |
+Module      : Specification.Prop
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module provides the specification of propositional logic, i.e. its
+operators, rules and some examples.
+-}
 module Specification.Prop (
   operatorsProp,
   rulesProp,
@@ -8,10 +19,19 @@ module Specification.Prop (
 
 import App.Model (Model, initialModel)
 import Fitch.Proof
-import Specification.Types
 import Miso.Router (URI)
 import Parser.Proof
+import Specification.Types
 
+-----------------------------------------------------------------------------
+
+-- * Operators
+
+{- | Operators of propositional logic.
+
+Each entry is a triple @(alias, operator, arity)@, where @alias@ is
+ASCII text the parser also accepts and the operator is usually a unicode symbol.
+-}
 operatorsProp :: [(Text, Text, Int)]
 operatorsProp =
   [ ("bot", "⊥", 0)
@@ -22,6 +42,11 @@ operatorsProp =
   , ("->", "→", 2)
   ]
 
+-----------------------------------------------------------------------------
+
+-- * Rules
+
+-- | The standard Fitch-style natural deduction rules for propositional logic.
 rulesProp :: Map Text RuleSpec
 rulesProp =
   [ ("∧I", RuleSpec [phi, psi] [] (phi ∧ psi))
@@ -53,11 +78,24 @@ rulesProp =
   f1 ∨ f2 = FOpr "∨" [f1, f2]
   f1 ↝ f2 = FOpr "→" [f1, f2]
 
+-----------------------------------------------------------------------------
+
+-- * Parser
+
+{- | Parses a t'Proof' of propositional logic.
+
+__Note:__ Should not be used outside of this module, because it uses 'error'.
+-}
 readProof :: Text -> Proof
 readProof proofText = case parseProof operatorsProp [] [] proofText of
   Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
   Right p -> p
 
+-----------------------------------------------------------------------------
+
+-- * Examples
+
+-- | The default empty t'Proof' shown when the user starts a new proof in propositional logic.
 emptyProofProp :: Proof
 emptyProofProp =
   readProof
@@ -66,6 +104,7 @@ emptyProofProp =
     |⊤ (⊤I)
     """
 
+-- | A list of example t'Proof's shown in the sidebar, each paired with a display name.
 exampleProofsProp :: [(Text, Proof)]
 exampleProofsProp =
   [
@@ -94,7 +133,17 @@ exampleProofsProp =
     )
   ]
 
-initialModelProp :: URI -> Maybe Proof -> Model
+-----------------------------------------------------------------------------
+
+-- * Model
+
+-- | Constructs the initial t'Model' for propositional logic.
+initialModelProp ::
+  -- | The current t'URI' of the application.
+  URI ->
+  -- | An optional t'Proof' decoded from the URL; falls back to the first example proof.
+  Maybe Proof ->
+  Model
 initialModelProp uri mp =
   initialModel
     emptyProofProp
