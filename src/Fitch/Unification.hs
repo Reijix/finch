@@ -1,3 +1,18 @@
+{- |
+Module      : Fitch.Unification
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This module implements the ability to check a t'Term', t'Formula' or t'Assumption'
+against its t'TermSpec', t'FormulaSpec' or t'AssumptionSpec'.
+
+Furthermore, implements a variant of the Martelli Montanari unification algorithm. where
+t'Formula'e or t'Term's are unified *on* a specific variable, meaning the variable must
+occur on the left-hand-side of the resulting unifier.
+-}
 module Fitch.Unification where
 
 import Data.Set qualified as Set
@@ -5,13 +20,13 @@ import Fitch.Proof
 import Relude.Extra (delete, member, notMember)
 import Specification.Types
 
--- * Collecting variables in structures
+-- * Collecting Variables
 
 -- ** All variables
 
 -- | Type class for structures that have variables occuring in them.
 class AllVars a where
-  -- | Returns all variables occuring in the structure
+  -- | Returns all variables occuring in the structure.
   allVars :: a -> Set Name
 
   {- | Takes a name and a structure and makes it fresh
@@ -20,6 +35,7 @@ class AllVars a where
   makeFresh :: Name -> a -> Name
   makeFresh n t = if not (isFresh n t) then makeFresh (n <> "'") t else n
 
+  -- | Checks if a variable is fresh in a structure.
   isFresh :: Name -> a -> Bool
   isFresh n t = n `notMember` allVars t
 
@@ -43,7 +59,7 @@ instance AllVars RawAssumption where
 
 -- | Type class for structures that have variables occuring in them.
 class FreeVars a where
-  -- | Returns only the *free* (i.e. unbound) variables occuring in the structure.
+  -- | Returns only the __free__ (i.e. unbound) variables occuring in the structure.
   freeVars :: a -> Set Name
 
 instance FreeVars Term where
@@ -92,9 +108,10 @@ instance Substitute RawFormula Term where
 
 -- * Unification
 
-{- | Unification on terms, this is the Martelli-Monatanari unification algorithm with a twist:
-the unification happens "on" a variable @x@.
+{- | Unification on terms, this is the Martelli-Montanari unification algorithm with a twist:
+the unification happens *on* a variable @x@.
 Meaning the resulting unificator must have the variable @x@ on the left hand side.
+
 This is guaranteed by adding a new orient rule,
 which orients assignments of the form @x := y@, where @y@ is also a variable.
 -}
@@ -182,7 +199,7 @@ unifyFormulaeOnVariable n = fmap fromList . go
         go ((f1, f2) : rest)
   go _ = Nothing
 
--- | Unify terms with a term specification.
+-- | Unify t'Term' with t'TermSpec'.
 termMatchesSpec :: [(Term, TermSpec)] -> Bool
 termMatchesSpec ((Fun t ts, TFun s ss) : rest)
   | t == s && length ts == length ss =
@@ -192,10 +209,8 @@ termMatchesSpec ((t, TPlaceholder n) : rest) = termMatchesSpec rest
 termMatchesSpec [] = True
 termMatchesSpec _ = False
 
--- | Unify formula with formula specification.
+-- | Unify t'RawFormula' with t'FormulaSpec'.
 formulaMatchesSpec :: RawFormula -> FormulaSpec -> Bool
--- formulaMatchesSpec f@(FreshVar v) fs@(FFreshVar v') = True
--- formulaMatchesSpec (FreshVar{}) _ = False
 formulaMatchesSpec f@(Pred p ts) fs@(FPred p' ts')
   | p == p' && length ts == length ts' = termMatchesSpec (zip ts ts')
 formulaMatchesSpec f@(Pred p [t1, t2]) fs@(FInfixPred p' t1' t2')
@@ -208,6 +223,7 @@ formulaMatchesSpec f fs@(FPlaceholder n) = True
 formulaMatchesSpec f fs@(FSubst n sub) = True
 formulaMatchesSpec _ _ = False
 
+-- | Unify t'RawAssumption' with t'AssumptionSpec'.
 assumptionMatchesSpec :: RawAssumption -> AssumptionSpec -> Bool
 assumptionMatchesSpec (FreshVar{}) (FFreshVar{}) = True
 assumptionMatchesSpec (RawAssumption rf) (AssumptionSpec fSpec) = formulaMatchesSpec rf fSpec

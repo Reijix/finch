@@ -1,3 +1,16 @@
+{- |
+Module      : Main
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
+
+This is the entry point of the Finch application. It reads the @?logic=@
+and @?proof=@ URL query parameters to select the initial logic (propositional
+or first-order) and to optionally restore a t'Proof' encoded in the URL,
+then starts the Miso application with the appropriate t'Model'.
+-}
 module Main where
 
 import App.Model
@@ -18,6 +31,14 @@ import Specification.Prop
 foreign export javascript "hs_start" main :: IO ()
 #endif
 
+{- | Starts the Miso application for the given @window@ t'DOMRef' and
+initial t'Model'.
+
+Registers the browser event listeners (drag, keyboard, mouse,
+touch and default events), mounts the application with the 'Setup' action,
+and adds the 'PopState' URI subscription together with the keyboard
+subscription 'onKeyDownSub'.
+-}
 startAppWrapper :: DOMRef -> Model -> IO ()
 startAppWrapper window model =
   startApp
@@ -33,6 +54,18 @@ startAppWrapper window model =
       , subs = [uriSub PopState, onKeyDownSub window]
       }
 
+{- | Application entry point.
+
+1. Reads the current t'URI'.
+2. Inspects the @?logic=@ query parameter:
+   * @prop@ — initializes propositional logic via 'initialModelProp'.
+   * @fol@ — initializes first-order logic via 'initialModelFOL'.
+   * defaults to @fol@.
+3. If a @?proof=@ query parameter is present, decodes it with
+   'decodeFromUrl' and uses it as the initial t'Proof'; otherwise the
+   default example proof for the selected logic is shown.
+4. Then starts the Miso application using 'startAppWrapper'.
+-}
 main :: IO ()
 main = do
   window <- jsg "window"

@@ -1,16 +1,16 @@
-module Fitch.Verification where
+{- |
+Module      : Fitch.Verification
+Copyright   : (c) Leon Vatthauer, 2026
+License     : GPL-3
+Maintainer  : Leon Vatthauer <leon.vatthauer@fau.de>
+Stability   : experimental
+Portability : non-portable (ghc-wasm-meta)
 
-import App.Model
-import Data.Map qualified as M
-import Data.Traversable (mapAccumM)
-import Fitch.Proof
-import Fitch.Unification
-import Relude.Extra.Map
-import Relude.Extra.Newtype
-import Specification.Types
-import Util (allCombinations)
+This module implements the proof verification algorithm for Fitch-style
+natural deduction t'Proof's. Given a map of t'RuleSpec's, it checks each
+t'Derivation' line by verifying that its t'RuleApplication' is applied correctly.
 
-{- Phases of proof verification:
+Phases of proof verification:
   1. Check that the rule exists
   2. Check that the formula matches the rules' conclusion.
   3. Match references to lines/proof, concretely:
@@ -33,7 +33,29 @@ import Util (allCombinations)
      can be identified as φ (yielded by backwards-substitution).
   7. Now check that for every φ all its mappings can be made equal by
      choosing from the lists.
- -}
+
+It also provides 'checkFreshness' for validating fresh-variable
+t'Assumption's, and 'regenerateSymbols' for collecting and validating
+function- and predicate-symbol arities across the whole t'Proof'.
+-}
+module Fitch.Verification where
+
+import App.Model
+import Data.Map qualified as M
+import Data.Traversable (mapAccumM)
+import Fitch.Proof
+import Fitch.Unification
+import Relude.Extra.Map
+import Relude.Extra.Newtype
+import Specification.Types
+import Util (allCombinations)
+
+{- | Runs the full proof-verification pipeline on a t'Proof',
+adding error messages to erroneous t'RuleApplication's
+
+__Note:__ This does not check freshness assumptions or check if arities are consistent.
+Use 'checkFreshness' and 'regenerateSymbols' for that.
+-}
 verifyProof :: Map Name RuleSpec -> Proof -> Proof
 verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
  where
@@ -400,7 +422,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
             let x' = case termMap !? x of
                   Just (Var x') -> x'
                   _ -> "_" <> x
-             in -- \^ NOTE: we use ('_' <> x) because it can not clash with a variable name.
+             in -- NOTE: we use ('_' <> x) because it can not clash with a variable name.
                 case substBackwardsForm (Subst x' t') f of
                   f :| [] ->
                     insertWith
@@ -435,6 +457,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     ---------------------------------------------------
 
     -- helpers
+
+    -- Checks if given reference is visible for the current rule.
     refIsVisible ::
       (Int, NodeAddr) -> Either (Int, NodeAddr) ((Int, Int), ProofAddr) -> Maybe Text
     refIsVisible (ruleLine, ruleAddr) (Left (refLine, refAddr))
@@ -482,6 +506,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           <> " cannot be referenced because it is located inside of a subproof."
     refIsVisible _ _ = Nothing
 
+    -- tries to look up a 'ProofReference'
     lookupProofReference :: Int -> Int -> Proof -> Either Text Proof
     lookupProofReference start end p = case (pIndexProof start end p, fromLineRange start end p, fromLineNo ruleLine p) of
       (_, _, Nothing) -> Left "Internal error on lookupProofReference: should not happen!"
@@ -496,17 +521,11 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
             <> " should mark the start of a subproof and line "
             <> show end
             <> " should be its conclusion."
-      -- <> "\nDEBUG:\n"
-      -- <> "pIndexProof start end p=\n"
-      -- <> prettyPrint (pIndexProof start end p)
-      -- <> "\nfromLineRange start end p=\n"
-      -- <> show (fromLineRange start end p)
-      -- <> "\np=\n"
-      -- <> prettyPrint p
       (Just prf, Just refAddr, Just ruleAddr) -> case refIsVisible (ruleLine, ruleAddr) (Right ((start, end), refAddr)) of
         Nothing -> Right prf
         Just err -> Left err
 
+    -- tries to look up a 'LineReference'
     lookupLineReference :: Int -> Proof -> Either Text (Either Assumption Formula)
     lookupLineReference refLine p = case (pIndex refLine p, fromLineNo refLine p, fromLineNo ruleLine p) of
       (_, _, Nothing) -> Left "Internal error on lookupLineReference: should not happen!"
@@ -520,6 +539,11 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
 -- * Semantic checking
 
+{- | Validates every fresh-variable t'Assumption' @[c]@ in a t'Proof'.
+
+For each such t'Assumption', it collects all lines that are in scope and
+checks that @c@ does not appear free in any of their t'Formula'e.
+-}
 checkFreshness :: Proof -> Proof
 checkFreshness p = pMapLinesWithAddr (goAssumption p) (const id) p
  where
@@ -558,7 +582,7 @@ type RegenState = (Int, Map Text (Int, Pos), Map Text (Int, Pos))
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.
 
 This is done by iterating over the proof and collecting all symbols.
-The first occurence of a symbol fixes its arity, and all following symbols with the same name are compared to this arity.
+The first occurence of a symbol fixes its arity, and all following symbols with the same t'Name' are compared to this arity.
 -}
 regenerateSymbols :: Proof -> (Map Text (Int, Pos), Map Text (Int, Pos), Proof)
 regenerateSymbols p =
