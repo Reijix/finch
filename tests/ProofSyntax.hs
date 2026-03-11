@@ -70,7 +70,12 @@ exProof2 =
       (derivation 9)
 
 exProof3 :: PrettyProof
-exProof3 = PrettyProof $ SubProof [] [Right $ SubProof [assumption 0] [line 1] (derivation 2), line 3] (derivation 4)
+exProof3 =
+  PrettyProof $
+    SubProof
+      []
+      [Right $ SubProof [assumption 0] [line 1] (derivation 2), line 3]
+      (derivation 4)
 
 --------------------------------------------
 -- PROPERTIES
@@ -136,7 +141,8 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
   (_, AnyKind) -> oneof [naAssumption, naLine ps, naSubProof AnyKind, naConclusion]
  where
   naConclusion = pure NAConclusion
-  naLine ps = maybe discard NALine <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isLeft ps)
+  naLine ps =
+    maybe discard NALine <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isLeft ps)
   -- naProof ps = maybe discard (`NAProof` Nothing) <$> suchThatMaybe (chooseInt (0, length ps - 1)) (holdsAt isRight ps)
   naAssumption = fmap NAAssumption (chooseInt (0, length fs - 1))
   naSubProof ak = do
@@ -192,7 +198,8 @@ prop_lInsertAfterFormulaPlus1 (PrettyProof p) =
 prop_lInsertlLookupFormulaBefore :: PrettyProof -> Property
 prop_lInsertlLookupFormulaBefore (PrettyProof p) =
   forAll (arbitraryNodeAddrFor p AssumptionKind) $ \a ->
-    (naLookup a <$> naInsertBefore' (Left $ assumption 0) a p) === (Just . Just . Left $ assumption 0)
+    (naLookup a <$> naInsertBefore' (Left $ assumption 0) a p)
+      === (Just . Just . Left $ assumption 0)
 
 prop_lInsertBeforeLinePlus1 :: PrettyProof -> Property
 prop_lInsertBeforeLinePlus1 (PrettyProof p) =

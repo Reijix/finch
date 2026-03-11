@@ -8,47 +8,21 @@ Portability : non-portable (GHCJS)
 
 The update loop of the application, basically all of its logic.
 -}
-module App.Update (
-  updateModel,
-  checkProof,
-  tryParse,
-) where
+module App.Update where
 
 -----------------------------------------------------------------------------
 import App.Decoder
 import App.Model
 import App.Views
-import Data.IntSet (isSubsetOf)
 import Data.Text qualified as T
 import Fitch.Proof
-import Fitch.Verification (checkFreshness, regenerateSymbols, verifyProof)
+import Fitch.Verification
 import Miso (
-  App,
-  CSS (Href),
-  Component (..),
-  ComponentInfo,
-  DOMRef,
   Effect,
-  KeyInfo (keyCode, shiftKey),
   MisoString,
-  Phase (..),
-  PointerEvent (client),
   ROOT,
-  Schedule,
-  ToJSVal (toJSVal),
-  URI (..),
-  View,
-  addEventListener,
-  callFunction,
+  URI (uriQueryString),
   castJSVal,
-  component,
-  consoleLog,
-  defaultEvents,
-  defaultOptions,
-  dispatchEvent,
-  dragEvents,
-  emptyDecoder,
-  eventPreventDefault,
   focus,
   fromMisoString,
   getElementById,
@@ -56,26 +30,10 @@ import Miso (
   getURI,
   io,
   io_,
-  isNull,
-  issue,
-  keyboardEvents,
-  mouseEvents,
-  mouseSub,
   ms,
-  newEvent,
-  preventDefault,
   pushURI,
-  removeEventListener,
-  replaceURI,
-  select,
   setSelectionRange,
-  startApp,
-  startSub,
-  stopSub,
-  text,
-  touchEvents,
-  uriSub,
-  withSink,
+  (#),
  )
 import Miso.DSL (jsg, (#))
 import Miso.Effect (Sub)
@@ -84,7 +42,6 @@ import Miso.Html.Element qualified as H
 import Miso.Html.Property qualified as HP
 import Miso.Lens (Lens, LensCore (_get), use, (%=), (.=), (<~), (^.))
 import Miso.Subscription.Util (createSub)
-import Miso.Svg (text_)
 import Parser.Formula (
   FormulaParserState (FormulaParserState),
   parseAssumption,
@@ -93,7 +50,7 @@ import Parser.Formula (
 import Parser.Proof (parseProof)
 import Parser.Rule (parseRuleApplication)
 import Relude.Extra.Map (insert, member, (!?))
-import Util
+import Util ((%=?))
 
 -----------------------------------------------------------------------------
 
@@ -110,7 +67,7 @@ updateModel (SetProof p) = do
   proofReparse
   updateProof
 ------------------------------------
--- 'URI' event
+-- t'URI' event
 updateModel (PopState uri) = do
   readURI uri >> proofReparse >> checkProof >> updateTitle
 ------------------------------------
@@ -136,9 +93,9 @@ updateModel (DragEnter na) = do
   p <- use proof
   use spawnType
     >>= \case
-      Just (canSpawnIn na -> True) ->
+      Just (canSpawnBefore na -> True) ->
         currentHoverLine .= Just na
-      Just (canSpawnIn na -> False) ->
+      Just (canSpawnBefore na -> False) ->
         currentHoverLine .= Nothing
       Nothing ->
         use dragTarget >>= \case
@@ -161,7 +118,7 @@ updateModel DragEnd = do
   clearDrag
 ------------------------------------
 -- Input related events
-updateModel (FocusInput ea) = do
+updateModel (Focus ea) = do
   fline <- use focusedLine
   if fline /= Just ea
     then
@@ -230,15 +187,15 @@ updateModel Nop = pass
 
 -- * Effects
 
-{- | Re-checks a 'Proof', i.e. runs the verifier, updates the 'URI' and document title.
+{- | Re-checks a t'Proof', i.e. runs the verifier, updates the t'URI' and document title.
 
-Should be called after every change to the 'Proof'.
+Should be called after every change to the t'Proof'.
 -}
 updateProof :: Effect ROOT Model Action
 updateProof = checkProof >> updateURI >> updateTitle
 
 {- | Updates the @document.title@ to show how many errors there are and
-what the conclusion of the 'Proof' is.
+what the conclusion of the t'Proof' is.
 -}
 updateTitle :: Effect ROOT Model Action
 updateTitle = do
@@ -251,11 +208,11 @@ updateTitle = do
           <> prettyPrint f
   io_ [js| document.title = ${title} |]
 
-{- | Runs the 'Proof' verification algorithm, i.e.
+{- | Runs the t'Proof' verification algorithm, i.e.
 
 1. Checks that symbols only occur with the same arity
-2. Checks freshness 'Assumption's
-3. Verifies all 'RuleApplication's.
+2. Checks freshness t'Assumption's
+3. Verifies all t'RuleApplication's.
 -}
 checkProof :: forall m. (MonadState Model m) => m ()
 checkProof = do
@@ -276,7 +233,7 @@ clearDrag = do
   dragTarget .= Nothing
   spawnType .= Nothing
 
--- | Takes a 'URI' and reads in a proof if it contains one.
+-- | Takes a t'URI' and reads in a proof if it contains one.
 readURI :: URI -> Effect ROOT Model Action
 readURI uri = do
   case uriQueryString uri !? "proof" of
@@ -285,7 +242,7 @@ readURI uri = do
       Just (p :: Proof) -> proof .= p
     _ -> pass
 
--- | Updates the 'URI' to reflect the current 'Proof'.
+-- | Updates the t'URI' to reflect the current 'Proof'.
 updateURI :: Effect ROOT Model Action
 updateURI = do
   p <- use proof
@@ -298,11 +255,11 @@ updateURI = do
             }
     if uri /= newURI then pushURI newURI else pass
 
--- | Re-parses every line of the current 'Proof'
+-- | Re-parses every line of the current t'Proof'
 proofReparse :: Effect ROOT Model Action
 proofReparse = get >>= \m -> proof %= reparseProof m
 
--- | Re-parses a single 'Derivation' or 'Assumption'.
+-- | Re-parses a single 'Derivation' or t'Assumption'.
 naReparseLine :: NodeAddr -> Effect ROOT Model Action
 naReparseLine na =
   get >>= \m ->
@@ -313,7 +270,7 @@ naReparseLine na =
         proof %=? naUpdateFormula (Right $ const (reparse m lineNo f)) na
       _ -> pass
 
--- | Move or create a 'Assumption', 'Derivation' or 'Proof' before a given 'NodeAddr'.
+-- | Move or create a t'Assumption', t'Derivation' or t'Proof' before a given t'NodeAddr'.
 dropBeforeLine :: NodeAddr -> Effect ROOT Model Action
 dropBeforeLine targetAddr = do
   m <- get
@@ -352,8 +309,8 @@ dropBeforeLine targetAddr = do
           _ -> pass
   clearDrag >> updateProof
 
-{- | Set focus to a @<input>@ field specified by a 'NodeAddr'
-(either the formula or the rule).
+{- | Set focus to a @<input>@ field specified by a t'NodeAddr'
+(either the t'Formula' or the t'RuleApplication').
 -}
 setFocus :: Either NodeAddr NodeAddr -> Effect ROOT Model Action
 setFocus ea = do
@@ -373,9 +330,9 @@ hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ 
 
 -- * Parsing
 
--- | Class for parsing `Text`
+-- | Class for parsing t`Text`
 class FromText a where
-  {- | Takes a `Model` and some `Text` and tries to parse it to the desired type.
+  {- | Takes a t`Model` and some t`Text` and tries to parse it to the desired type.
   On failure returns an error message.
   -}
   fromText :: Model -> Int -> Text -> Either Text a
@@ -405,12 +362,12 @@ instance FromText RuleApplication where
   fromText _ = parseRuleApplication
 
 {- | Wrapper for `fromText` that also takes a list of aliases and
-tries to replace these aliases in the `Text`
+tries to replace these aliases in the t`Text`
 -}
 tryParse ::
   forall a.
   (FromText a) =>
-  -- | The model.
+  -- | The t'Model'.
   Model ->
   -- | Line number.
   Int ->
@@ -428,21 +385,21 @@ tryParse m n txt = case fromText m n replacedTxt :: Either Text a of
       (foldr (\(alias, name, _) t -> T.replace alias name t) txt (m ^. operators))
       (m ^. quantifiers)
 
--- | Takes some 'Wrapper' and re-parses it.
+-- | Takes some t'Wrapper' and re-parses it.
 reparse ::
   forall a.
   (FromText a) =>
-  -- | The model.
+  -- | The t'Model'.
   Model ->
   -- | The line number.
   Int ->
-  -- | The wrapper to re-parse.
+  -- | The t'Wrapper' to re-parse.
   Wrapper a ->
   -- | Parse result.
   Wrapper a
 reparse m n w = tryParse m n (getText w)
 
--- | Uses 'reparse' to re-parse the whole 'Proof'.
+-- | Uses 'reparse' to re-parse the whole t'Proof'.
 reparseProof :: Model -> Proof -> Proof
 reparseProof model = pMapLinesWithLineNo reparseAssumption reparseDerivation
  where

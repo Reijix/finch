@@ -25,7 +25,6 @@ jobs:
         uses: cachix/cachix-action@v16
         with:
           name: haskell-miso-cachix
-      
 
       - name: Test using Nix
         run: nix develop .#test --command bash -c "make test" && nix-collect-garbage -d

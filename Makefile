@@ -1,7 +1,7 @@
 
-.PHONY= update build optim
+.PHONY: update build optim haddock haddock-serve
 
-all: build optim serve
+all: update build optim
 
 update:
 	wasm32-wasi-cabal update
@@ -18,14 +18,21 @@ optim:
 	wasm-opt -all -O2 public/finch.wasm -o public/finch.wasm
 	wasm-tools strip -o public/finch.wasm public/finch.wasm
 
-serve:
+serve: all
 	http-server public
 
 clean:
-	rm -rf dist-newstyle public
+	rm -rf dist-newstyle public haddock
 
 test:
+	cabal update
 	cabal test
+
+haddock:
+	wasm32-wasi-cabal haddock --html --hyperlinked-source --haddock-quickjump --haddock-output-dir haddock
+
+haddock-serve: haddock
+	xdg-open haddock/Finch/index.html
 
 report:
 	cabal test --enable-coverage
