@@ -119,9 +119,9 @@ library
     Parser.Proof
     Parser.Rule
     Parser.Util
-    Specification.Types
     Specification.FOL
     Specification.Prop
+    Specification.Types
     Util
 
   mixins:

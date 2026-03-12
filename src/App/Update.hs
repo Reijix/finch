@@ -24,6 +24,7 @@ import Miso (
   ROOT,
   URI (uriQueryString),
   castJSVal,
+  consoleLog,
   focus,
   fromMisoString,
   getElementById,
@@ -100,7 +101,10 @@ updateModel (DragEnter na) = do
         currentHoverLine .= Nothing
       Nothing ->
         use dragTarget >>= \case
-          Just (naCanMoveBefore p na -> True) -> currentHoverLine .= Just na
+          Just (Left (flip (naCanMoveBefore p) na -> True)) -> currentHoverLine .= Just na
+          Just (Right sourcePA) -> case paFromNA na p of
+            Nothing -> currentHoverLine .= Nothing
+            Just targetPA -> currentHoverLine .= if paCanMoveBefore sourcePA targetPA then Just na else Nothing
           _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
@@ -284,6 +288,9 @@ dropBeforeLine targetAddr = do
           proof %= const p
           naReparseLine ta
     Just (Right pa) -> do
+      io_ $ consoleLog $ "Dropping proof at pa=" <> show pa <> "\ninto na=" <> show targetAddr
+      p <- use proof
+      io_ $ consoleLog $ "Which is paTarget=" <> show (paFromNA targetAddr p)
       proof %=? \p -> do
         paTarget <- paFromNA targetAddr p
         snd <$> paMoveBefore paTarget pa p

@@ -592,6 +592,12 @@ isNestedNAAssumption (NAProof _ na) = isNestedNAAssumption na
 isNestedNAAssumption NAAssumption{} = True
 isNestedNAAssumption _ = False
 
+-- | Returns whether a t'NodeAddr' points to a possibly nested t'Assumption'.
+isNestedNAConclusion :: NodeAddr -> Bool
+isNestedNAConclusion (NAProof _ na) = isNestedNAConclusion na
+isNestedNAConclusion NAConclusion = True
+isNestedNAConclusion _ = False
+
 -- | Returns whether two t'NodeAddr's are on the same level in the same t'Proof'.
 naInSameProof :: NodeAddr -> NodeAddr -> Bool
 naInSameProof (NAProof n na1) (NAProof m na2) = n == m && naInSameProof na1 na2
@@ -604,34 +610,50 @@ paInSameProof (PANested n pa1) (PANested m pa2) = n == m && paInSameProof pa1 pa
 paInSameProof PAProof{} PAProof{} = True
 paInSameProof _ _ = False
 
+{- | Returns whether a t'NodeAddr' is the first line
+in a t'Proof'. This could be because:
+
+* it is the first assumption;
+* there are no assumptions and it is the first line;
+* there are no assumptions and it is the first line of the first subproof;
+* there are no assumptions, no lines, no subproofs and it is the conclusion.
+-}
+isFirstLineIn :: Proof -> NodeAddr -> Bool
+isFirstLineIn (SubProof (_ : _) _ _) (NAAssumption 0) = True
+isFirstLineIn (SubProof [] (Left _ : _) _) (NALine 0) = True
+isFirstLineIn (SubProof [] (Right p : _) _) (NAProof 0 na) = isFirstLineIn p na
+isFirstLineIn (SubProof [] [] _) NAConclusion = True
+isFirstLineIn _ _ = False
+
 -- | Address of a t'Proof' within a t'Proof'.
 data ProofAddr
-  = -- | The @n@-th t'Proof' in the current proof.
-    PAProof Int
-  | -- | A nested t'Proof'.
+  = -- | A nested t'Proof'.
     PANested Int ProofAddr
+  | -- | The current t'Proof'.
+    PAProof
   deriving (Show, Eq)
 
 instance Ord ProofAddr where
   compare :: ProofAddr -> ProofAddr -> Ordering
-  compare (PAProof n) (PAProof m) = compare n m
-  compare (PAProof n) (PANested m _) = case compare n m of
+  compare PAProof PAProof = EQ
+  compare PAProof PANested{} = LT
+  compare PANested{} PAProof = GT
+  compare (PANested n1 pa1) (PANested n2 pa2) = case compare n1 n2 of
     LT -> LT
-    EQ -> LT
+    EQ -> compare pa1 pa2
     GT -> GT
-  compare (PANested n _) (PAProof m) = case compare n m of
-    LT -> LT
-    EQ -> GT
-    GT -> GT
-  compare (PANested n addr1) (PANested m addr2) | n == m = compare addr1 addr2
-  compare (PANested n _) (PANested m _) = compare n m
 
 {- | Moves the given t'ProofAddr' one level higher,
 returning a function that can be used to build t'ProofAddr's on the current level.
 -}
 paProofToNested :: ProofAddr -> (ProofAddr -> ProofAddr)
-paProofToNested (PAProof n) = PANested n
+paProofToNested PAProof = id
 paProofToNested (PANested n pa) = PANested n . paProofToNested pa
+
+-- | Returns the t'ProofAddr' that contains the t'NodeAddr'.
+paContaining :: NodeAddr -> ProofAddr
+paContaining (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) = PAProof
+paContaining (NAProof n na) = PANested n (paContaining na)
 
 -- ** Conversion between line numbers and t'NodeAddr'
 
@@ -696,56 +718,36 @@ fromLineRange ::
   Int ->
   Proof ->
   Maybe ProofAddr
-fromLineRange start end p = join $ go start end 0 p
- where
-  go :: Int -> Int -> Int -> Proof -> Maybe (Maybe ProofAddr)
-  go start end _ _ | start < 1 || end < start = Nothing
-  go 1 end currentOffset p = do
-    first <- fromLineNo 1 p
-    last <- fromLineNo end p
-    unifyNAs first last p
-   where
-    unifyNAs :: NodeAddr -> NodeAddr -> Proof -> Maybe (Maybe ProofAddr)
-    unifyNAs na NAConclusion p | isFirstLineIn p na = Just Nothing
-     where
-      isFirstLineIn :: Proof -> NodeAddr -> Bool
-      isFirstLineIn (SubProof (_ : _) _ _) (NAAssumption 0) = True
-      isFirstLineIn (SubProof [] (Left _ : _) _) (NALine 0) = True
-      isFirstLineIn (SubProof [] (Right p : _) _) (NAProof 0 na) = isFirstLineIn p na
-      isFirstLineIn (SubProof [] [] _) NAConclusion = True
-      isFirstLineIn _ _ = False
-    unifyNAs (NAProof n na1) (NAProof m na2) (SubProof _ ((!!? n) -> Just (Right p)) _) | n == m = case unifyNAs na1 na2 p of
-      Nothing -> Nothing
-      Just Nothing -> Just $ Just $ PAProof currentOffset
-      Just (Just pa) -> Just $ Just $ PANested n pa
-    unifyNAs _ _ _ = Nothing
-  go start end n (SubProof fs (Left d : ps) c) = go (start - 1) (end - 1) (n + 1) (SubProof fs ps c)
-  go start end n (SubProof fs (Right p : ps) c)
-    | pLength p + length fs < start =
-        go (start - pLength p) (end - pLength p) (n + 1) (SubProof fs ps c)
-    | otherwise = case go (start - length fs) (end - length fs) 0 p of
-        Nothing -> Nothing
-        Just Nothing -> Just $ Just $ PAProof n
-        Just (Just pa) -> Just $ Just $ PANested n pa
-  go start end n p = Nothing
+fromLineRange start end p = do
+  -- get corresponding 'NodeAddr's
+  lastLine <- fromLineNo end p
+
+  -- Get 'ProofAddr' of the conclusion
+  pa <-
+    if isNestedNAConclusion lastLine
+      then Just $ paContaining lastLine
+      else Nothing
+
+  -- compare starting line of pa with firstLine
+  (start', _) <- lineRangeFromProofAddr pa p
+  if start' == start
+    then Just pa
+    else Nothing
 
 {- | Returns the start and end line numbers of the t'Proof' addressed by a t'ProofAddr'.
 Returns v'Nothing' if the t'ProofAddr' is invalid.
 -}
 lineRangeFromProofAddr :: ProofAddr -> Proof -> Maybe (Int, Int)
-lineRangeFromProofAddr pa p = go 1 pa p
- where
-  go :: Int -> ProofAddr -> Proof -> Maybe (Int, Int)
-  go n (PAProof 0) (SubProof [] (e : _) c) = case e of
-    Right p -> Just (n, n + pLength p - 1)
-    _ -> Nothing
-  go n (PAProof m) (SubProof [] (p : ps) c) = go (n + either (const 1) pLength p) (PAProof (m - 1)) (SubProof [] ps c)
-  go n (PANested 0 pa) (SubProof [] (e : _) _) = case e of
-    Right p -> go n pa p
-    _ -> Nothing
-  go n (PANested m pa) (SubProof [] (p : ps) c) = go (n + either (const 1) pLength p) (PANested (m - 1) pa) (SubProof [] ps c)
-  go n pa (SubProof (f : fs) ps c) = go (n + length fs + 1) pa (SubProof [] ps c)
-  go _ _ _ = Nothing
+lineRangeFromProofAddr PAProof p = Just (1, pLength p)
+lineRangeFromProofAddr (PANested 0 pa) (SubProof fs (Right p : ps) _) =
+  case lineRangeFromProofAddr pa p of
+    Just (start, end) -> Just (start + length fs, end + length fs)
+    Nothing -> Nothing
+lineRangeFromProofAddr (PANested n pa) (SubProof fs (e : ps) c) | n > 0 =
+  case lineRangeFromProofAddr (PANested (n - 1) pa) (SubProof fs ps c) of
+    Just (start, end) -> Just (start + either (const 1) pLength e, end + either (const 1) pLength e)
+    Nothing -> Nothing
+lineRangeFromProofAddr _ _ = Nothing
 
 -- ** Utilities for working with addresses
 
@@ -767,26 +769,16 @@ incrementNodeAddr _ = Nothing
 For other t'NodeAddr's, returns v'Nothing'.
 -}
 paFromNA :: NodeAddr -> Proof -> Maybe ProofAddr
-paFromNA (NALine n) _ = Just $ PAProof n
-paFromNA NAConclusion (SubProof _ ps _) = Just $ PAProof (length ps)
+paFromNA (NALine n) _ = Just $ PANested n PAProof
+paFromNA NAConclusion (SubProof _ ps _) = Just $ PANested (length ps) PAProof
 paFromNA (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = PANested n <$> paFromNA na p
 paFromNA _ _ = Nothing
 
-{- | Returns the immediate containing t'ProofAddr' of a nested t'NodeAddr'.
-
-Returns v'Nothing' if the t'NodeAddr' is on the outermost proof.
+{- | Turns a t'ProofAddr' into a function for building a t'NodeAddr'
+that is contained in the t'ProofAddr'.
 -}
-paContaining :: NodeAddr -> Maybe ProofAddr
-paContaining (NAProof n (NAAssumption{})) = Just $ PAProof n
-paContaining (NAProof n (NALine{})) = Just $ PAProof n
-paContaining (NAProof n NAConclusion) = Just $ PAProof n
-paContaining (NAProof n NAAfterConclusion) = Just $ PAProof n
-paContaining (NAProof n na) = PANested n <$> paContaining na
-paContaining _ = Nothing
-
--- | Turns a t'ProofAddr' into a function for building a t'NodeAddr' out of it.
 naFromPA :: ProofAddr -> (NodeAddr -> NodeAddr)
-naFromPA (PAProof n) = NAProof n
+naFromPA PAProof = id
 naFromPA (PANested n pa) = NAProof n . naFromPA pa
 
 -- | Returns a function that lifts a nested t'NodeAddr' by one proof level, if possible.
@@ -847,7 +839,7 @@ naLookup _ _ = Nothing
 -- | Returns the t'Proof' at a given t'ProofAddr' if it exists.
 paLookup :: ProofAddr -> Proof -> Maybe Proof
 paLookup (PANested n pa) (SubProof _ ((!!? n) -> Just (Right p)) _) = paLookup pa p
-paLookup (PAProof n) (SubProof _ ((!!? n) -> Just (Right p)) _) = Just p
+paLookup PAProof p = Just p
 paLookup _ _ = Nothing
 
 -- | Returns the t'Assumption' or t'Derivation' at the given line number if it exists.
@@ -1006,13 +998,15 @@ naRemoveRaw _ _ = Nothing
 __Note:__ Use 'paRemove' if references must stay consistent.
 -}
 paRemoveRaw :: ProofAddr -> Proof -> Maybe Proof
-paRemoveRaw (PAProof n) (SubProof fs ps c)
+paRemoveRaw PAProof _ = Nothing
+paRemoveRaw (PANested n PAProof) (SubProof fs ps c)
   | holdsAt isRight ps n =
       liftA3
         SubProof
         (pure fs)
         (removeAt n ps)
         (pure c)
+  | otherwise = Nothing
 paRemoveRaw (PANested n pa) (SubProof fs ps c) =
   liftA3
     SubProof
@@ -1141,8 +1135,8 @@ paInsertBeforeRaw ::
   ProofAddr ->
   Proof ->
   Maybe (ProofAddr, Proof)
-paInsertBeforeRaw p (PAProof n) (SubProof fs ps c) =
-  fmap (PAProof n,) (liftA3 SubProof (pure fs) (insertAt (Right p) n ps) (pure c))
+paInsertBeforeRaw p (PANested n PAProof) (SubProof fs ps c) =
+  fmap (PANested n PAProof,) (liftA3 SubProof (pure fs) (insertAt (Right p) n ps) (pure c))
 paInsertBeforeRaw p (PANested n pa) (SubProof fs ps@((!!? n) -> Just (Right prf)) c) =
   paInsertBeforeRaw p pa prf
     >>= \(pa, p') ->
@@ -1184,24 +1178,26 @@ __Note:__ Use 'naMoveBefore' if references must stay consistent.
 -}
 naMoveBeforeRaw :: NodeAddr -> NodeAddr -> Proof -> Maybe (NodeAddr, Proof)
 naMoveBeforeRaw targetAddr sourceAddr p =
-  case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
-    (LT, Just node) -> do
-      p' <- naRemoveRaw sourceAddr p
-      naInsertBeforeRaw node targetAddr p'
-    (GT, Just node) -> do
-      -- since 'e' is returned here already
-      (na, p') <- naInsertBeforeRaw node targetAddr p
-      p'' <- naRemoveRaw sourceAddr p'
-      -- we might need to decrement 'e' by one, if sourceAddr is in the same proof.
-      let
-        naDecrementWhenOnSameLevel :: NodeAddr -> NodeAddr -> NodeAddr
-        naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} | n > 0 = NAAssumption (n - 1)
-        naDecrementWhenOnSameLevel (NALine n) NALine{} | n > 0 = NALine (n - 1)
-        naDecrementWhenOnSameLevel (NAProof n na) NALine{} | n > 0 = NAProof (n - 1) na
-        naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
-        naDecrementWhenOnSameLevel na _ = na
-      pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
-    _ -> Nothing
+  if not (naCanMoveBefore p sourceAddr targetAddr)
+    then Nothing
+    else case (compare targetAddr sourceAddr, naLookup sourceAddr p) of
+      (LT, Just node) -> do
+        p' <- naRemoveRaw sourceAddr p
+        naInsertBeforeRaw node targetAddr p'
+      (GT, Just node) -> do
+        -- since 'na' is fixed here already
+        (na, p') <- naInsertBeforeRaw node targetAddr p
+        p'' <- naRemoveRaw sourceAddr p'
+        -- we might need to decrement 'na' by one, if sourceAddr is in the same proof.
+        let
+          naDecrementWhenOnSameLevel :: NodeAddr -> NodeAddr -> NodeAddr
+          naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} | n > 0 = NAAssumption (n - 1)
+          naDecrementWhenOnSameLevel (NALine n) NALine{} | n > 0 = NALine (n - 1)
+          naDecrementWhenOnSameLevel (NAProof n na) NALine{} | n > 0 = NAProof (n - 1) na
+          naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
+          naDecrementWhenOnSameLevel na _ = na
+        pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
+      _ -> Nothing
 
 -- | Returns whether @lineNo@ falls within the given line range, accounting for same-proof boundary rules.
 targetInRange :: Int -> (Int, Int) -> Proof -> Bool
@@ -1216,11 +1212,9 @@ Returns v'Nothing' if the move is rejected by 'naCanMoveBefore'.
 -}
 naMoveBefore :: NodeAddr -> NodeAddr -> Proof -> Maybe (NodeAddr, Proof)
 naMoveBefore targetAddr sourceAddr p =
-  if naCanMoveBefore p targetAddr (Left sourceAddr)
-    then case naMoveBeforeRaw targetAddr sourceAddr p of
-      Nothing -> Nothing
-      Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
-    else Nothing
+  case naMoveBeforeRaw targetAddr sourceAddr p of
+    Nothing -> Nothing
+    Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
  where
   go :: NodeAddr -> Proof -> Maybe Proof
   go targetAddr' p' =
@@ -1245,95 +1239,91 @@ naMoveBefore targetAddr sourceAddr p =
       | target >= end && source < start -> ProofReference (start - 1) (end - 1)
       | otherwise -> ProofReference start end
 
-{- | 'naCompatible' @target@ @source@ returns v'True' if @source@ and @target@ are
-broadly compatible for a move, meaning they are of the same structural kind
-(e.g. t'Assumption's before t'Assumption's, t'Derivation's before t'Derivation's or t'Proof's).
+{- | Returns whether a t'NodeAddr' is contained in the t'Proof' designated by a t'ProofAddr'.
 
-__Note:__ this does not fully determine whether a move is legal; it also
-returns v'True' when comparing a t'Proof's address with an address inside it.
-Use 'naCanMoveBefore' for the complete check.
+__Note:__ does not check if the t'NodeAddr' is valid!
 -}
-naCompatible :: NodeAddr -> Either NodeAddr ProofAddr -> Bool
-naCompatible (NAProof _ na) e = naCompatible na e
-naCompatible _ (Left na) = True
-naCompatible (NALine{}; NAConclusion) (Right pa) = True
-naCompatible _ _ = False
-
--- | Returns whether a t'NodeAddr' is contained in the t'Proof' designated by a t'ProofAddr'.
 naContainedIn :: NodeAddr -> ProofAddr -> Bool
-naContainedIn (NAProof n _) (PAProof m) = n == m
+naContainedIn _ PAProof = True
 naContainedIn (NAProof n na) (PANested m pa) = n == m && naContainedIn na pa
 naContainedIn _ _ = False
 
--- | Returns whether a t'ProofAddr' is contained in another t'ProofAddr'.
+{- | Returns whether a t'ProofAddr' is contained in another t'ProofAddr'.
+
+__Note:__ does not check if either t'ProofAddr' is valid!
+-}
 paContainedIn :: ProofAddr -> ProofAddr -> Bool
-paContainedIn (PANested n _) (PAProof m) = n == m
+paContainedIn PANested{} PAProof = True
 paContainedIn (PANested n pa1) (PANested m pa2) = n == m && paContainedIn pa1 pa2
 paContainedIn _ _ = False
 
 -- | Returns whether the target address is identical to, or immediately after, the source.
-naSameOrNext :: NodeAddr -> Either NodeAddr ProofAddr -> Proof -> Bool
-naSameOrNext (NAProof n na) (Left (NAProof ((== n) -> True) na')) (SubProof _ ((!!? n) -> Just (Right p)) _) =
-  naSameOrNext na (Left na') p
-naSameOrNext (NAProof n na) (Right (PANested ((== n) -> True) pa)) (SubProof _ ((!!? n) -> Just (Right p)) _) =
-  naSameOrNext na (Right pa) p
-naSameOrNext (NAAssumption n) (Left (NAAssumption m)) _ = n == m || n == m + 1
-naSameOrNext (NALine n) (Left (NALine m)) _ = n == m || n == m + 1
-naSameOrNext (NALine n) (Right (PAProof m)) _ = n == m || n == m + 1
-naSameOrNext NAAfterConclusion (Left NAConclusion) _ = True
-naSameOrNext NAConclusion (Left NAConclusion) _ = True
-naSameOrNext NAConclusion (Left (NALine n)) (SubProof _ ps _) = n == length ps - 1
-naSameOrNext NAConclusion (Right (PAProof n)) (SubProof _ ps _) = n == length ps - 1
+naSameOrNext :: NodeAddr -> NodeAddr -> Proof -> Bool
+naSameOrNext (NAProof n na) (NAProof ((== n) -> True) na') (SubProof _ ((!!? n) -> Just (Right p)) _) =
+  naSameOrNext na na' p
+naSameOrNext (NAAssumption n) (NAAssumption m) _ = n == m || n == m + 1
+naSameOrNext (NALine n) (NALine m) _ = n == m || n == m + 1
+naSameOrNext NAAfterConclusion NAConclusion _ = True
+naSameOrNext NAConclusion NAConclusion _ = True
+naSameOrNext NAConclusion (NALine n) (SubProof _ ps _) = n == length ps - 1
 naSameOrNext _ _ _ = False
+
+-- | Returns whether the target address is identical to, or immediately after, the source.
+paSameOrNext :: ProofAddr -> ProofAddr -> Bool
+paSameOrNext (PANested n PAProof) (PANested m PAProof) = n == m || n == m + 1
+paSameOrNext (PANested n pa1) (PANested m pa2) | n == m = paSameOrNext pa1 pa2
+paSameOrNext _ _ = False
 
 {- | Helper for deciding whether a t'NodeAddr' may be moved to the target position
 defaulting to v'True' and only does a real check for v'NAConclusion' where it
 checks whether the conclusion has a t'Derivation' that can take its place, when it moves.
 -}
-naCanMoveConclusion :: Maybe NodeAddr -> NodeAddr -> Proof -> Bool
-naCanMoveConclusion target NAConclusion (SubProof fs ps c) = case unsnoc ps of
-  Nothing -> case fs of
-    [] -> case target of
-      Just NAAssumption{} -> False
-      _ -> True
-    _ -> False
+naCanMoveConclusion :: NodeAddr -> Proof -> Bool
+naCanMoveConclusion NAConclusion (SubProof fs ps c) = case unsnoc ps of
   Just (_, Left _) -> True
-  Just (_, Right _) -> False
-naCanMoveConclusion na' (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = case na' of
-  Just (NAProof m na'') | m == n -> naCanMoveConclusion (Just na'') na p
-  _ -> naCanMoveConclusion Nothing na p
-naCanMoveConclusion _ _ _ = True
+  _ -> False
+naCanMoveConclusion (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = naCanMoveConclusion na p
+naCanMoveConclusion _ _ = True
 
--- | Returns whether a t'NodeAddr' or t'ProofAddr' can be moved before the given target t'NodeAddr'.
-naCanMoveBefore :: Proof -> NodeAddr -> Either NodeAddr ProofAddr -> Bool
-naCanMoveBefore p na e =
-  naCompatible na e
-    && either (\n -> naCanMoveConclusion (Just na) n p) (const True) e
-    && not (naSameOrNext na e p)
-    && case e of
-      Left _ -> True
-      Right pa -> not $ naContainedIn na pa
+-- | Returns whether a t'NodeAddr' can be moved before the given target t'NodeAddr'.
+naCanMoveBefore :: Proof -> NodeAddr -> NodeAddr -> Bool
+naCanMoveBefore p source target =
+  naCanMoveConclusion source p
+    && not (naSameOrNext target source p)
+
+-- | Returns whether a t'ProofAddr' can be moved before the given target t'ProofAddr'.
+paCanMoveBefore :: ProofAddr -> ProofAddr -> Bool
+paCanMoveBefore source target =
+  not (paContainedIn target source)
+    && not (paSameOrNext target source)
 
 {- | Moves a t'Proof' before another t'Proof' without updating references.
 
 __Note:__ Use 'paMoveBefore' if references must stay consistent.
 -}
 paMoveBeforeRaw :: ProofAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
-paMoveBeforeRaw targetAddr sourceAddr p = case (compare targetAddr sourceAddr, paLookup sourceAddr p) of
-  (LT, Just prf) -> do
-    p' <- paRemoveRaw sourceAddr p
-    paInsertBeforeRaw prf targetAddr p'
-  (GT, Just prf) -> do
-    (pa, p') <- paInsertBeforeRaw prf targetAddr p
-    p'' <- paRemoveRaw sourceAddr p'
-    let
-      paDecrementWhenOnSameLevel :: ProofAddr -> ProofAddr -> ProofAddr
-      paDecrementWhenOnSameLevel (PAProof n) PAProof{} | n > 0 = PAProof (n - 1)
-      paDecrementWhenOnSameLevel (PANested n pa) PAProof{} | n > 0 = PANested (n - 1) pa
-      paDecrementWhenOnSameLevel (PANested n pa1) (PANested m pa2) | n == m = PANested n $ paDecrementWhenOnSameLevel pa1 pa2
-      paDecrementWhenOnSameLevel na _ = na
-    pure (paDecrementWhenOnSameLevel pa sourceAddr, p'')
-  _ -> Nothing
+paMoveBeforeRaw targetAddr sourceAddr p =
+  if not (paCanMoveBefore sourceAddr targetAddr)
+    then Nothing
+    else case (compare targetAddr sourceAddr, paLookup sourceAddr p) of
+      (LT, Just prf) -> do
+        p' <- paRemoveRaw sourceAddr p
+        paInsertBeforeRaw prf targetAddr p'
+      (GT, Just prf) -> do
+        (pa, p') <- paInsertBeforeRaw prf targetAddr p
+        p'' <- paRemoveRaw sourceAddr p'
+        let
+          -- Decrements the new targetAddr by one, on the same level that sourceAddr lives.
+          -- This is needed, because removal happens after insertion, so
+          -- paInsertBeforeRaw returns a 'ProofAddr' that is not valid for p''.
+          paDecrementWhenOnSameLevel :: ProofAddr -> ProofAddr -> ProofAddr
+          paDecrementWhenOnSameLevel (PANested n pa) (PANested _ PAProof; PAProof) | n > 0 = PANested (n - 1) pa
+          paDecrementWhenOnSameLevel pa@(PANested n pa1) (PANested m pa2)
+            | n == m = PANested n $ paDecrementWhenOnSameLevel pa1 pa2
+            | otherwise = pa
+          paDecrementWhenOnSameLevel pa _ = pa
+        pure (paDecrementWhenOnSameLevel pa sourceAddr, p'')
+      _ -> Nothing
 
 -- | Moves a t'Proof' before another t'Proof' and updates all affected references.
 paMoveBefore :: ProofAddr -> ProofAddr -> Proof -> Maybe (ProofAddr, Proof)
@@ -1343,8 +1333,35 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
  where
   go :: ProofAddr -> Proof -> Maybe Proof
   go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
-    (Just targetRange, Just sourceRange) -> pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
+    (Just targetRange, Just sourceRange) ->
+      pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
+    -- error $
+    --   "paMoveBefore succeeded on \ntargetAddr="
+    --     <> show targetAddr
+    --     <> "\ntargetAddr'="
+    --     <> show targetAddr'
+    --     <> "\nsourceAddr="
+    --     <> show sourceAddr
+    --     <> "\np=\n"
+    --     <> prettyPrint p
+    --     <> "\np'=\n"
+    --     <> prettyPrint p'
+    --     <> "\ntargetRange="
+    --     <> show targetRange
+    --     <> "\nsourceRange="
+    --     <> show sourceRange
     _ -> Nothing
+  -- error $
+  --   "paMoveBefore failed on \ntargetAddr="
+  --     <> show targetAddr
+  --     <> "\ntargetAddr'="
+  --     <> show targetAddr'
+  --     <> "\nsourceAddr="
+  --     <> show sourceAddr
+  --     <> "\np=\n"
+  --     <> prettyPrint p
+  --     <> "\np'=\n"
+  --     <> prettyPrint p'
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)

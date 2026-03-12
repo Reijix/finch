@@ -498,7 +498,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           <> " can not be referenced, because it contains line "
           <> show ruleLine
           <> "!"
-    refIsVisible _ (Right ((start, end), PANested _ _)) =
+    refIsVisible _ (Right ((start, end), PANested _ PANested{})) =
       Just $
         "Line range "
           <> show start
@@ -579,7 +579,8 @@ checkFreshness p = pMapLinesWithAddr (goAssumption p) (const id) p
   isFreshList v ((na, Right (Derivation (fromWrapper -> Just f) _)) : rest) = if isFresh v f then isFreshList v rest else Just (na, Right f)
 
 {- | State used in 'regenerateSymbols',
-contains list of functionSymbols and predicateSymbols -}
+contains list of functionSymbols and predicateSymbols
+-}
 type RegenState = (Int, Map Text (Int, Pos), Map Text (Int, Pos))
 
 {- | Recalculates the list of functionsymbols and predicatesymbols in the model.

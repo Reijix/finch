@@ -12,7 +12,7 @@ import Text.Show qualified
 
 -- Definitions for unit testing:
 
-newtype PrettyProof = PrettyProof Proof
+newtype PrettyProof = PrettyProof Proof deriving (Eq)
 
 fromPretty :: PrettyProof -> Proof
 fromPretty (PrettyProof p) = p
@@ -129,10 +129,10 @@ instance Arbitrary PrettyProof where
   arbitrary :: Gen PrettyProof
   arbitrary = fmap PrettyProof arbitrary
 
-data AddrKind = AssumptionKind | LineKind | ProofKind | ConclusionKind | AnyKind
+data AddrKind = AssumptionKind | LineKind | ConclusionKind | AnyKind
 
 arbitraryNodeAddrFor :: Proof -> AddrKind -> Gen NodeAddr
-arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
+arbitraryNodeAddrFor (SubProof fs ps _) ak = case (fs, ak) of
   ([], AssumptionKind) -> discard
   ([], AnyKind) -> oneof [naLine ps, naSubProof AnyKind, naConclusion]
   (_, AssumptionKind) -> oneof [naAssumption, naSubProof AssumptionKind]
@@ -153,6 +153,36 @@ arbitraryNodeAddrFor (SubProof fs ps l) ak = case (fs, ak) of
         Just (Right p) -> arbitraryNodeAddrFor p ak <&> NAProof n
         _ -> discard
       _ -> discard
+
+arbitraryProofAddrFor :: Proof -> Gen ProofAddr
+arbitraryProofAddrFor (SubProof fs ps c) = oneof [paProof, paNested]
+ where
+  paProof = pure PAProof
+  paNested = do
+    mn <- chooseInt (0, length ps - 1) `suchThatMaybe` holdsAt isRight ps
+    case mn of
+      Just n -> case ps !!? n of
+        Just (Right p) -> arbitraryProofAddrFor p <&> PANested n
+        _ -> discard
+      _ -> discard
+
+arbitraryLineRangeFor :: Proof -> Gen (Int, Int)
+arbitraryLineRangeFor p@(SubProof _ ps _) = oneof [thisRange, nestedRange]
+ where
+  thisRange = pure (1, pLength p)
+  nestedRange = do
+    mn <- chooseInt (0, length ps - 1) `suchThatMaybe` holdsAt isRight ps
+    case mn of
+      Just n -> go n p
+      Nothing -> discard
+  go :: Int -> Proof -> Gen (Int, Int)
+  go 0 (SubProof fs (Right p : ps) c) = do
+    (start, end) <- arbitraryLineRangeFor p
+    pure (start + length fs, end + length fs)
+  go n (SubProof fs (e : ps) c) | n > 0 = do
+    (start, end) <- go (n - 1) (SubProof fs ps c)
+    pure (start + either (const 1) pLength e, end + either (const 1) pLength e)
+  go _ _ = discard
 
 prop_lRemoveMinus1 :: PrettyProof -> Property
 prop_lRemoveMinus1 (PrettyProof p) =
@@ -248,6 +278,56 @@ prop_compareLineNo (PrettyProof p) =
       compare a b
         === compare (fromNodeAddr a p) (fromNodeAddr b p)
 
+prop_fromLineRangeInverse :: PrettyProof -> Property
+prop_fromLineRangeInverse (PrettyProof p) = forAll (arbitraryProofAddrFor p) $ \pa ->
+  ((\(s, e) -> fromLineRange s e p) =<< lineRangeFromProofAddr pa p) === Just pa
+
+prop_lineRangeFromProofAddrInverse :: PrettyProof -> Property
+prop_lineRangeFromProofAddrInverse (PrettyProof p) =
+  forAll (arbitraryLineRangeFor p) $ \(start, end) ->
+    ((`lineRangeFromProofAddr` p) =<< fromLineRange start end p) === Just (start, end)
+
+-- prop_paMoveBeforeRawValidAddress :: PrettyProof -> Property
+-- prop_paMoveBeforeRawValidAddress (PrettyProof p) =
+--   forAll (arbitraryProofAddrFor p) $ \paSource ->
+--     forAll (arbitraryNodeAddrFor p LineKind) $ \naTarget -> case paFromNA naTarget p of
+--       Nothing -> discard
+--       Just paTarget ->
+--         case paMoveBeforeRaw paTarget paSource p of
+--           Nothing -> discard
+--           Just (paTarget', p') ->
+--             paTarget === (PrettyProof <$> paLookup paSource p)
+
+prop_paMoveBeforeRawSameProof :: PrettyProof -> Property
+prop_paMoveBeforeRawSameProof (PrettyProof p) =
+  forAll (arbitraryProofAddrFor p) $ \paSource ->
+    forAll (arbitraryNodeAddrFor p LineKind) $ \naTarget -> case paFromNA naTarget p of
+      Nothing -> discard
+      Just paTarget ->
+        if paTarget == paSource || paTarget == PAProof || paSource == PAProof
+          then discard
+          else case paMoveBeforeRaw paTarget paSource p of
+            Nothing -> discard
+            Just (paTarget', p') ->
+              counterexample
+                ( "paTarget="
+                    <> show paTarget
+                    <> "\npaTarget'="
+                    <> show paTarget'
+                    <> "\np'=\n"
+                    <> toString (prettyPrint p')
+                )
+                $ (PrettyProof <$> paLookup paTarget' p') === (PrettyProof <$> paLookup paSource p)
+
+lineRangeQCTests :: TestTree
+lineRangeQCTests =
+  testGroup
+    "testing conversion of line range and ProofAddr"
+    [ QC.testProperty "prop_fromLineRangeInverse" prop_fromLineRangeInverse
+    , QC.testProperty "prop_lineRangeFromProofAddrInverse" prop_lineRangeFromProofAddrInverse
+    , QC.testProperty "prop_paMoveBeforeRawSameProof" prop_paMoveBeforeRawSameProof
+    ]
+
 compareQCTests :: TestTree
 compareQCTests =
   testGroup
@@ -271,6 +351,13 @@ proofTests :: TestTree
 proofTests =
   testGroup
     "Testing functions concerning the modification of proofs"
-    [ testGroup "QuickCheck" [lRemoveQCTests, lInsertQCTests, lineNoQCTests, compareQCTests] -- ,collectVisibleLinesTests]
+    [ testGroup
+        "QuickCheck"
+        [ lRemoveQCTests
+        , lInsertQCTests
+        , lineNoQCTests
+        , lineRangeQCTests
+        , compareQCTests -- ,collectVisibleLinesTests]
+        ]
     , testGroup "HUnit" []
     ]

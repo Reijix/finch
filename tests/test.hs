@@ -10,7 +10,7 @@ import Test.Tasty.QuickCheck as QC
 main :: IO ()
 main =
   defaultMainWithIngredients (coverageReporter : defaultIngredients) $
-    localOption (QuickCheckTests 200) $
+    localOption (QuickCheckTests 500) $
       localOption (QuickCheckMaxRatio 50) tests
 
 tests :: TestTree

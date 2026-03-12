@@ -480,7 +480,7 @@ Proof containers
   margin-left: var(--formula-left-margin);
 }
 
-/*.subproof
+.subproof
   > .subproof:not(
     :has(
       .subproof:hover,
@@ -491,7 +491,7 @@ Proof containers
   ):hover {
   background-color: var(--bg-color);
   transition: 0.1s linear;
-}*/
+}
 
 .last-assumption {
   border-bottom: var(--subproof-border);

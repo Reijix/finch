@@ -374,19 +374,20 @@ viewProof model =
   proofView =
     H.div_
       [HP.class_ "formulae-container"]
-      [_viewProof Nothing id (model ^. proof)]
-  _viewProof :: Maybe ProofAddr -> (NodeAddr -> NodeAddr) -> Proof -> View Model Action
+      [_viewProof id id (model ^. proof)]
+  _viewProof ::
+    (ProofAddr -> ProofAddr) -> (NodeAddr -> NodeAddr) -> Proof -> View Model Action
   _viewProof pa na (SubProof fs ps d) =
     optionalAttrs
       H.div_
       [ HP.class_ "subproof"
-      , HP.id_ (show pa)
+      , HP.id_ . show $ pa PAProof
       ]
-      (isJust pa)
+      (pa PAProof /= PAProof)
       [ HP.class_ "draggable"
       , HP.draggable_ (isNothing (model ^. focusedLine))
-      , HP.classList_ [("drag-target", (Right <$> pa) == model ^. dragTarget)]
-      , HE.onDragStartWithOptions stopPropagation $ DragStart (Right (fromJust pa))
+      , HP.classList_ [("drag-target", Just (Right (pa PAProof)) == model ^. dragTarget)]
+      , HE.onDragStartWithOptions stopPropagation . DragStart . Right $ pa PAProof
       , HE.onDragEndWithOptions defaultOptions DragEnd
       ]
       ( interleaveWithDropZones
@@ -427,7 +428,7 @@ viewProof model =
               ( m + 1
               , either
                   (viewLine model (na $ NALine m) . Right)
-                  (_viewProof (maybe id paProofToNested pa <$> Just (PAProof m)) (na . NAProof m))
+                  (_viewProof (pa . PANested m) (na . NAProof m))
                   e
               )
           )
