@@ -108,6 +108,7 @@ updateModel (DragEnter na) = do
           _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
+  io_ . hidePopover . ms $ show st
   spawnType .= Just st
   dragging .= True
 updateModel (DragStart dt) = do

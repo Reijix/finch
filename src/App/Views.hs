@@ -102,12 +102,23 @@ viewBin =
     [ HE.onDragOverWithOptions preventDefault Nop
     , HE.onDragEnterWithOptions preventDefault Nop
     , HE.onDragLeaveWithOptions preventDefault Nop
+    , HP.class_ "anchor-container"
+    , HP.class_ "anchor"
+    , HE.onMouseOver (PopOpen "bin" True)
+    , HE.onMouseOut (PopClose "bin")
     , HE.onDropWithOptions defaultOptions (Drop LocationBin)
     , HP.class_ "bin"
     , HP.class_ "icon-container"
-    , HP.title_ "Drag lines or subproofs here to delete them."
     ]
     [ viewMaterialIcon "delete"
+    , H.p_
+        [ HP.class_ "tooltip"
+        , HP.class_ "anchored-bottom"
+        , HP.id_ "bin"
+        , textProp "popover" "manual"
+        , HP.draggable_ False
+        ]
+        [text "Drag lines or subproofs here to delete them."]
     ]
 
 {- | For use in 'viewProofActionsHeader',
@@ -125,13 +136,24 @@ viewSpawnNode tp title icon =
   H.div_
     [ HP.class_ "spawn-button"
     , HP.class_ "draggable"
+    , HP.class_ "anchor-container"
     , HP.draggable_ True
-    , HP.title_ title
+    , HP.class_ "anchor"
+    , HE.onMouseOver (PopOpen (ms $ show tp) True)
+    , HE.onMouseOut (PopClose (ms $ show tp))
     , HE.onDragStartWithOptions stopPropagation $ SpawnStart tp
     , HE.onDragEndWithOptions defaultOptions DragEnd
     , HP.class_ "icon-container"
     ]
     [ viewMaterialIcon icon
+    , H.p_
+        [ HP.class_ "tooltip"
+        , HP.class_ "anchored-bottom"
+        , HP.id_ (show tp)
+        , textProp "popover" "manual"
+        , HP.draggable_ False
+        ]
+        [text title]
     ]
 
 {- | For use in 'viewHeader',
@@ -278,7 +300,7 @@ viewGrammar model =
           [text $ ms symbol]
       , H.p_
           [ HP.class_ "tooltip"
-          , HP.class_ "anchored"
+          , HP.class_ "anchored-right"
           , HP.id_ (ms alias)
           , textProp "popover" "manual"
           , HP.draggable_ False
@@ -310,7 +332,7 @@ viewRules model =
           [text $ ms name]
       , H.p_
           [ HP.class_ "tooltip"
-          , HP.class_ "anchored"
+          , HP.class_ "anchored-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
           , textProp "popover" "manual"
@@ -344,7 +366,7 @@ viewExamples model =
           [text $ ms name]
       , H.p_
           [ HP.class_ "tooltip"
-          , HP.class_ "anchored"
+          , HP.class_ "anchored-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
           , textProp "popover" "manual"
@@ -530,12 +552,14 @@ viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id 
         [ HE.onMouseOver (PopOpen errorBoxId hasError)
         , HE.onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
+        , HP.class_ "anchor-container"
         , HE.onClick $ Focus (Right na)
         ]
         [ viewErrorBox errorBoxId err
         , H.input_
             [ HP.class_ "rule-input"
             , HP.id_ inputId
+            , HP.class_ "anchor"
             , HP.classList_
                 [ ("has-error", hasError)
                 , ("focused", Just (Right na) == model ^. focusedLine)
@@ -568,6 +592,7 @@ viewErrorBox ::
 viewErrorBox name err =
   H.code_
     [ HP.class_ "tooltip"
+    , HP.class_ "anchored-bottom"
     , HP.id_ name
     , textProp "popover" "manual"
     , HP.draggable_ False
@@ -595,6 +620,7 @@ viewLine model na e =
     H.div_
       [ HP.class_ "formula-container"
       , HP.class_ "draggable"
+      , HP.class_ "anchor-container"
       , HP.draggable_ (isNothing (model ^. focusedLine))
       , if model ^. focusedLine /= Just (Left na)
           then HE.onDragStartWithOptions stopPropagation $ DragStart (Left na)
@@ -607,9 +633,10 @@ viewLine model na e =
       [ H.input_
           [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
           , HP.id_ inputId
+          , HP.class_ "formula-input"
+          , HP.class_ "anchor"
           , HP.classList_
-              [ ("formula-input", True)
-              , ("has-error", hasError)
+              [ ("has-error", hasError)
               , ("drag-target", Just (Left na) == model ^. dragTarget)
               , ("draggable", Just (Left na) /= model ^. focusedLine)
               , ("focused", Just (Left na) == model ^. focusedLine)

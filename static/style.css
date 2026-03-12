@@ -393,7 +393,6 @@ Proof containers
   align-items: center;
   background-color: var(--proof-color);
   width: calc(100% - var(--formula-left-margin));
-  anchor-scope: --error-anchor;
   margin-left: var(--formula-left-margin);
 }
 
@@ -418,7 +417,6 @@ Proof containers
   font-size: var(--normal-text-size);
   font-family: var(--font-math);
   z-index: 110;
-  anchor-name: --error-anchor;
 }
 
 .formulae-container {
@@ -427,9 +425,6 @@ Proof containers
 }
 
 .tooltip {
-  position: absolute;
-  position-area: bottom;
-  position-anchor: --error-anchor;
   border: 1px solid;
   border-radius: 2px;
   width: fit-content;
@@ -444,7 +439,14 @@ Proof containers
   anchor-scope: --anchor;
 }
 
-.anchored {
+.anchored-bottom {
+  position: absolute;
+  position-area: bottom;
+  position-anchor: --anchor;
+}
+
+.anchored-right {
+  position: absolute;
   position-area: right;
   position-anchor: --anchor;
 }
@@ -538,7 +540,6 @@ Rule containers
   font-family: var(--font-math);
   font-size: var(--normal-text-size);
   background-color: var(--proof-color);
-  anchor-name: --error-anchor;
 }
 
 .rule-container {
@@ -549,7 +550,6 @@ Rule containers
   margin: 0;
   position: relative;
   background-color: var(--proof-color);
-  anchor-scope: --error-anchor;
   cursor: pointer;
 }
 
