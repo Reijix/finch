@@ -1125,8 +1125,8 @@ naInsertBefore e na prf = case naInsertBeforeRaw e na prf of
     | lineNo <= line = LineReference $ line + 1
   goRef p na lineNo (ProofReference start end) = case fromLineRange start end p of
     Just pa
-      | lineNo > end -> ProofReference start end
       | naContainedIn na pa -> ProofReference start (end + 1)
+      | lineNo > end -> ProofReference start end
       | lineNo <= start -> ProofReference (start + 1) (end + 1)
     _ -> ProofReference start end
 
