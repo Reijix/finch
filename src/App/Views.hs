@@ -71,14 +71,31 @@ viewHeader :: Model -> View Model Action
 viewHeader model =
   H.header_
     [HP.class_ "header"]
-    [ H.h1_
-        []
-        [ H.img_ [HP.src_ "favicon.svg"]
-        , "Finch"
-        , H.button_ [HP.class_ "help-button", HE.onClick ToggleSidebar] [viewMaterialIcon "help"]
-        ]
+    [ viewLogoHeader
     , viewProofActionsHeader
     , viewNewProofButton model
+    ]
+
+viewLogoHeader :: View Model Action
+viewLogoHeader =
+  H.div_
+    [HP.class_ "logo-header"]
+    [ H.img_ [HP.src_ "favicon.svg"]
+    , H.h1_ [] ["Finch"]
+    , H.button_ [HP.class_ "help-button", HE.onClick ToggleSidebar] [viewMaterialIcon "help"]
+    , H.div_
+        [HP.class_ "navigation-container"]
+        [ H.button_
+            [ HE.onClick NavigateBackward
+            , HP.class_ "spawn-button"
+            ]
+            [viewMaterialIcon "arrow_left_alt"]
+        , H.button_
+            [ HE.onClick NavigateForward
+            , HP.class_ "spawn-button"
+            ]
+            [viewMaterialIcon "arrow_right_alt"]
+        ]
     ]
 
 {- | For use in 'viewHeader',
@@ -108,7 +125,6 @@ viewBin =
     , HE.onMouseOut (PopClose "bin")
     , HE.onDropWithOptions defaultOptions (Drop LocationBin)
     , HP.class_ "bin"
-    , HP.class_ "icon-container"
     ]
     [ viewMaterialIcon "delete"
     , H.p_
@@ -143,7 +159,6 @@ viewSpawnNode tp title icon =
     , HE.onMouseOut (PopClose (ms $ show tp))
     , HE.onDragStartWithOptions stopPropagation $ SpawnStart tp
     , HE.onDragEndWithOptions defaultOptions DragEnd
-    , HP.class_ "icon-container"
     ]
     [ viewMaterialIcon icon
     , H.p_

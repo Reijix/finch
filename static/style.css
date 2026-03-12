@@ -41,11 +41,6 @@ input:focus {
   outline: none;
 }
 
-h1 {
-  margin-block: 0.67em;
-  font-size: var(--header-text-size);
-}
-
 /*
 --------------------------------------------------
 Button containers
@@ -182,14 +177,6 @@ ul {
   width: 2em;
 }
 
-.icon-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-wrap: wrap;
-  text-align: center;
-}
-
 .example-container {
   display: flex;
   justify-content: center;
@@ -230,17 +217,26 @@ ul {
 
 .spawn-button {
   display: flex;
+  cursor: pointer;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   width: 6vw;
-  border: 1px solid;
+  /*border: 1px solid;*/
+  border: none;
   border-radius: 6px;
+  background-color: white;
   color: #24292e;
   border-color: #1b1f2326;
   box-shadow:
     rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,
     rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset;
+}
+
+.spawn-button:hover {
+  background-color: #f3f4f6;
+  border-color: #1b1f2326;
+  transition-duration: 0.1s;
 }
 
 /*
@@ -277,6 +273,32 @@ Proof containers
   height: var(--header-height);
 }
 
+.logo-header {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  font-size: var(--header-text-size);
+}
+
+.navigation-container {
+  display: inline-flex;
+  border: 1px solid #d1d5db;
+  overflow: hidden;
+  margin-left: 1vw;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.navigation-container:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.navigation-container:last-child {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
 .proof-actions-header {
   display: flex;
   flex-direction: row;
@@ -284,13 +306,21 @@ Proof containers
   font-size: var(--error-text-size);
 }
 
-.header > h1 {
+@media only screen and (max-width: 1200px) {
+  .logo-header > h1 {
+    width: 0;
+    overflow: hidden;
+  }
+}
+
+.logo-header > h1 {
+  font-size: var(--header-text-size);
   display: flex;
   flex-direction: row;
   justify-content: center;
 }
 
-.header > h1 > img {
+.logo-header > img {
   height: var(--header-text-size);
   margin-right: 0.5vw;
 }
@@ -416,7 +446,6 @@ Proof containers
   margin: 0;
   font-size: var(--normal-text-size);
   font-family: var(--font-math);
-  z-index: 110;
 }
 
 .formulae-container {

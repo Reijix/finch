@@ -85,6 +85,10 @@ data Action where
   DragEnd :: Action
   -- | Called when spawning starts with given t'SpawnType'.
   SpawnStart :: SpawnType -> Action
+  -- Navigate forward in the history
+  NavigateForward :: Action
+  -- | Navigate backward in the history
+  NavigateBackward :: Action
   -- | No op.
   Nop :: Action
 

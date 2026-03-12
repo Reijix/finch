@@ -23,9 +23,11 @@ import Miso (
   MisoString,
   ROOT,
   URI (uriQueryString),
+  back,
   castJSVal,
   consoleLog,
   focus,
+  forward,
   fromMisoString,
   getElementById,
   getProperty,
@@ -69,9 +71,11 @@ updateModel (SetProof p) = do
   proofReparse
   updateProof
 ------------------------------------
--- t'URI' event
+-- t'URI' events
 updateModel (PopState uri) = do
   readURI uri >> proofReparse >> checkProof >> updateTitle
+updateModel NavigateForward = io_ forward
+updateModel NavigateBackward = io_ back
 ------------------------------------
 -- Events that toggle UI elements
 updateModel (PopOpen name True) =
