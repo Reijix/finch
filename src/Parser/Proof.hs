@@ -34,17 +34,23 @@ import Text.Megaparsec (
  )
 import Text.Megaparsec qualified as Parsec
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Line parsers
 
--- | Parses a t'Formula', capturing the source text and wrapping the result in 'ParsedValid'.
+{- | Parses a t'Formula', capturing the source text and wrapping the result in
+'ParsedValid'.
+-}
 pFormula :: (FormulaParser m) => m Formula
 pFormula = matchNoSpaces (lexeme pRawFormula) <&> uncurry ParsedValid
 
--- | Parses an t'Assumption', capturing the source text and wrapping the result in 'ParsedValid'.
+{- | Parses an t'Assumption', capturing the source text and wrapping the result in
+'ParsedValid'.
+-}
 pAssumption :: (FormulaParser m) => m Assumption
-pAssumption = mkAssumption <$> (matchNoSpaces (lexeme pRawAssumption) <&> uncurry ParsedValid)
+pAssumption =
+  mkAssumption
+    <$> (matchNoSpaces (lexeme pRawAssumption) <&> uncurry ParsedValid)
 
 -- | Parses a t'Derivation': a t'Formula' followed by a t'RuleApplication'.
 pDerivation :: (FormulaParser m) => m Derivation
@@ -54,7 +60,7 @@ pDerivation =
     pFormula
     (matchNoSpaces (lexeme pRule) <&> uncurry ParsedValid)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Proof structure parsers
 
@@ -82,14 +88,19 @@ pProof ind =
   do
     fs <- manyTill (withIndent ind (lexeme pAssumption)) (try (pFormulaSep ind))
     proofs <-
-      some1 . try $ lexeme (eitherP (try $ withIndent ind pDerivation) (pProof (ind + 1)))
+      some1 . try $
+        lexeme
+          ( eitherP
+              (try $ withIndent ind pDerivation)
+              (pProof (ind + 1))
+          )
 
     case last proofs of
       Left d -> pure $ SubProof fs (init proofs) d
       Right p -> unexpected (Label $ fromList "subproof")
     <?> "subproof"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Entry points
 
@@ -121,7 +132,12 @@ parseLine operators infixPreds quantifiers input = case evalState
           PosState
             { pstateInput = input
             , pstateOffset = 0
-            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = pos1, sourceColumn = pos1}
+            , pstateSourcePos =
+                SourcePos
+                  { sourceName = ""
+                  , sourceLine = pos1
+                  , sourceColumn = pos1
+                  }
             , pstateTabWidth = defaultTabWidth
             , pstateLinePrefix = ""
             }
@@ -163,7 +179,12 @@ parseProof operators infixPreds quantifiers input =
           PosState
             { pstateInput = input
             , pstateOffset = 0
-            , pstateSourcePos = SourcePos{sourceName = "", sourceLine = pos1, sourceColumn = pos1}
+            , pstateSourcePos =
+                SourcePos
+                  { sourceName = ""
+                  , sourceLine = pos1
+                  , sourceColumn = pos1
+                  }
             , pstateTabWidth = defaultTabWidth
             , pstateLinePrefix = ""
             }

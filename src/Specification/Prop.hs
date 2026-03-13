@@ -23,7 +23,7 @@ import Miso.Router (URI)
 import Parser.Proof
 import Specification.Types
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Operators
 
@@ -42,7 +42,7 @@ operatorsProp =
   , ("->", "→", 2)
   ]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Rules
 
@@ -78,7 +78,7 @@ rulesProp =
   f1 ∨ f2 = FOpr "∨" [f1, f2]
   f1 ↝ f2 = FOpr "→" [f1, f2]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parser
 
@@ -91,11 +91,13 @@ readProof proofText = case parseProof operatorsProp [] [] proofText of
   Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
   Right p -> p
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Examples
 
--- | The default empty t'Proof' shown when the user starts a new proof in propositional logic.
+{- | The default empty t'Proof' shown when the user starts a new proof in
+propositional logic.
+-}
 emptyProofProp :: Proof
 emptyProofProp =
   readProof
@@ -133,7 +135,7 @@ exampleProofsProp =
     )
   ]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Model
 
@@ -147,7 +149,13 @@ initialModelProp ::
 initialModelProp uri mp =
   initialModel
     emptyProofProp
-    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤I)" (RuleApplication "⊤I" [])))
+    ( Derivation
+        (ParsedValid "⊤" (Opr "⊤" []))
+        ( ParsedValid
+            "(⊤I)"
+            (RuleApplication "⊤I" [])
+        )
+    )
     (fromMaybe initialP mp)
     exampleProofsProp
     operatorsProp

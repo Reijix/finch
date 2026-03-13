@@ -16,11 +16,13 @@ import Miso.Lens (Lens, lens)
 import Miso.Lens.TH (makeLenses)
 import Specification.Types
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Data Types
 
--- | Specifies the location where a t'Assumption', t'Derivation' or t'Proof' has been dropped.
+{- | Specifies the location where a t'Assumption', t'Derivation' or
+t'Proof' has been dropped.
+-}
 data DropLocation where
   -- | Dropped __before__ a t'NodeAddr'.
   LineAddr :: NodeAddr -> DropLocation
@@ -37,11 +39,13 @@ data SpawnType where
   deriving (Show, Eq)
 
 {- | Returns whether a given t'SpawnType' can be spawned __before__ a t'NodeAddr'.
-For example, a t'Proof' can be spawned before a 'NAConclusion', but not before a 'NAAssumption'.
+For example, a t'Proof' can be spawned before a 'NAConclusion',
+but not before a 'NAAssumption'.
 -}
 canSpawnBefore :: NodeAddr -> SpawnType -> Bool
 canSpawnBefore (NAProof n na) st = canSpawnBefore na st
-canSpawnBefore (NALine{}; NAAssumption{}; NAConclusion; NAAfterConclusion) SpawnLine = True
+canSpawnBefore (NALine{}; NAAssumption{}; NAConclusion; NAAfterConclusion) SpawnLine =
+  True
 canSpawnBefore (NALine{}; NAConclusion) SpawnProof = True
 canSpawnBefore _ _ = False
 
@@ -59,7 +63,9 @@ data Action where
   ToggleSidebar :: Action
   -- | Update the t'Proof'.
   SetProof :: Proof -> Action
-  -- | Pop a state of the history, see <https://developer.mozilla.org/en-US/docs/Web/API/History_API>.
+  {- | Pop a state of the history,
+  see <https://developer.mozilla.org/en-US/docs/Web/API/History_API>.
+  -}
   PopState :: URI -> Action
   -- | Setup directly called after application is mounted.
   Setup :: Action
@@ -95,7 +101,7 @@ data Action where
 -- | Type for position information.
 type Pos = Int
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Model
 
@@ -156,7 +162,9 @@ data Model = Model
 initialModel ::
   -- | Empty t'Proof', for the "New Proof" @<button>@.
   Proof ->
-  -- | Empty t'Derivation', used for inserting t'Assumption's, t'Derivation's and t'Proof's.
+  {- | Empty t'Derivation', used for inserting t'Assumption's, t'Derivation's and
+  t'Proof's.
+  -}
   Derivation ->
   -- | Initial t'Proof'.
   Proof ->

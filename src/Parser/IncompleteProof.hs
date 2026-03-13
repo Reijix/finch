@@ -22,7 +22,7 @@ import Parser.Util
 import Text.Megaparsec (chunk, eof, manyTill, runParser, try)
 import Text.Megaparsec.Char
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Serialization
 
@@ -34,7 +34,8 @@ Legend of control characters:
 
 * @\\31@ separates a t'Formula' from its t'RuleApplication'
 * @\\30@ separates individual lines from each other
-* @\\29@ encloses groups: the t'Assumption' list, the t'Derivation' or t'Proof' list, and the conclusion
+* @\\29@ encloses groups: the t'Assumption' list, the t'Derivation' or t'Proof' list,
+and the conclusion
 * @\\28@ encloses an entire t'Proof'
 -}
 safeParsePrint :: Proof -> Text
@@ -55,11 +56,12 @@ safeParsePrint (SubProof fs ps c) =
   derivationShow :: Derivation -> Text
   derivationShow (Derivation f r) = prettyPrint f <> "\31" <> prettyPrint r <> "\30"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parsers
 
-{- | Parses a single t'Derivation' from the serialization format produced by 'safeParsePrint'.
+{- | Parses a single t'Derivation' from the serialization format produced by
+'safeParsePrint'.
 The t'Formula' and t'RuleApplication' fields are left as v'Unparsed'
 wrappers and are re-parsed later by the application.
 -}
@@ -71,7 +73,8 @@ pIncompleteDerivation = do
   chunk "\30"
   pure $ Derivation (Unparsed f "") (Unparsed r "")
 
-{- | Parses a single t'Assumption' from the serialization format produced by 'safeParsePrint'.
+{- | Parses a single t'Assumption' from the serialization format produced by
+'safeParsePrint'.
 Both the t'Formula' and t'RuleApplication' fields are left as v'Unparsed' wrappers
 and are re-parsed later by the application.
 -}
@@ -96,7 +99,7 @@ pIncompleteProof = do
   chunk "\29\28"
   pure $ SubProof fs ps c
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Entry point
 

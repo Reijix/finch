@@ -28,7 +28,7 @@ import Text.Megaparsec (
   (<?>),
  )
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parser state
 
@@ -42,10 +42,12 @@ data FormulaParserState = FormulaParserState
   -- ^ List of quantifiers as (alias, quantifier).
   }
 
--- | Constraint alias combining a t'Parser' with a 'MonadState' over t'FormulaParserState'.
+{- | Constraint alias combining a t'Parser' with a 'MonadState'
+over t'FormulaParserState'.
+-}
 type FormulaParser m = (MonadParsec Void Text m, MonadState FormulaParserState m)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Term parsers
 
@@ -56,7 +58,11 @@ __Note:__ the parser cannot distinguish between function constants and variables
 This does not matter for this application — constants are treated as variables.
 -}
 pFun :: (FormulaParser m) => m Term
-pFun = lexeme (liftA2 Fun pLowerName (parens (pTerm `sepBy` comma)) <?> "function symbol")
+pFun =
+  lexeme
+    ( liftA2 Fun pLowerName (parens (pTerm `sepBy` comma))
+        <?> "function symbol"
+    )
 
 -- | Parses a variable: a single lowercase name.
 pVar :: (FormulaParser m) => m Term
@@ -66,7 +72,7 @@ pVar = lexeme (Var <$> pLowerName <?> "variable")
 pTerm :: (FormulaParser m) => m Term
 pTerm = try pFun <|> pVar <?> "term"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Formula parsers
 
@@ -76,7 +82,9 @@ Thus also capturing propositional atoms.
 pPredicate :: (FormulaParser m) => m RawFormula
 pPredicate =
   lexeme
-    (liftA2 Pred pUpperName (parens (pTerm `sepBy` comma) <|> pure []) <?> "predicate symbol")
+    ( liftA2 Pred pUpperName (parens (pTerm `sepBy` comma) <|> pure [])
+        <?> "predicate symbol"
+    )
 
 {- | Parses a quantifier name from the current t'FormulaParserState',
 accepting both the actual symbol and the alias.
@@ -86,12 +94,17 @@ pQuantifierName = do
   symbols <- gets quantifiers
   foldr (\(alias, s) p -> chunk s <|> (chunk alias >> pure s) <|> p) empty symbols
 
--- | Parses a constant, i.e. a nullary 'Opr' like @⊥@ from the current t'FormulaParserState'.
+{- | Parses a constant, i.e. a nullary 'Opr' like @⊥@
+ from the current t'FormulaParserState'.
+-}
 pConstant :: (FormulaParser m) => m RawFormula
 pConstant = do
   ops <- gets operators
   op <-
-    foldr (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p) empty ops
+    foldr
+      (\(alias, o, n) p -> if n == 0 then chunk alias <|> chunk o <|> p else p)
+      empty
+      ops
   lexeme . pure $ Opr op []
 
 -- | Parses a quantified t'RawFormula' of the form @quantifier variable . formula@.
@@ -137,24 +150,34 @@ pRawFormula = do
   let operatorTable =
         [ concatMap
             ( \(alias, u, arity) ->
-                if arity == 1 then [prefix alias (\f -> Opr u [f]), prefix u (\f -> Opr u [f])] else []
+                if arity == 1
+                  then
+                    [ prefix alias (\f -> Opr u [f])
+                    , prefix u (\f -> Opr u [f])
+                    ]
+                  else []
             )
             ops
         , concatMap
             ( \(alias, b, arity) ->
                 if arity == 2
-                  then [binary alias (\f1 f2 -> Opr b [f1, f2]), binary b (\f1 f2 -> Opr b [f1, f2])]
+                  then
+                    [ binary alias (\f1 f2 -> Opr b [f1, f2])
+                    , binary b (\f1 f2 -> Opr b [f1, f2])
+                    ]
                   else []
             )
             ops
         ]
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Assumption parsers
 
--- | Parses a fresh-variable marker: a lowercase name enclosed in square brackets, e.g. @[x]@.
+{- | Parses a fresh-variable marker: a lowercase name enclosed in square brackets,
+e.g. @[x]@.
+-}
 pFreshVariable :: (FormulaParser m) => m RawAssumption
 pFreshVariable = lexeme $ FreshVar <$> brackets pLowerName
 
@@ -162,12 +185,12 @@ pFreshVariable = lexeme $ FreshVar <$> brackets pLowerName
 pRawAssumption :: (FormulaParser m) => m RawAssumption
 pRawAssumption = (pFreshVariable <|> (RawAssumption <$> pRawFormula)) <?> "assumption"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Entry points
 
-{- | Constructs an initial Megaparsec t'Text.Megaparsec.State' positioned at the given line number,
-so that parse errors report the correct source location.
+{- | Constructs an initial Megaparsec t'Text.Megaparsec.State' positioned at the
+given line number, so that parse errors report the correct source location.
 -}
 initialParserState ::
   -- | Line number at which parsing begins.

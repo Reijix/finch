@@ -108,7 +108,8 @@ instance Substitute RawFormula Term where
 
 -- * Unification
 
-{- | Unification on terms, this is the Martelli-Montanari unification algorithm with a twist:
+{- | Unification on terms, this is the Martelli-Montanari unification algorithm
+with a twist:
 the unification happens *on* a variable @x@.
 Meaning the resulting unificator must have the variable @x@ on the left hand side.
 
@@ -226,5 +227,6 @@ formulaMatchesSpec _ _ = False
 -- | Unify t'RawAssumption' with t'AssumptionSpec'.
 assumptionMatchesSpec :: RawAssumption -> AssumptionSpec -> Bool
 assumptionMatchesSpec (FreshVar{}) (FFreshVar{}) = True
-assumptionMatchesSpec (RawAssumption rf) (AssumptionSpec fSpec) = formulaMatchesSpec rf fSpec
+assumptionMatchesSpec (RawAssumption rf) (AssumptionSpec fSpec) =
+  formulaMatchesSpec rf fSpec
 assumptionMatchesSpec _ _ = False

@@ -23,14 +23,16 @@ import Text.Megaparsec (
 import Text.Megaparsec.Char (space1)
 import Text.Megaparsec.Char.Lexer qualified as L
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Types
 
--- | Constraint alias for a Megaparsec parser over a t'Text' stream with no custom error type.
+{- | Constraint alias for a Megaparsec parser over a t'Text' stream with no custom
+error type.
+-}
 type Parser = MonadParsec Void Text
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Lexer
 
@@ -54,11 +56,12 @@ symbol = L.symbol sc
 matchNoSpaces :: (Parser m) => m a -> m (Text, a)
 matchNoSpaces p = first T.strip <$> match p
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Name parsers
 
-{- | Parses a name that starts with one or more uppercase letters, followed by zero or more letters.
+{- | Parses a name that starts with one or more uppercase letters,
+followed by zero or more letters.
 Used for predicate symbols.
 -}
 pUpperName :: (Parser m) => m Text
@@ -68,7 +71,8 @@ pUpperName =
     end <- takeWhileP (Just "letter") isLetter
     pure (start <> end)
 
-{- | Parses a name that starts with one or more lowercase letters, followed by zero or more letters.
+{- | Parses a name that starts with one or more lowercase letters,
+followed by zero or more letters.
 Used for function symbols and variables.
 -}
 pLowerName :: (Parser m) => m Text
@@ -78,19 +82,23 @@ pLowerName =
     end <- takeWhileP (Just "letter") isLetter
     pure (start <> end)
 
-{- | Parses a symbolic name, i.e. any non-empty sequence of characters that are neither @(@ nor @)@.
+{- | Parses a symbolic name, i.e. any non-empty sequence of characters
+that are neither @(@ nor @)@.
 Used for parsing rule applications.
 -}
 pSymbolicName :: (Parser m) => m Text
-pSymbolicName = takeWhile1P (Just "symbolic letter") (`notElem` ("()" :: String)) <?> "name"
+pSymbolicName =
+  takeWhile1P (Just "symbolic letter") (`notElem` ("()" :: String))
+    <?> "name"
 
 {- | Parses arbitrary characters, excluding the control characters
-@\\28@, @\\29@, @\\30@, and @\\31@ that are used as separators in t'Parser.IncompleteProof'.
+@\\28@, @\\29@, @\\30@, and @\\31@ that are used as separators in
+t'Parser.IncompleteProof'.
 -}
 pText :: (Parser m) => m Text
 pText = takeWhileP (Just "text") (`notElem` ("\28\29\30\31" :: String)) <?> "text"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Symbol parsers
 
@@ -110,7 +118,7 @@ parens = between (symbol "(") (symbol ")")
 brackets :: (Parser m) => m a -> m a
 brackets = between (symbol "[") (symbol "]")
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Operator combinators
 

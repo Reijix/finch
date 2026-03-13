@@ -55,7 +55,7 @@ test-suite test
     ProofSyntax
 
   main-is:
-    test.hs
+    Main.hs
 
   mixins:
     base hiding (Prelude),
@@ -82,22 +82,9 @@ executable finch
   hs-source-dirs:
     .
 
-  default-extensions:
-    CPP
-    OverloadedStrings
-
   build-depends:
     Finch,
     base >=4.21.0 && <5,
-    containers >=0.7 && <0.9,
-    miso,
-    relude,
-    text >=2.1.2 && <2.2,
-
-  mixins:
-    base hiding (Prelude),
-    relude (Relude as Prelude),
-    relude,
 
   main-is:
     Main.hs
@@ -107,6 +94,7 @@ executable finch
 
 library
   exposed-modules:
+    App.Entry
     App.Model
     App.URLDecoder
     App.Update

@@ -45,7 +45,7 @@ import Text.Megaparsec (
 import Text.Megaparsec.Char (digitChar, letterChar, printChar, space1, string)
 import Text.Megaparsec.Char.Lexer qualified as L
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parsers
 
@@ -59,7 +59,9 @@ or a v'LineReference' (a single line number @n@).
 pReference :: (Parser m) => m Reference
 pReference = proofReference <|> lineReference
  where
-  proofReference = liftA2 ProofReference (try $ pLine <* lexeme minus) pLine <?> "line range"
+  proofReference =
+    liftA2 ProofReference (try $ pLine <* lexeme minus) pLine
+      <?> "line range"
   lineReference = LineReference <$> pLine <?> "line number"
 
 {- | Parses a t'RuleApplication': a rule name enclosed in parentheses,
@@ -72,7 +74,7 @@ pRule =
     (parens (try pSymbolicName <|> pure ""))
     (lexeme pReference `sepBy` comma)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Entry point
 

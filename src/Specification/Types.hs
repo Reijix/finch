@@ -14,7 +14,7 @@ module Specification.Types where
 import Data.Text qualified as T
 import Fitch.Proof
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Rule specifications
 
@@ -62,7 +62,7 @@ ruleSpecTex (RuleSpec fs ps conclusion) =
     assumptionSpecTex (AssumptionSpec frm) = formulaSpecTex frm
   showFsPs = T.intercalate "\\quad " (map formulaSpecTex fs <> map proofSpecTex ps)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Term and Formula specifications
 
@@ -140,4 +140,4 @@ instance PrettyPrint AssumptionSpec where
   prettyPrint (AssumptionSpec fSpec) = prettyPrint fSpec
   prettyPrint (FFreshVar n) = "[" <> n <> "]"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------

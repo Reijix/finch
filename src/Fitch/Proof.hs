@@ -18,7 +18,7 @@ import Relude.Extra.Map (toPairs, (!?))
 import Relude.Extra.Newtype
 import Util
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Pretty-printing
 
@@ -57,7 +57,7 @@ instance (PrettyPrint a) => PrettyPrint (Map Name a) where
   prettyPrint :: Map Name a -> Text
   prettyPrint m = unlines $ map (\(n, a) -> n <> " |-> " <> prettyPrint a) (toPairs m)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parsed wrappers
 
@@ -115,22 +115,27 @@ getText (ParsedValid txt _) = txt
 getText (ParsedInvalid txt _ _) = txt
 getText (Unparsed txt _) = txt
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- | Renders a short preview of a t'Proof' as assumptions followed by its conclusion.
 proofPreviewTex :: Proof -> Text
-proofPreviewTex (SubProof fs _ (Derivation f _)) = T.concat viewFs <> "⊢\n" <> prettyPrint f
+proofPreviewTex (SubProof fs _ (Derivation f _)) =
+  T.concat viewFs
+    <> "⊢\n"
+    <> prettyPrint f
  where
   viewFs = map (\a -> prettyPrint a <> "\n") fs
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Proof Types
 
 -- | Type of symbolic names such as variables, predicates, rules, and operators.
 type Name = Text
 
--- | A term in first-order logics consists either of a variable or a function applied to terms.
+{- | A term in first-order logics consists either of a variable or
+a function applied to terms.
+-}
 data Term
   = -- | A single variable in first-order logic
     Var Name
@@ -215,10 +220,13 @@ instance {-# OVERLAPPING #-} PrettyPrint Assumption where
   prettyPrint :: Assumption -> Text
   prettyPrint = prettyPrint . fst
 
--- | Converts a t'Derivation' into an t'Assumption' by wrapping its formula as a t'RawAssumption'.
+{- | Converts a t'Derivation' into an t'Assumption' by wrapping its formula
+as a t'RawAssumption'.
+-}
 toAssumption :: Derivation -> Assumption
 toAssumption (Derivation (Unparsed txt err) ra) = (Unparsed txt err, ra)
-toAssumption (Derivation (ParsedInvalid txt err f) ra) = (ParsedInvalid txt err (RawAssumption f), ra)
+toAssumption (Derivation (ParsedInvalid txt err f) ra) =
+  (ParsedInvalid txt err (RawAssumption f), ra)
 toAssumption (Derivation (ParsedValid txt f) ra) = (ParsedValid txt (RawAssumption f), ra)
 
 {- | Converts an t'Assumption' into a t'Derivation'.
@@ -254,7 +262,12 @@ instance {-# OVERLAPPING #-} PrettyPrint (Wrapper RuleApplication) where
 
 instance PrettyPrint RuleApplication where
   prettyPrint :: RuleApplication -> Text
-  prettyPrint (RuleApplication n refs) = "(" <> n <> ")" <> " " <> T.intercalate "," (map prettyPrint refs)
+  prettyPrint (RuleApplication n refs) =
+    "("
+      <> n
+      <> ")"
+      <> " "
+      <> T.intercalate "," (map prettyPrint refs)
 
 -- | A derivation inside a t'Proof'.
 data Derivation
@@ -270,7 +283,9 @@ instance PrettyPrint Derivation where
 
 -- | A datatype for representing Fitch-style proofs.
 data Proof where
-  -- | A sub proof consisting of t'Assumption's, t'Derivation's, nested t'Proof's, and a conclusion.
+  {- | A sub proof consisting of t'Assumption's, t'Derivation's,
+  nested t'Proof's, and a conclusion.
+  -}
   SubProof :: [Assumption] -> [Either Derivation Proof] -> Derivation -> Proof
   deriving (Eq, Show)
 
@@ -297,19 +312,25 @@ instance PrettyPrint Proof where
         <> cShow
      where
       (line', fsShow) =
-        mapAccumL (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f)) line fs
+        mapAccumL
+          (\ln f -> (ln + 1, withLine ln $ withLevel (level + 1) $ prettyPrint f))
+          line
+          fs
       (line'', psShow) =
         mapAccumL
           ( \ln' e ->
               ( ln' + either (const 1) pLength e
-              , either (withLine ln' . withLevel (level + 1) . prettyPrint) (pretty' ln' (level + 1)) e
+              , either
+                  (withLine ln' . withLevel (level + 1) . prettyPrint)
+                  (pretty' ln' (level + 1))
+                  e
               )
           )
           line'
           ps
       cShow = withLine line'' $ withLevel (level + 1) $ prettyPrint c
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Folds and Maps
 
@@ -322,7 +343,18 @@ pFoldLines ::
   a ->
   Proof ->
   a
-pFoldLines af df s (SubProof fs ps c) = df (foldl' (\s' -> either (df s') (pFoldLines af df s')) (foldl' af s fs) ps) c
+pFoldLines af df s (SubProof fs ps c) =
+  df
+    ( foldl'
+        ( \s' ->
+            either
+              (df s')
+              (pFoldLines af df s')
+        )
+        (foldl' af s fs)
+        ps
+    )
+    c
 
 -- | The 'pLength' of a t'Proof' is its total number of lines.
 pLength :: Proof -> Int
@@ -343,7 +375,8 @@ pFoldLinesM af df s (SubProof fs ps d) = do
 
 {- | Serializes a t'Proof' by mapping t'Assumption's, t'Derivation's, t'Proof's,
 and conclusions.
-Nested proofs are first serialized recursively and then combined with the given proof function.
+Nested proofs are first serialized recursively
+and then combined with the given proof function.
 -}
 pSerialize ::
   (Assumption -> a) ->
@@ -367,7 +400,9 @@ pSerializeLines af df (SubProof fs ps d) =
     <> concatMap (either (one . df) (pSerializeLines af df)) ps
     <> one (df d)
 
--- | Like 'pSerializeLines' but also passes the current t'NodeAddr' to each mapping function.
+{- | Like 'pSerializeLines' but also passes the current t'NodeAddr'
+to each mapping function.
+-}
 pSerializeLinesWithAddr ::
   (NodeAddr -> Assumption -> a) ->
   (NodeAddr -> Derivation -> a) ->
@@ -381,12 +416,22 @@ pSerializeLinesWithAddr = go id
     (NodeAddr -> Derivation -> a) ->
     Proof ->
     [a]
-  go getNA af df (SubProof fs ps d) = mappedFs ++ concat mappedPs ++ [df (getNA NAConclusion) d]
+  go getNA af df (SubProof fs ps d) =
+    mappedFs
+      <> concat mappedPs
+      <> [df (getNA NAConclusion) d]
    where
     (_, mappedFs) = mapAccumL (\m frm -> (m + 1, af (getNA $ NAAssumption m) frm)) 0 fs
     (_, mappedPs) =
       mapAccumL
-        (\m e -> (m + 1, either (one . df (getNA (NALine m))) (go (getNA . NAProof m) af df) e))
+        ( \m e ->
+            ( m + 1
+            , either
+                (one . df (getNA (NALine m)))
+                (go (getNA . NAProof m) af df)
+                e
+            )
+        )
         0
         ps
 
@@ -398,7 +443,11 @@ pMapLines ::
   (Derivation -> Derivation) ->
   Proof ->
   Proof
-pMapLines af df (SubProof fs ps d) = SubProof (map af fs) (map (bimap df (pMapLines af df)) ps) (df d)
+pMapLines af df (SubProof fs ps d) =
+  SubProof
+    (map af fs)
+    (map (bimap df (pMapLines af df)) ps)
+    (df d)
 
 -- | Like 'pMapLines', but threads an accumulator from left to right.
 pMapLinesAccumL ::
@@ -452,7 +501,12 @@ pMapLinesWithAddr = go id
     (_, ps') =
       mapAccumL
         ( \m e ->
-            (m + 1, either (Left . df (getNA (NALine m))) (Right . go (getNA . NAProof m) af df) e)
+            ( m + 1
+            , either
+                (Left . df (getNA (NALine m)))
+                (Right . go (getNA . NAProof m) af df)
+                e
+            )
         )
         0
         ps
@@ -498,7 +552,9 @@ pMapLinesMAccumL af df s (SubProof fs ps d) = do
   (s''', d') <- df s'' d
   pure (s''', SubProof fs' ps' d')
 
--- | Maps every t'Reference' in a t'Proof', optionally removing references by returning 'Nothing'.
+{- | Maps every t'Reference' in a t'Proof', optionally removing references
+by returning 'Nothing'.
+-}
 pMapRefs :: (Reference -> Maybe Reference) -> Proof -> Proof
 pMapRefs goRef = pMapLines goAssumption goDerivation
  where
@@ -601,7 +657,9 @@ isNestedNAConclusion _ = False
 -- | Returns whether two t'NodeAddr's are on the same level in the same t'Proof'.
 naInSameProof :: NodeAddr -> NodeAddr -> Bool
 naInSameProof (NAProof n na1) (NAProof m na2) = n == m && naInSameProof na1 na2
-naInSameProof (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) = True
+naInSameProof
+  (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion)
+  (NAAssumption{}; NALine{}; NAConclusion; NAAfterConclusion) = True
 naInSameProof _ _ = False
 
 -- | Returns whether two t'ProofAddr's are on the same level in the same t'Proof'.
@@ -695,11 +753,29 @@ fromNodeAddr = go 1
   go n (NALine m) (SubProof fs ps _)
     | holdsAt isLeft ps m =
         pure $
-          length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps)
-  go n NAConclusion (SubProof fs ps _) = pure $ length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 ps
+          length fs
+            + n
+            + foldr
+              (\p n -> either (const $ n + 1) ((n +) . pLength) p)
+              0
+              (take m ps)
+  go n NAConclusion (SubProof fs ps _) =
+    pure $
+      length fs
+        + n
+        + foldr
+          (\p n -> either (const $ n + 1) ((n +) . pLength) p)
+          0
+          ps
   go n (NAProof m na) (SubProof fs ps@((!!? m) -> Just (Right p)) _) =
     go
-      (length fs + n + foldr (\p n -> either (const $ n + 1) ((n +) . pLength) p) 0 (take m ps))
+      ( length fs
+          + n
+          + foldr
+            (\p n -> either (const $ n + 1) ((n +) . pLength) p)
+            0
+            (take m ps)
+      )
       na
       p
   go _ _ _ = Nothing
@@ -745,7 +821,15 @@ lineRangeFromProofAddr (PANested 0 pa) (SubProof fs (Right p : ps) _) =
     Nothing -> Nothing
 lineRangeFromProofAddr (PANested n pa) (SubProof fs (e : ps) c) | n > 0 =
   case lineRangeFromProofAddr (PANested (n - 1) pa) (SubProof fs ps c) of
-    Just (start, end) -> Just (start + either (const 1) pLength e, end + either (const 1) pLength e)
+    Just (start, end) ->
+      Just
+        ( start + either (const 1) pLength e
+        , end
+            + either
+              (const 1)
+              pLength
+              e
+        )
     Nothing -> Nothing
 lineRangeFromProofAddr _ _ = Nothing
 
@@ -771,7 +855,9 @@ For other t'NodeAddr's, returns v'Nothing'.
 paFromNA :: NodeAddr -> Proof -> Maybe ProofAddr
 paFromNA (NALine n) _ = Just $ PANested n PAProof
 paFromNA NAConclusion (SubProof _ ps _) = Just $ PANested (length ps) PAProof
-paFromNA (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = PANested n <$> paFromNA na p
+paFromNA (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) =
+  PANested n
+    <$> paFromNA na p
 paFromNA _ _ = Nothing
 
 {- | Turns a t'ProofAddr' into a function for building a t'NodeAddr'
@@ -793,7 +879,7 @@ naLevelup2 = go id
   go na (NAProof m na') = go (na . NAProof m) na'
   go _ _ = Nothing
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Querying proofs
 
@@ -820,11 +906,17 @@ proofErrors (SubProof fs ps c) =
 holdsAt :: (a -> Bool) -> [a] -> Int -> Bool
 holdsAt f xs n = maybe False f (xs !!? n)
 
--- | Returns v'True' if the t'NodeAddr' points to a t'Derivation'.
-pIsLine :: NodeAddr -> Proof -> Bool
-pIsLine (NALine n) (SubProof _ ps _) = holdsAt isLeft ps n
-pIsLine (NAProof n na) (SubProof _ ps _) = holdsAt (either (const False) (pIsLine na)) ps n
-pIsLine _ _ = False
+{- | Returns whether the element at the given t'NodeAddr' exists
+ and satisfies a predicate.
+-}
+holdsAtNA :: (Either Assumption Derivation -> Bool) -> Proof -> NodeAddr -> Bool
+holdsAtNA f p na = maybe False f (naLookup na p)
+
+{- | Returns whether the t'NodeAddr' is a valid address for the given t'Proof'.
+(Valid in the sense that 'naLookup' would return a valid result.)
+-}
+naValid :: NodeAddr -> Proof -> Bool
+naValid na p = isJust $ naLookup na p
 
 {- | Returns the line at a given t'NodeAddr'.
 Returns v'Nothing' if the t'NodeAddr' does not correspond to any line in the t'Proof'.
@@ -896,7 +988,10 @@ Returns v'Nothing' if the address does not exist or is incompatible
 with the chosen update function.
 -}
 naUpdateFormula ::
-  Either (Assumption -> Assumption) (Formula -> Formula) -> NodeAddr -> Proof -> Maybe Proof
+  Either (Assumption -> Assumption) (Formula -> Formula) ->
+  NodeAddr ->
+  Proof ->
+  Maybe Proof
 naUpdateFormula (Left f) (NAAssumption n) (SubProof fs ps l) =
   liftA3
     SubProof
@@ -935,7 +1030,10 @@ Returns v'Nothing' if the address does not exist
 or points to an t'Assumption' (which has no editable t'RuleApplication').
 -}
 naUpdateRule ::
-  (Wrapper RuleApplication -> Wrapper RuleApplication) -> NodeAddr -> Proof -> Maybe Proof
+  (Wrapper RuleApplication -> Wrapper RuleApplication) ->
+  NodeAddr ->
+  Proof ->
+  Maybe Proof
 naUpdateRule f (NALine n) (SubProof fs ps l) =
   liftA3
     SubProof
@@ -973,8 +1071,19 @@ it is promoted to become the new conclusion. Otherwise v'Nothing' is returned.
 __Note:__ Use 'naRemove' if references must stay consistent.
 -}
 naRemoveRaw :: NodeAddr -> Proof -> Maybe Proof
-naRemoveRaw (NAAssumption n) (SubProof fs ps c) = liftA3 SubProof (removeAt n fs) (pure ps) (pure c)
-naRemoveRaw (NALine n) (SubProof fs ps c) | holdsAt isLeft ps n = liftA3 SubProof (pure fs) (removeAt n ps) (pure c)
+naRemoveRaw (NAAssumption n) (SubProof fs ps c) =
+  liftA3
+    SubProof
+    (removeAt n fs)
+    (pure ps)
+    (pure c)
+naRemoveRaw (NALine n) (SubProof fs ps c)
+  | holdsAt isLeft ps n =
+      liftA3
+        SubProof
+        (pure fs)
+        (removeAt n ps)
+        (pure c)
 naRemoveRaw NAConclusion p@(SubProof fs ps c) = case unsnoc ps of
   Just (ps', Left d) -> Just $ SubProof fs ps' d
   _ -> Nothing
@@ -1032,7 +1141,9 @@ naRemove na p@(fromNodeAddr na -> Just lineNo) = pMapRefs goRef <$> naRemoveRaw 
 -- | Removes the t'Proof' at a valid t'ProofAddr' and updates all affected references.
 paRemove :: ProofAddr -> Proof -> Maybe Proof
 paRemove pa (lineRangeFromProofAddr pa -> Nothing) = Nothing
-paRemove pa p@(lineRangeFromProofAddr pa -> Just (start, end)) = pMapRefs goRef <$> paRemoveRaw pa p
+paRemove pa p@(lineRangeFromProofAddr pa -> Just (start, end)) =
+  pMapRefs goRef
+    <$> paRemoveRaw pa p
  where
   pLen = end - start + 1
   goRef :: Reference -> Maybe Reference
@@ -1046,10 +1157,13 @@ paRemove pa p@(lineRangeFromProofAddr pa -> Just (start, end)) = pMapRefs goRef 
     | start > start' && start <= end' = Just $ ProofReference start' (end' - pLen)
     | start > start' && start > end' = Just $ ProofReference start' end'
 
-{- | Inserts a line before the given t'NodeAddr' in the t'Proof', without updating t'Reference's.
+{- | Inserts a line before the given t'NodeAddr' in the t'Proof',
+without updating t'Reference's.
 
-* 'naInsertBeforeRaw' ('Left' @a@) @addr@ @proof@ inserts the t'Assumption' @a@ before @addr@.
-* 'naInsertBeforeRaw' ('Right' @d@) @addr@ @proof@ inserts the t'Derivation' @d@ before @addr@.
+* 'naInsertBeforeRaw' ('Left' @a@) @addr@ @proof@
+inserts the t'Assumption' @a@ before @addr@.
+* 'naInsertBeforeRaw' ('Right' @d@) @addr@ @proof@
+inserts the t'Derivation' @d@ before @addr@.
 
 Returns the t'NodeAddr' of the inserted line together with the updated t'Proof'.
 Returns v'Nothing' if line could not be inserted.
@@ -1136,7 +1250,14 @@ paInsertBeforeRaw ::
   Proof ->
   Maybe (ProofAddr, Proof)
 paInsertBeforeRaw p (PANested n PAProof) (SubProof fs ps c) =
-  fmap (PANested n PAProof,) (liftA3 SubProof (pure fs) (insertAt (Right p) n ps) (pure c))
+  fmap
+    (PANested n PAProof,)
+    ( liftA3
+        SubProof
+        (pure fs)
+        (insertAt (Right p) n ps)
+        (pure c)
+    )
 paInsertBeforeRaw p (PANested n pa) (SubProof fs ps@((!!? n) -> Just (Right prf)) c) =
   paInsertBeforeRaw p pa prf
     >>= \(pa, p') ->
@@ -1191,20 +1312,29 @@ naMoveBeforeRaw targetAddr sourceAddr p =
         -- we might need to decrement 'na' by one, if sourceAddr is in the same proof.
         let
           naDecrementWhenOnSameLevel :: NodeAddr -> NodeAddr -> NodeAddr
-          naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{} | n > 0 = NAAssumption (n - 1)
+          naDecrementWhenOnSameLevel (NAAssumption n) NAAssumption{}
+            | n > 0 =
+                NAAssumption (n - 1)
           naDecrementWhenOnSameLevel (NALine n) NALine{} | n > 0 = NALine (n - 1)
           naDecrementWhenOnSameLevel (NAProof n na) NALine{} | n > 0 = NAProof (n - 1) na
-          naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2) | n == m = NAProof n $ naDecrementWhenOnSameLevel na1 na2
+          naDecrementWhenOnSameLevel (NAProof n na1) (NAProof m na2)
+            | n == m =
+                NAProof n $ naDecrementWhenOnSameLevel na1 na2
           naDecrementWhenOnSameLevel na _ = na
         pure (naDecrementWhenOnSameLevel na sourceAddr, p'')
       _ -> Nothing
 
--- | Returns whether @lineNo@ falls within the given line range, accounting for same-proof boundary rules.
+{- | Returns whether @lineNo@ falls within the given line range,
+accounting for same-proof boundary rules.
+-}
 targetInRange :: Int -> (Int, Int) -> Proof -> Bool
 targetInRange lineNo (start, end) p =
   lineNo > start && lineNo <= end
     || lineNo == start
-      && maybe False (maybe (const False) naInSameProof (fromLineNo start p)) (fromLineNo end p)
+      && maybe
+        False
+        (maybe (const False) naInSameProof (fromLineNo start p))
+        (fromLineNo end p)
 
 {- | Moves the line at @source@ before the line at @target@ in t'Proof' @p@,
 and updates all t'Reference's affected by the move.
@@ -1239,7 +1369,8 @@ naMoveBefore targetAddr sourceAddr p =
       | target >= end && source < start -> ProofReference (start - 1) (end - 1)
       | otherwise -> ProofReference start end
 
-{- | Returns whether a t'NodeAddr' is contained in the t'Proof' designated by a t'ProofAddr'.
+{- | Returns whether a t'NodeAddr' is contained in the t'Proof'
+designated by a t'ProofAddr'.
 
 __Note:__ does not check if the t'NodeAddr' is valid!
 -}
@@ -1259,8 +1390,11 @@ paContainedIn _ _ = False
 
 -- | Returns whether the target address is identical to, or immediately after, the source.
 naSameOrNext :: NodeAddr -> NodeAddr -> Proof -> Bool
-naSameOrNext (NAProof n na) (NAProof ((== n) -> True) na') (SubProof _ ((!!? n) -> Just (Right p)) _) =
-  naSameOrNext na na' p
+naSameOrNext
+  (NAProof n na)
+  (NAProof ((== n) -> True) na')
+  (SubProof _ ((!!? n) -> Just (Right p)) _) =
+    naSameOrNext na na' p
 naSameOrNext (NAAssumption n) (NAAssumption m) _ = n == m || n == m + 1
 naSameOrNext (NALine n) (NALine m) _ = n == m || n == m + 1
 naSameOrNext NAAfterConclusion NAConclusion _ = True
@@ -1282,7 +1416,8 @@ naCanMoveConclusion :: NodeAddr -> Proof -> Bool
 naCanMoveConclusion NAConclusion (SubProof fs ps c) = case unsnoc ps of
   Just (_, Left _) -> True
   _ -> False
-naCanMoveConclusion (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) = naCanMoveConclusion na p
+naCanMoveConclusion (NAProof n na) (SubProof _ ((!!? n) -> Just (Right p)) _) =
+  naCanMoveConclusion na p
 naCanMoveConclusion _ _ = True
 
 -- | Returns whether a t'NodeAddr' can be moved before the given target t'NodeAddr'.
@@ -1313,11 +1448,14 @@ paMoveBeforeRaw targetAddr sourceAddr p =
         (pa, p') <- paInsertBeforeRaw prf targetAddr p
         p'' <- paRemoveRaw sourceAddr p'
         let
-          -- Decrements the new targetAddr by one, on the same level that sourceAddr lives.
+          -- Decrements the new targetAddr by one, on the same level
+          -- that sourceAddr lives.
           -- This is needed, because removal happens after insertion, so
           -- paInsertBeforeRaw returns a 'ProofAddr' that is not valid for p''.
           paDecrementWhenOnSameLevel :: ProofAddr -> ProofAddr -> ProofAddr
-          paDecrementWhenOnSameLevel (PANested n pa) (PANested _ PAProof; PAProof) | n > 0 = PANested (n - 1) pa
+          paDecrementWhenOnSameLevel
+            (PANested n pa)
+            (PANested _ PAProof; PAProof) | n > 0 = PANested (n - 1) pa
           paDecrementWhenOnSameLevel pa@(PANested n pa1) (PANested m pa2)
             | n == m = PANested n $ paDecrementWhenOnSameLevel pa1 pa2
             | otherwise = pa
@@ -1332,36 +1470,11 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
   Just (targetAddr', p') -> (targetAddr',) <$> go targetAddr' p'
  where
   go :: ProofAddr -> Proof -> Maybe Proof
-  go targetAddr' p' = case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
-    (Just targetRange, Just sourceRange) ->
-      pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
-    -- error $
-    --   "paMoveBefore succeeded on \ntargetAddr="
-    --     <> show targetAddr
-    --     <> "\ntargetAddr'="
-    --     <> show targetAddr'
-    --     <> "\nsourceAddr="
-    --     <> show sourceAddr
-    --     <> "\np=\n"
-    --     <> prettyPrint p
-    --     <> "\np'=\n"
-    --     <> prettyPrint p'
-    --     <> "\ntargetRange="
-    --     <> show targetRange
-    --     <> "\nsourceRange="
-    --     <> show sourceRange
-    _ -> Nothing
-  -- error $
-  --   "paMoveBefore failed on \ntargetAddr="
-  --     <> show targetAddr
-  --     <> "\ntargetAddr'="
-  --     <> show targetAddr'
-  --     <> "\nsourceAddr="
-  --     <> show sourceAddr
-  --     <> "\np=\n"
-  --     <> prettyPrint p
-  --     <> "\np'=\n"
-  --     <> prettyPrint p'
+  go targetAddr' p' =
+    case (lineRangeFromProofAddr targetAddr' p', lineRangeFromProofAddr sourceAddr p) of
+      (Just targetRange, Just sourceRange) ->
+        pure $ pMapRefs (pure . goRef targetRange sourceRange) p'
+      _ -> Nothing
   goRef :: (Int, Int) -> (Int, Int) -> Reference -> Reference
   goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (LineReference line)
     | inRange (sourceStart, sourceEnd) line = LineReference (targetStart + proofOffset)
@@ -1371,25 +1484,31 @@ paMoveBefore targetAddr sourceAddr p = case paMoveBeforeRaw targetAddr sourceAdd
    where
     proofOffset = line - sourceStart
     proofLen = sourceEnd - sourceStart + 1
-  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end) = case fromLineRange start end p of
-    Nothing -> ProofReference start end
-    Just pa
-      | start == sourceStart && end == sourceEnd -> ProofReference targetStart targetEnd
-      | paContainedIn pa sourceAddr ->
-          ProofReference (start + (targetStart - sourceStart)) (end + (targetEnd - sourceEnd))
-      | paContainedIn sourceAddr pa && not (paContainedIn targetAddr pa) ->
-          case compare targetAddr pa of
-            LT; EQ -> ProofReference (start + proofLen) end
-            GT -> ProofReference start (end - proofLen)
-      | paContainedIn targetAddr pa && not (paContainedIn sourceAddr pa) ->
-          case compare sourceAddr pa of
-            LT; EQ -> ProofReference (start - proofLen) end
-            GT -> ProofReference start (end + proofLen)
-      | not (paContainedIn targetAddr pa) && not (paContainedIn sourceAddr pa) ->
-          case (compare sourceAddr pa, compare targetAddr pa) of
-            ((,) (LT; EQ) GT) -> ProofReference (start - proofLen) (end - proofLen)
-            ((,) GT (LT; EQ)) -> ProofReference (start + proofLen) (end + proofLen)
-            _ -> ProofReference start end
-      | otherwise -> ProofReference start end
+  goRef (targetStart, targetEnd) (sourceStart, sourceEnd) (ProofReference start end) =
+    case fromLineRange start end p of
+      Nothing -> ProofReference start end
+      Just pa
+        | start == sourceStart && end == sourceEnd ->
+            ProofReference
+              targetStart
+              targetEnd
+        | paContainedIn pa sourceAddr ->
+            ProofReference
+              (start + (targetStart - sourceStart))
+              (end + (targetEnd - sourceEnd))
+        | paContainedIn sourceAddr pa && not (paContainedIn targetAddr pa) ->
+            case compare targetAddr pa of
+              LT; EQ -> ProofReference (start + proofLen) end
+              GT -> ProofReference start (end - proofLen)
+        | paContainedIn targetAddr pa && not (paContainedIn sourceAddr pa) ->
+            case compare sourceAddr pa of
+              LT; EQ -> ProofReference (start - proofLen) end
+              GT -> ProofReference start (end + proofLen)
+        | not (paContainedIn targetAddr pa) && not (paContainedIn sourceAddr pa) ->
+            case (compare sourceAddr pa, compare targetAddr pa) of
+              ((,) (LT; EQ) GT) -> ProofReference (start - proofLen) (end - proofLen)
+              ((,) GT (LT; EQ)) -> ProofReference (start + proofLen) (end + proofLen)
+              _ -> ProofReference start end
+        | otherwise -> ProofReference start end
    where
     proofLen = sourceEnd - sourceStart + 1

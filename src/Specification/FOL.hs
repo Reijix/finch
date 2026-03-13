@@ -27,7 +27,7 @@ import Parser.Proof (parseProof)
 import Specification.Prop
 import Specification.Types
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Operators
 
@@ -41,7 +41,7 @@ Operators are inherited from 'operatorsProp'.
 operatorsFOL :: [(Text, Text, Int)]
 operatorsFOL = operatorsProp
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Infix Predicates
 
@@ -53,7 +53,7 @@ the parser also accepts.
 infixPredsFOL :: [(Text, Text)]
 infixPredsFOL = [("", "=")]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Quantifiers
 
@@ -65,7 +65,7 @@ the parser also accepts and @quantifier@ is a unicode symbol.
 quantifiersFOL :: [(Text, Text)]
 quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Rules
 
@@ -107,7 +107,7 @@ rulesFOL =
   phi = FPlaceholder "φ"
   psi = FPlaceholder "ψ"
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Parser
 
@@ -116,15 +116,18 @@ rulesFOL =
 __Note:__ Should not be used outside of this module, because it uses 'error'.
 -}
 readProof :: Text -> Proof
-readProof proofText = case parseProof operatorsFOL infixPredsFOL quantifiersFOL proofText of
-  Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
-  Right p -> p
+readProof proofText =
+  case parseProof operatorsFOL infixPredsFOL quantifiersFOL proofText of
+    Left err -> error $ "Could not parse proof:\n" <> proofText <> "\nError:\n" <> err
+    Right p -> p
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Examples
 
--- | The default empty t'Proof' shown when the user starts a new proof in first-order-logic mode.
+{- | The default empty t'Proof' shown when the user starts a new proof in
+first-order-logic.
+-}
 emptyProofFOL :: Proof
 emptyProofFOL =
   readProof
@@ -222,7 +225,7 @@ exampleProofsFOL =
     )
   ]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Model
 
@@ -236,7 +239,13 @@ initialModelFOL ::
 initialModelFOL uri mp =
   initialModel
     emptyProofFOL
-    (Derivation (ParsedValid "⊤" (Opr "⊤" [])) (ParsedValid "(⊤I)" (RuleApplication "⊤I" [])))
+    ( Derivation
+        (ParsedValid "⊤" (Opr "⊤" []))
+        ( ParsedValid
+            "(⊤I)"
+            (RuleApplication "⊤I" [])
+        )
+    )
     (fromMaybe initialP mp)
     exampleProofsFOL
     operatorsFOL

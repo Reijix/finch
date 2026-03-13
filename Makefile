@@ -29,10 +29,10 @@ test:
 	cabal test
 
 haddock:
-	wasm32-wasi-cabal haddock --haddock-html --haddock-hyperlinked-source --haddock-quickjump --haddock-output-dir haddock
+	cabal haddock-project --all --internal --hackage
 
 haddock-serve: haddock
-	xdg-open haddock/Finch/index.html
+	xdg-open haddock/finch/index.html
 
 report:
 	cabal test --enable-coverage

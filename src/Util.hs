@@ -12,12 +12,13 @@ module Util where
 
 import Miso.Lens (Lens, (%=))
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * List utilities
 
 {- | Returns all combinations of a list of list.
-Taken from package [liquid-fixpoint](https://hackage.haskell.org/package/liquid-fixpoint-0.5.0.1)
+Taken from package
+[liquid-fixpoint](https://hackage.haskell.org/package/liquid-fixpoint-0.5.0.1)
 and adjusted to use `NonEmpty`.
 
 Satisfies:
@@ -75,7 +76,7 @@ updateAtM _ _ [] = fail ""
 updateAtM 0 f (a : as) = f a <&> (: as)
 updateAtM n f (a : as) = (a :) <$> updateAtM (n - 1) f as
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Lens utilities
 
@@ -86,7 +87,7 @@ unchanged.
 (%=?) :: (MonadState record m) => Lens record field -> (field -> Maybe field) -> m ()
 (%=?) _lens f = _lens %= (\x -> fromMaybe x (f x))
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Numeric utilities
 

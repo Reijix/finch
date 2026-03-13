@@ -10,7 +10,7 @@ This module defines the Miso t'View's of the application.
 -}
 module App.Views where
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 import App.Model
 import Data.List qualified as L
 import Fitch.Proof
@@ -43,7 +43,7 @@ import Relude.Unsafe (fromJust)
 import Specification.Types
 import Util (interleave)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Views
 
@@ -62,7 +62,7 @@ viewModel model =
         ]
     ]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- ** Header
 
@@ -76,13 +76,16 @@ viewHeader model =
     , viewNewProofButton model
     ]
 
+-- | Shows the logo in the 'viewHeader', together with a title and navigation buttons
 viewLogoHeader :: View Model Action
 viewLogoHeader =
   H.div_
     [HP.class_ "logo-header"]
     [ H.img_ [HP.src_ "favicon.svg"]
     , H.h1_ [] ["Finch"]
-    , H.button_ [HP.class_ "help-button", HE.onClick ToggleSidebar] [viewMaterialIcon "help"]
+    , H.button_
+        [HP.class_ "help-button", HE.onClick ToggleSidebar]
+        [viewMaterialIcon "help"]
     , H.div_
         [HP.class_ "navigation-container"]
         [ H.button_
@@ -182,7 +185,7 @@ viewNewProofButton model =
     ]
     [text "New Proof"]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- ** Sidebar
 
@@ -240,16 +243,26 @@ viewUsage =
     "info"
     ( H.ul_
         [HP.class_ "column-sidebar-content"]
-        [ H.li_ [] ["Use the buttons at the top of the screen to add lines and subproofs."]
-        , H.li_ [] ["Drag lines and subproofs to modify the proof."]
-        , H.li_ [] ["Drag lines and subproofs to the trash can at the top to delete them."]
-        , H.li_ [] ["Click lines to edit their contents."]
-        , H.li_ [] ["Check below how to write the symbols and how the rules are defined."]
+        [ H.li_
+            []
+            ["Use the buttons at the top of the screen to add lines and subproofs."]
+        , H.li_
+            []
+            ["Drag lines and subproofs to modify the proof."]
+        , H.li_
+            []
+            ["Drag lines and subproofs to the trash can at the top to delete them."]
+        , H.li_
+            []
+            ["Click lines to edit their contents."]
+        , H.li_
+            []
+            ["Check below how to write the symbols and how the rules are defined."]
         ]
     )
 
-{- | For use in 'viewSidebar',
-returns a list of buttons that enable the user to change the underlying logic of the proof checker.
+{- | For use in 'viewSidebar', returns a list of buttons
+that enable the user to change the underlying logic of the proof checker.
 -}
 viewLogics :: Model -> View Model Action
 viewLogics model =
@@ -331,7 +344,10 @@ viewRules model =
   viewDetails
     "Rules"
     "rule"
-    (H.div_ [HP.class_ "row-sidebar-content"] (map viewSingleRule (toPairs $ model ^. rules)))
+    ( H.div_
+        [HP.class_ "row-sidebar-content"]
+        (map viewSingleRule (toPairs $ model ^. rules))
+    )
  where
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
   viewSingleRule (name, rs) =
@@ -356,8 +372,8 @@ viewRules model =
           [text . ms $ "\\[(\\mathrm{" <> name <> "})" <> ruleSpecTex rs <> "\\]"]
       ]
 
-{- | For use in 'viewSidebar',
-returns a list of example t'Proof's, on hover shows the t'Assumption's and conclusion of the t'Proof'.
+{- | For use in 'viewSidebar', returns a list of example t'Proof's,
+on hover shows the t'Assumption's and conclusion of the t'Proof'.
 -}
 viewExamples :: Model -> View Model Action
 viewExamples model =
@@ -390,7 +406,7 @@ viewExamples model =
           [text . ms $ proofPreviewTex p]
       ]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- ** Proof
 
@@ -433,7 +449,12 @@ viewProof model =
           Nothing
           (na . NAAssumption)
           viewAssumptions
-          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) viewProofs
+          <> interleaveWithDropZones
+            model
+            Nothing
+            (Just (na NAConclusion))
+            (na . NALine)
+            viewProofs
           <> drop
             1
             ( interleaveWithDropZones
@@ -477,7 +498,10 @@ viewProof model =
 returns a list of line numbers that are shown to the left of the t'Proof'.
 -}
 viewLineNos :: Model -> View Model Action
-viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id (model ^. proof)
+viewLineNos model =
+  H.div_ [HP.class_ "line-no-container"] $
+    one $
+      goProof 1 id (model ^. proof)
  where
   lineNoFor :: Int -> View Model Action
   lineNoFor = H.p_ [HP.class_ "line-no", HP.draggable_ False] . one . text . ms
@@ -491,7 +515,12 @@ viewLineNos model = H.div_ [HP.class_ "line-no-container"] $ one $ goProof 1 id 
           Nothing
           (na . NAAssumption)
           goFs
-          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) goPs
+          <> interleaveWithDropZones
+            model
+            Nothing
+            (Just (na NAConclusion))
+            (na . NALine)
+            goPs
           <> drop
             1
             ( interleaveWithDropZones
@@ -524,7 +553,10 @@ returns a list of t'RuleApplication's (judgements),
 that are shown to the right of the t'Proof'.
 -}
 viewRuleApplications :: Model -> View Model Action
-viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id (model ^. proof)
+viewRuleApplications model =
+  H.div_ [HP.class_ "rules-container"] $
+    one $
+      go id (model ^. proof)
  where
   go :: (NodeAddr -> NodeAddr) -> Proof -> View Model Action
   go na (SubProof fs ps c) =
@@ -536,7 +568,12 @@ viewRuleApplications model = H.div_ [HP.class_ "rules-container"] $ one $ go id 
           Nothing
           (na . NAAssumption)
           goFs
-          <> interleaveWithDropZones model Nothing (Just (na NAConclusion)) (na . NALine) goPs
+          <> interleaveWithDropZones
+            model
+            Nothing
+            (Just (na NAConclusion))
+            (na . NALine)
+            goPs
           <> drop
             1
             ( interleaveWithDropZones
@@ -677,7 +714,7 @@ viewLine model na e =
       (ParsedInvalid str err f') -> (True, ms str, ms err)
       (Unparsed str err) -> (True, ms str, ms err)
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
 
 -- * Utilities
 
@@ -688,7 +725,8 @@ viewMaterialIcon :: MisoString -> View Model Action
 viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
 
 {- |
-Shows a dropzone for the given t'NodeAddr', i.e. a small empty div, where nodes can be dropped.
+Shows a dropzone for the given t'NodeAddr',
+i.e. a small empty div, where nodes can be dropped.
 
 Expands, if a node can be dropped inside.
 -}
@@ -725,7 +763,9 @@ interleaveWithDropZones ::
   Maybe MisoString ->
   -- | Optionally a differing t'NodeAddr' for the last dropzone.
   Maybe NodeAddr ->
-  -- | A function for generating t'NodeAddr' from a number (e.g. turn @n@ into @v'NAAssumption' n@).
+  {- | A function for generating t'NodeAddr' from a number
+  (e.g. turn @n@ into @v'NAAssumption' n@).
+  -}
   (Int -> NodeAddr) ->
   -- | The list of views to be interleaved.
   [View Model Action] ->
@@ -743,4 +783,4 @@ interleaveWithDropZones model mclass lastNA na views = interleave dropzones view
       )
       [0 .. length views]
 
------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------
