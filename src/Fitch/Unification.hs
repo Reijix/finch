@@ -10,7 +10,7 @@ This module implements the ability to check a t'Term', t'Formula' or t'Assumptio
 against its t'TermSpec', t'FormulaSpec' or t'AssumptionSpec'.
 
 Furthermore, implements a variant of the Martelli Montanari unification algorithm. where
-t'Formula'e or t'Term's are unified *on* a specific variable, meaning the variable must
+t'Formula'e or t'Term's are unified __on__ a specific variable, meaning the variable must
 occur on the left-hand-side of the resulting unifier.
 -}
 module Fitch.Unification where
@@ -110,7 +110,7 @@ instance Substitute RawFormula Term where
 
 {- | Unification on terms, this is the Martelli-Montanari unification algorithm
 with a twist:
-the unification happens *on* a variable @x@.
+the unification happens __on__ a variable @x@.
 Meaning the resulting unificator must have the variable @x@ on the left hand side.
 
 This is guaranteed by adding a new orient rule,

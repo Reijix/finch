@@ -15,12 +15,11 @@ There are three kinds of tests, each contained in their own folder:
 
 * __Valid proofs__ (@tests\/ValidProofs\/@) — tests that the whole t'Proof' is valid, i.e.
 everything is parsed correctly and every t'RuleApplication' can be verified.
-
 * __Invalid rules__ (@tests\/InvalidRules\/@) — tests that the file contains
 a wrongful t'RuleApplication'. The offending line number is encoded into the filename via
 a @%@, e.g.:
-> tests\/InvalidRules\/eqE1%3.fitch
 
+> tests/InvalidRules/eqE1%3.fitch
 * __Invalid formulae__ (@tests\/InvalidFormulae\/@) — same as invalid rules, but checks
 that a formulae is invalid. This can either verify parse errors or freshness violations.
 -}
@@ -148,7 +147,7 @@ testValidProofs =
       =<< pathsInDir "tests/ValidProofs/"
 
 {- | Reads every proof file in @tests\/InvalidRules\/@ and asserts that the
-t'RuleApplication' at the line number encoded in the filename is v'ParsedInvalid'
+  t'RuleApplication' at the line number encoded in the filename is v'ParsedInvalid'
 using 'expectInvalidRuleAt'.
 -}
 testInvalidRules :: TestTree

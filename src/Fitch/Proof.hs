@@ -589,13 +589,9 @@ pMapRefs goRef = pMapLines goAssumption goDerivation
 A t'NodeAddr' may either be a reference to
 
 * a single t'Assumption': v'NAAssumption' @n@,
-
 * the conclusion: 'NAConclusion' of the t'Proof'
-
 * the spot after the conclusion: 'NAAfterConclusion'
-
 * a single t'Derivation' inside the proof @v'NALine' n@
-
 * a reference to a nested element inside the t'Proof' 'NAProof' @n@ ('Just' @a@)
 -}
 data NodeAddr

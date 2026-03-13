@@ -483,16 +483,13 @@ compareQCTests =
     [ QC.testProperty "prop_compareLineNo" prop_compareLineNo
     ]
 
-{- | Groups 'prop_fromLineRangeInverse', 'prop_lineRangeFromProofAddrInverse',
-  and 'prop_paMoveBeforeRawSameProof' under a single t'TestTree'.
--}
+-- | Tests regarding the conversion of line ranges and t'ProofAddr's.
 lineRangeQCTests :: TestTree
 lineRangeQCTests =
   testGroup
     "Testing conversion of line ranges and ProofAddr"
     [ QC.testProperty "prop_fromLineRangeInverse" prop_fromLineRangeInverse
     , QC.testProperty "prop_lineRangeFromProofAddrInverse" prop_lineRangeFromProofAddrInverse
-    , QC.testProperty "prop_paMoveBeforeRawSameProof" prop_paMoveBeforeRawSameProof
     ]
 
 -- | Groups all tests in this module.

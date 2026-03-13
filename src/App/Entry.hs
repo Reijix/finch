@@ -18,6 +18,7 @@ import App.URLDecoder
 import App.Update
 import App.Views
 import Data.Text qualified as T
+import Fitch.Proof
 import Miso
 import Miso.Subscription.Util (createSub)
 import Relude.Extra.Map
@@ -55,6 +56,7 @@ startAppWrapper window model =
 
 1. Reads the current t'URI'.
 2. Inspects the @?logic=@ query parameter:
+
    * @prop@ — initializes propositional logic via 'initialModelProp'.
    * @fol@ — initializes first-order logic via 'initialModelFOL'.
    * defaults to @fol@.
@@ -90,11 +92,12 @@ runApp = do
 
 -- * Subscriptions
 
-{- | Subscription for the 'onkeydown' event.
+{- | Subscription for the @onkeydown@ event.
 
-Used for detecting presses of '(' and 'Enter'.
-* On 'Enter' fires the `Blur` event,
-* On '(' inserts the closing parenthesis at the end of selection.
+Used for detecting presses of @(@ and @Enter@.
+
+* On @Enter@ fires the `Blur` event,
+* On @(@ inserts the closing parenthesis at the end of selection.
 -}
 onKeyDownSub :: DOMRef -> Sub Action
 onKeyDownSub window = createSub acquire (removeEventListener window "keydown")

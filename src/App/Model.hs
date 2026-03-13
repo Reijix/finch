@@ -141,12 +141,14 @@ data Model = Model
   -}
   , _functionSymbols :: Map Text (Int, Pos)
   {- ^ Collected function symbols consisting of
+
   * name :: Text
   * arity :: Int
   * first occurence :: Pos
   -}
   , _predicateSymbols :: Map Text (Int, Pos)
   {- ^ Collected predicate symbols consisting of
+
   * name :: Text
   * arity :: Int
   * first occurence :: Pos
