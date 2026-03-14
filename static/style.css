@@ -28,6 +28,9 @@ Variables
   --subproof-border-expanded: 0.3rem solid rgba(193, 201, 204);
   --font-ui: "Fira Sans", system-ui, -apple-system, sans-serif;
   --font-math: "Fira Sans", monospace;
+  /* Widths */
+  --sidebar-width-desktop: 20vw;
+  --sidebar-width-mobile: 60vw;
 }
 
 body {
@@ -52,7 +55,8 @@ Button containers
   border-right: 1px solid #e0e0e0;
   z-index: 110;
   height: calc(100dvh - var(--header-height));
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-x: auto;
   scrollbar-width: none;
 }
 
@@ -60,6 +64,7 @@ Button containers
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  width: var(--sidebar-width-desktop);
 
   padding: 2vh 0 2vh 0;
   gap: 2vh;
@@ -72,12 +77,12 @@ Button containers
 
 .sidebar-closed {
   width: 0;
-  transition: width 0.2s linear;
+  transition: width 0.2s ease-in-out;
 }
 
 .sidebar-open {
-  width: 15vw;
-  transition: width 0.2s linear;
+  width: var(--sidebar-width-desktop);
+  transition: width 0.2s ease-in-out;
 }
 
 @media only screen and (max-width: 1200px) {
@@ -86,11 +91,11 @@ Button containers
   }
 
   .sidebar-open {
-    width: 60vw;
+    width: var(--sidebar-width-mobile);
   }
 
   .sidebar-content {
-    width: 100%;
+    width: var(--sidebar-width-mobile);
   }
 }
 
@@ -222,8 +227,7 @@ ul {
   justify-content: center;
   align-items: center;
   width: 6vw;
-  /*border: 1px solid;*/
-  border: none;
+  border: 1px solid;
   border-radius: 6px;
   background-color: white;
   color: #24292e;

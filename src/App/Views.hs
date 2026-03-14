@@ -73,7 +73,7 @@ viewHeader model =
     [HP.class_ "header"]
     [ viewLogoHeader
     , viewProofActionsHeader
-    , viewNewProofButton model
+    , viewNavigationButtons
     ]
 
 -- | Shows the logo in the 'viewHeader', together with a title and navigation buttons
@@ -81,24 +81,26 @@ viewLogoHeader :: View Model Action
 viewLogoHeader =
   H.div_
     [HP.class_ "logo-header"]
-    [ H.img_ [HP.src_ "favicon.svg"]
+    [ viewMenuButton
+    , H.img_ [HP.src_ "favicon.svg"]
     , H.h1_ [] ["Finch"]
-    , H.button_
-        [HP.class_ "help-button", HE.onClick ToggleSidebar]
-        [viewMaterialIcon "help"]
-    , H.div_
-        [HP.class_ "navigation-container"]
-        [ H.button_
-            [ HE.onClick NavigateBackward
-            , HP.class_ "spawn-button"
-            ]
-            [viewMaterialIcon "arrow_left_alt"]
-        , H.button_
-            [ HE.onClick NavigateForward
-            , HP.class_ "spawn-button"
-            ]
-            [viewMaterialIcon "arrow_right_alt"]
+    ]
+
+-- | Adds navigation @<button>@s for accessing the browsers history API.
+viewNavigationButtons :: View Model Action
+viewNavigationButtons =
+  H.div_
+    [HP.class_ "navigation-container"]
+    [ H.button_
+        [ HE.onClick NavigateBackward
+        , HP.class_ "spawn-button"
         ]
+        [viewMaterialIcon "arrow_left_alt"]
+    , H.button_
+        [ HE.onClick NavigateForward
+        , HP.class_ "spawn-button"
+        ]
+        [viewMaterialIcon "arrow_right_alt"]
     ]
 
 {- | For use in 'viewHeader',
@@ -174,6 +176,12 @@ viewSpawnNode tp title icon =
         [text title]
     ]
 
+viewMenuButton :: View Model Action
+viewMenuButton =
+  H.button_
+    [HE.onClick ToggleSidebar, HP.class_ "app-button"]
+    [viewMaterialIcon "menu"]
+
 {- | For use in 'viewHeader',
 returns a @<button>@ for starting a new t'Proof'.
 -}
@@ -183,7 +191,7 @@ viewNewProofButton model =
     [ HP.class_ "app-button"
     , HE.onClick (SetProof (model ^. emptyProof))
     ]
-    [text "New Proof"]
+    [text "Start New Proof"]
 
 ------------------------------------------------------------------------------------------
 
@@ -204,7 +212,8 @@ viewSidebar model =
     $ H.div_
       [ HP.class_ "sidebar-content"
       ]
-      [ viewUsage
+      [ viewNewProofButton model
+      , viewUsage
       , viewGrammar model
       , viewRules model
       , viewExamples model
