@@ -124,8 +124,8 @@ viewBin =
     [ HE.onDragOverWithOptions preventDefault Nop
     , HE.onDragEnterWithOptions preventDefault Nop
     , HE.onDragLeaveWithOptions preventDefault Nop
-    , HP.class_ "anchor-container"
-    , HP.class_ "anchor"
+    , HP.class_ "tooltip-container"
+    , HP.class_ "tooltip-anchor"
     , HE.onMouseOver (PopOpen "bin" True)
     , HE.onMouseOut (PopClose "bin")
     , HE.onDropWithOptions defaultOptions (Drop LocationBin)
@@ -133,8 +133,7 @@ viewBin =
     ]
     [ viewMaterialIcon "delete"
     , H.p_
-        [ HP.class_ "tooltip"
-        , HP.class_ "anchored-bottom"
+        [ HP.class_ "tooltip-bottom"
         , HP.id_ "bin"
         , textProp "popover" "manual"
         , HP.draggable_ False
@@ -157,9 +156,9 @@ viewSpawnNode tp title icon =
   H.div_
     [ HP.class_ "spawn-button"
     , HP.class_ "draggable"
-    , HP.class_ "anchor-container"
+    , HP.class_ "tooltip-container"
     , HP.draggable_ True
-    , HP.class_ "anchor"
+    , HP.class_ "tooltip-anchor"
     , HE.onMouseOver (PopOpen (ms $ show tp) True)
     , HE.onMouseOut (PopClose (ms $ show tp))
     , HE.onDragStartWithOptions stopPropagation $ SpawnStart tp
@@ -167,8 +166,7 @@ viewSpawnNode tp title icon =
     ]
     [ viewMaterialIcon icon
     , H.p_
-        [ HP.class_ "tooltip"
-        , HP.class_ "anchored-bottom"
+        [ HP.class_ "tooltip-bottom"
         , HP.id_ (show tp)
         , textProp "popover" "manual"
         , HP.draggable_ False
@@ -326,18 +324,17 @@ viewGrammar model =
       [text $ ms symbol]
   viewSingleSymbol (alias, symbol) =
     H.div_
-      [HP.class_ "anchor-container"]
+      [HP.class_ "tooltip-container"]
       [ H.button_
           [ HP.class_ "app-button"
-          , HP.class_ "anchor"
+          , HP.class_ "tooltip-anchor"
           , HP.class_ "symbol-button"
           , HE.onMouseOver (PopOpen (ms alias) True)
           , HE.onMouseOut (PopClose (ms alias))
           ]
           [text $ ms symbol]
       , H.p_
-          [ HP.class_ "tooltip"
-          , HP.class_ "anchored-right"
+          [ HP.class_ "tooltip-right"
           , HP.id_ (ms alias)
           , textProp "popover" "manual"
           , HP.draggable_ False
@@ -361,18 +358,17 @@ viewRules model =
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
   viewSingleRule (name, rs) =
     H.div_
-      [HP.class_ "anchor-container", HP.class_ "rulebox-container"]
+      [HP.class_ "tooltip-container", HP.class_ "rulebox-container"]
       [ H.button_
           [ HP.class_ "app-button"
-          , HP.class_ "anchor"
+          , HP.class_ "tooltip-anchor"
           , HP.class_ "rule-button"
           , HE.onMouseOver (PopOpen (ms name) True)
           , HE.onMouseOut (PopClose (ms name))
           ]
           [text $ ms name]
       , H.p_
-          [ HP.class_ "tooltip"
-          , HP.class_ "anchored-right"
+          [ HP.class_ "tooltip-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
           , textProp "popover" "manual"
@@ -394,10 +390,10 @@ viewExamples model =
   mkExample :: (Text, Proof) -> View Model Action
   mkExample (name, p) =
     H.div_
-      [HP.class_ "anchor-container", HP.class_ "example-container"]
+      [HP.class_ "tooltip-container", HP.class_ "example-container"]
       [ H.button_
           [ HP.class_ "app-button"
-          , HP.class_ "anchor"
+          , HP.class_ "tooltip-anchor"
           , HP.class_ "example-button"
           , HE.onMouseOver (PopOpen (ms name) True)
           , HE.onMouseOut (PopClose (ms name))
@@ -405,8 +401,7 @@ viewExamples model =
           ]
           [text $ ms name]
       , H.p_
-          [ HP.class_ "tooltip"
-          , HP.class_ "anchored-right"
+          [ HP.class_ "tooltip-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
           , textProp "popover" "manual"
@@ -613,14 +608,14 @@ viewRuleApplications model =
         [ HE.onMouseOver (PopOpen errorBoxId hasError)
         , HE.onMouseOut (PopClose errorBoxId)
         , HP.class_ "rule-container"
-        , HP.class_ "anchor-container"
+        , HP.class_ "tooltip-container"
         , HE.onClick $ Focus (Right na)
         ]
         [ viewErrorBox errorBoxId err
         , H.input_
             [ HP.class_ "rule-input"
             , HP.id_ inputId
-            , HP.class_ "anchor"
+            , HP.class_ "tooltip-anchor"
             , HP.classList_
                 [ ("has-error", hasError)
                 , ("focused", Just (Right na) == model ^. focusedLine)
@@ -652,8 +647,7 @@ viewErrorBox ::
   View Model Action
 viewErrorBox name err =
   H.code_
-    [ HP.class_ "tooltip"
-    , HP.class_ "anchored-bottom"
+    [ HP.class_ "tooltip-bottom"
     , HP.id_ name
     , textProp "popover" "manual"
     , HP.draggable_ False
@@ -681,7 +675,7 @@ viewLine model na e =
     H.div_
       [ HP.class_ "formula-container"
       , HP.class_ "draggable"
-      , HP.class_ "anchor-container"
+      , HP.class_ "tooltip-container"
       , HP.draggable_ (isNothing (model ^. focusedLine))
       , if model ^. focusedLine /= Just (Left na)
           then HE.onDragStartWithOptions stopPropagation $ DragStart (Left na)
@@ -695,7 +689,7 @@ viewLine model na e =
           [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
           , HP.id_ inputId
           , HP.class_ "formula-input"
-          , HP.class_ "anchor"
+          , HP.class_ "tooltip-anchor"
           , HP.classList_
               [ ("has-error", hasError)
               , ("drag-target", Just (Left na) == model ^. dragTarget)

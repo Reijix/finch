@@ -1,0 +1,24 @@
+@import shared.sass
+@import header.sass
+@import proof.sass
+@import sidebar.sass
+
+// Sensible defaults
+*
+  box-sizing: border-box
+  margin: 0
+  padding: 0
+
+// Set default font and prevent body from being scrollable
+body
+  font-family: $font-ui
+  overflow: clip
+
+// These have a default background-color, make it transparent
+button,
+input
+  background-color: transparent
+
+// Remove outlines
+input:focus
+  outline: none

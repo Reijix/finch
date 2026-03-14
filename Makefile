@@ -7,6 +7,7 @@ update:
 	wasm32-wasi-cabal update
 
 build:
+	sass static/sass/style.sass:static/style.css
 	wasm32-wasi-cabal build
 	rm -rf public
 	cp -r static public

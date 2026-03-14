@@ -1,0 +1,107 @@
+// sass/shared.sass
+// This file contains some helper definitions that are shared between the other modules.
+
+//----------------------------------------------------------------------------------------------------
+// VARIABLES
+//----------------------------------------------------------------------------------------------------
+
+// color theme
+$background0: #e9f1f4
+$background1: #f3f7fa
+$background2: #ffffff
+$header-button-text-color: #344054
+$sidebar-text-color: black
+$line-number-text-color: #4c4f69
+$formula-text-color: black
+$rule-text-color: black
+
+// Typography
+
+// Margins
+$drop-zone-height: clamp(0.1rem, 2vh, 0.5rem)
+$formula-left-margin: 0.5rem
+
+// Text sizes
+$sidebar-heading-text-size: clamp(1rem, calc(1vw + 0.75rem), 1.125rem)
+$sidebar-content-text-size: smaller
+$normal-text-size: clamp(1.125rem, calc(2vw + 0.75rem), 1.5rem)
+$error-text-size: calc(#{$normal-text-size} - 0.5rem)
+$header-text-size: clamp(1.5rem, calc(2.5vw + 1rem), 2.25rem)
+$header-height: calc(#{$header-text-size} + 2vh)
+$subproof-border-size: 0.2rem
+$subproof-border: $subproof-border-size solid rgba(193, 201, 204, 1)
+$subproof-border-expanded: 0.3rem solid rgba(193, 201, 204, 1)
+$font-ui: "Fira Sans", system-ui, -apple-system, sans-serif
+$font-math: "Fira Sans", monospace
+
+// widths
+$sidebar-width-desktop: 20vw
+$sidebar-width-mobile: 60vw
+
+//----------------------------------------------------------------------------------------------------
+// Drag and Drop
+//----------------------------------------------------------------------------------------------------
+
+.draggable
+  cursor: move !important
+  /* fallback if grab cursor is unsupported */
+  cursor: grab !important
+  cursor: -webkit-grab !important
+
+
+.drag-target
+  background-color: $background0
+
+
+.drop-zone
+  height: $drop-zone-height
+  transition: height 0.1s linear
+  cursor: default
+  width: calc(100% - #{$formula-left-margin})
+  margin-left: $formula-left-margin
+
+
+.expanded-drop-zone
+  height: $normal-text-size
+
+
+.material-symbols-outlined
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+
+//----------------------------------------------------------------------------------------------------
+// Buttons
+//----------------------------------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------------------------------
+// Tooltips
+//----------------------------------------------------------------------------------------------------
+
+%tooltip
+  position: absolute
+  border: 1px solid
+  border-radius: 2px
+  width: fit-content
+  padding: 0.5vh 0.5vw
+  white-space: pre
+  background-color: $background2
+  color: #000
+  font-size: $error-text-size
+
+%tooltip:empty
+  display: none
+
+.tooltip-right
+  @extend %tooltip
+  position-area: right
+  position-anchor: --tooltip
+
+.tooltip-bottom
+  @extend %tooltip
+  position-area: bottom
+  position-anchor: --tooltip
+
+.tooltip-container
+  anchor-scope: --tooltip
+
+.tooltip-anchor
+  anchor-name: --tooltip

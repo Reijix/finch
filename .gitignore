@@ -6,3 +6,6 @@ public
 .hpc
 *.tix
 haddocks/
+style.css
+style.css.map
+.sass-cache/
