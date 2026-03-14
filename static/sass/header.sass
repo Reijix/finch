@@ -11,42 +11,54 @@
 .logo-header
   display: flex
   flex-direction: row
+  gap: 0.5vw
   height: 100%
   font-size: $header-text-size
 
+.spawn-button
+  @extend .button
+  width: 3rem
+
+.header .button:hover
+  background-color: $background0
+
+.navigation-container > .button
+  border: none
+
+.menu-button
+  @extend .button
+
+.menu-button:active
+  transform: scale(0.8)
 
 .navigation-container
   display: inline-flex
+  height: 100%
   border: 1px solid #d1d5db
   overflow: hidden
   margin-left: 1vw
   border-radius: 6px
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05)
 
-
 .navigation-container:first-child
   border-top-left-radius: 6px
   border-bottom-left-radius: 6px
-
 
 .navigation-container:last-child
   border-top-right-radius: 6px
   border-bottom-right-radius: 6px
 
-
 .proof-actions-header
   display: flex
   flex-direction: row
+  height: 100%
   gap: 1vw
   font-size: $error-text-size
-
 
 @media only screen and (max-width: 1200px)
   .logo-header > h1
     width: 0
     overflow: hidden
-
-
 
 .logo-header > h1
   font-size: $header-text-size
@@ -54,35 +66,8 @@
   flex-direction: row
   justify-content: center
 
-
 .logo-header > img
   height: $header-text-size
-  margin-right: 0.5vw
-
-
-.help-button
-  display: inline-flex
-  align-items: center
-  justify-content: center
-  border: none
-  border-radius: 100%
-  background: transparent
-  cursor: pointer
-  margin-left: 1vw
-
-
-.help-button > span
-  font-size: $header-text-size
-  height: $header-text-size
-  width: $header-text-size
-
-
-.help-button:hover
-  background-color: #f3f4f6
-
-
-.help-button:active
-  transform: scale(0.92)
 
 .icon-text
   display: flex
@@ -90,40 +75,16 @@
   justify-content: center
   gap: 0.5vw
 
-
 .bin
   display: flex
   flex-direction: column
   justify-content: center
   align-items: center
-  width: 6vw
+  width: max(6vw,3rem)
   cursor: help
   border: 1px solid
   border-radius: 6px
   background-color: transparent
   color: $header-button-text-color
   border-color: #1b1f2326
-  // box-shadow:
-  //   rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,
-  //   rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset
-
-
-.spawn-button
-  display: flex
-  cursor: pointer
-  flex-direction: column
-  justify-content: center
-  align-items: center
-  width: 6vw
-  border: 1px solid
-  border-radius: 6px
-  background-color: transparent
-  color: $header-button-text-color
-  border-color: #1b1f2326
-  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset
-
-
-.spawn-button:hover
-  background-color: #f3f4f6
-  border-color: #1b1f2326
-  transition-duration: 0.1s
+  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset

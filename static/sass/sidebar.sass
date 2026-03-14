@@ -7,7 +7,6 @@
   overflow-x: auto
   scrollbar-width: none
 
-
 .sidebar-content
   box-sizing: border-box
   display: flex
@@ -24,12 +23,11 @@
 
 .sidebar-closed
   width: 0
-  transition: width 0.2s ease-in-out
-
+  transition: width 0.3s ease-in-out
 
 .sidebar-open
   width: $sidebar-width-desktop
-  transition: width 0.2s ease-in-out
+  transition: width 0.3s ease-in-out
 
 
 @media only screen and (max-width: 1200px)
@@ -44,8 +42,6 @@
   .sidebar-content
     width: $sidebar-width-mobile
 
-
-
 .sidebar-element
   background-color: $background2
   color: $sidebar-text-color
@@ -54,45 +50,35 @@
   margin: 0px 16px
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03)
 
-
 details > summary
   list-style: none
   cursor: pointer
   user-select: none
 
-
 details > summary > .summary-arrow
   transition: 0.3s
 
-
 ::details-content
-  transition: height 0.5s ease, content-visibility 0.5s ease allow-discrete
+  transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete
   height: 0
   overflow: clip
-
 
 [open]::details-content
   height: auto
 
-
 // allow-keywords if supported, this makes <details> animated. Not supported in firefox and safari!
 @supports (interpolate-size: allow-keywords)
-  root
+  \:root
     interpolate-size: allow-keywords
-
-
 
 details[open] > summary > .summary-arrow
   transform: rotate(180deg)
 
-
 details > summary::-webkit-details-marker
   display: none
 
-
 ul
   list-style-position: inside
-
 
 .sidebar-header
   font-family: inherit
@@ -102,7 +88,6 @@ ul
   justify-content: space-between
   align-items: center
   padding: 0.5vh 0.5vw
-
 
 .row-sidebar-content
   width: 100%
@@ -114,7 +99,6 @@ ul
   justify-content: center
   font-size: $sidebar-content-text-size
 
-
 .column-sidebar-content
   display: flex
   flex-direction: column
@@ -123,20 +107,43 @@ ul
   gap: 0.5vh
   font-size: $sidebar-content-text-size
 
+.new-proof-button
+  @extend .button
+  padding: 0.5vh 0.5vw
+
+.new-proof-button:hover
+  background-color: $background0
+
+%sidebar-button
+  @extend .button
+
+%sidebar-button:hover
+  background-color: $background1
 
 .symbol-button
+  @extend %sidebar-button
+  padding: 0.5vh 0.5vw
   width: 2em
-
 
 .example-container
   display: flex
   justify-content: center
 
+.rulebox-container
+  width: 4rem
+
+.rule-button
+  @extend %sidebar-button
+  font-family: $font-math
+  padding: 0.5vh 0.5vw
+  width: 100%
+  letter-spacing: 0.1em
 
 .example-button
+  @extend %sidebar-button
+  padding: 0.5vh 0.5vw
   width: 100%
-  display: flex !important
-  justify-self: left
+  justify-content: left
 
 
 .math-content

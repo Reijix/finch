@@ -177,7 +177,7 @@ viewSpawnNode tp title icon =
 viewMenuButton :: View Model Action
 viewMenuButton =
   H.button_
-    [HE.onClick ToggleSidebar, HP.class_ "app-button"]
+    [HE.onClick ToggleSidebar, HP.class_ "menu-button"]
     [viewMaterialIcon "menu"]
 
 {- | For use in 'viewHeader',
@@ -186,7 +186,8 @@ returns a @<button>@ for starting a new t'Proof'.
 viewNewProofButton :: Model -> View Model Action
 viewNewProofButton model =
   H.button_
-    [ HP.class_ "app-button"
+    [ HP.class_ "new-proof-button"
+    , HP.class_ "sidebar-element"
     , HE.onClick (SetProof (model ^. emptyProof))
     ]
     [text "Start New Proof"]
@@ -284,8 +285,7 @@ viewLogics model =
   mkLogic :: (Text, MisoString) -> View Model Action
   mkLogic (name, alias) =
     H.a_
-      [ HP.class_ "app-button"
-      , HP.class_ "example-button"
+      [ HP.class_ "example-button"
       , HP.href_ $
           prettyURI $
             URI
@@ -318,16 +318,14 @@ viewGrammar model =
   viewSingleSymbol :: (Name, Name) -> View Model Action
   viewSingleSymbol ("", symbol) =
     H.button_
-      [ HP.class_ "app-button"
-      , HP.class_ "symbol-button"
+      [ HP.class_ "symbol-button"
       ]
       [text $ ms symbol]
   viewSingleSymbol (alias, symbol) =
     H.div_
       [HP.class_ "tooltip-container"]
       [ H.button_
-          [ HP.class_ "app-button"
-          , HP.class_ "tooltip-anchor"
+          [ HP.class_ "tooltip-anchor"
           , HP.class_ "symbol-button"
           , HE.onMouseOver (PopOpen (ms alias) True)
           , HE.onMouseOut (PopClose (ms alias))
@@ -360,8 +358,7 @@ viewRules model =
     H.div_
       [HP.class_ "tooltip-container", HP.class_ "rulebox-container"]
       [ H.button_
-          [ HP.class_ "app-button"
-          , HP.class_ "tooltip-anchor"
+          [ HP.class_ "tooltip-anchor"
           , HP.class_ "rule-button"
           , HE.onMouseOver (PopOpen (ms name) True)
           , HE.onMouseOut (PopClose (ms name))
@@ -384,7 +381,7 @@ viewExamples :: Model -> View Model Action
 viewExamples model =
   viewDetails
     "Examples"
-    "menu"
+    "view_list"
     (H.div_ [HP.class_ "column-sidebar-content"] (map mkExample (model ^. exampleProofs)))
  where
   mkExample :: (Text, Proof) -> View Model Action
@@ -392,8 +389,7 @@ viewExamples model =
     H.div_
       [HP.class_ "tooltip-container", HP.class_ "example-container"]
       [ H.button_
-          [ HP.class_ "app-button"
-          , HP.class_ "tooltip-anchor"
+          [ HP.class_ "tooltip-anchor"
           , HP.class_ "example-button"
           , HE.onMouseOver (PopOpen (ms name) True)
           , HE.onMouseOut (PopClose (ms name))

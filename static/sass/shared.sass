@@ -55,7 +55,7 @@ $sidebar-width-mobile: 60vw
 
 .drop-zone
   height: $drop-zone-height
-  transition: height 0.1s linear
+  transition: height 0.2s linear
   cursor: default
   width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
@@ -71,6 +71,26 @@ $sidebar-width-mobile: 60vw
 //----------------------------------------------------------------------------------------------------
 // Buttons
 //----------------------------------------------------------------------------------------------------
+
+
+.button
+  display: flex
+  justify-content: center
+  align-items: center
+  outline: 0
+  cursor: pointer
+  // font-weight: 500
+  // line-height: 20px
+  font-size: $error-text-size
+  vertical-align: middle
+  border: 1px solid
+  border-radius: 6px
+  color: #24292e
+  background-color: transparent
+  transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1)
+  text-decoration: none
+  border-color: #1b1f2326
+  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset
 
 //----------------------------------------------------------------------------------------------------
 // Tooltips
