@@ -281,22 +281,23 @@ viewLogics model =
     "schema"
     ( H.div_
         [HP.class_ "column-sidebar-content"]
-        (map mkLogic [("First-order logic", "fol"), ("Propositional Logic", "prop")])
+        (map mkLogic [("First-order logic", FOL), ("Propositional Logic", Prop)])
     )
  where
-  mkLogic :: (Text, MisoString) -> View Model Action
-  mkLogic (name, alias) =
+  mkLogic :: (MisoString, Logic) -> View Model Action
+  mkLogic (description, l) =
     H.a_
       [ HP.class_ "example-button"
+      , HP.classList_ [("disabled", (model ^. logic) == l)]
       , HP.href_ $
           prettyURI $
             URI
               { uriPath = uriPath (model ^. uri)
               , uriFragment = ""
-              , uriQueryString = one ("logic", Just alias)
+              , uriQueryString = one ("logic", Just $ show l)
               }
       ]
-      [text $ ms name]
+      [text description]
 
 {- | For use in 'viewSidebar',
 returns a list of symbols that can be used, and on hover shows their aliases.

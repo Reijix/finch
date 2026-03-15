@@ -69,18 +69,12 @@ runApp :: IO ()
 runApp = do
   window <- jsg "window"
   url <- getURI
-  model <- case uriQueryString url !? "logic" of
-    Just (Just "prop") ->
+  model <- case join (uriQueryString url !? "logic") of
+    Just ((== show Prop) -> True) ->
       pure $
         initialModelProp url $
           decodeFromUrl . show =<< join (uriQueryString url !? "proof")
-    Just (Just "fol") ->
-      pure $
-        initialModelFOL url $
-          decodeFromUrl . show
-            =<< join
-              (uriQueryString url !? "proof")
-    _ -> do
+    (Just ((== show FOL) -> True); Nothing) ->
       pure $
         initialModelFOL url $
           decodeFromUrl . show
