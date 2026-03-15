@@ -93,12 +93,14 @@ viewNavigationButtons =
     [HP.class_ "navigation-container"]
     [ H.button_
         [ HE.onClick NavigateBackward
-        , HP.class_ "spawn-button"
+        , HP.class_ "navigation-button"
+        , HP.id_ "back-button"
         ]
         [viewMaterialIcon "arrow_left_alt"]
     , H.button_
         [ HE.onClick NavigateForward
-        , HP.class_ "spawn-button"
+        , HP.class_ "navigation-button"
+        , HP.id_ "forward-button"
         ]
         [viewMaterialIcon "arrow_right_alt"]
     ]
@@ -188,7 +190,7 @@ viewNewProofButton model =
   H.button_
     [ HP.class_ "new-proof-button"
     , HP.class_ "sidebar-element"
-    , HE.onClick (SetProof (model ^. emptyProof))
+    , HE.onClick (SetProof $ SubProof [] [] (model ^. emptyDerivation))
     ]
     [text "Start New Proof"]
 

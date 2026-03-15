@@ -109,19 +109,15 @@ ul
 
 .new-proof-button
   @extend .button
+  @extend %background0-hover
   padding: 0.5vh 0.5vw
 
-.new-proof-button:hover
-  background-color: $background0
-
-%sidebar-button
-  @extend .button
-
-%sidebar-button:hover
+%background1-hover:hover
   background-color: $background1
 
 .symbol-button
-  @extend %sidebar-button
+  @extend .button
+  @extend %background1-hover
   padding: 0.5vh 0.5vw
   width: 2em
 
@@ -133,14 +129,16 @@ ul
   width: 4rem
 
 .rule-button
-  @extend %sidebar-button
+  @extend .button
+  @extend %background1-hover
   font-family: $font-math
   padding: 0.5vh 0.5vw
   width: 100%
   letter-spacing: 0.1em
 
 .example-button
-  @extend %sidebar-button
+  @extend .button
+  @extend %background1-hover
   padding: 0.5vh 0.5vw
   width: 100%
   justify-content: left

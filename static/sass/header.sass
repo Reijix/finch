@@ -15,21 +15,31 @@
   height: 100%
   font-size: $header-text-size
 
-.spawn-button
-  @extend .button
-  width: 3rem
-
-.header .button:hover
+%background0-hover:hover
   background-color: $background0
 
-.navigation-container > .button
-  border: none
+%active-scale:active
+  transform: scale(0.9)
+
+.spawn-button
+  @extend .button
+  @extend %background0-hover
+  width: 3rem
+
+.spawn-button:hover
+  background-color: $background0
 
 .menu-button
   @extend .button
+  @extend %background0-hover
+  @extend %active-scale
 
-.menu-button:active
-  transform: scale(0.8)
+.navigation-button
+  @extend .button
+  @extend %background0-hover
+  @extend %active-scale
+  width: 3rem
+  border: none
 
 .navigation-container
   display: inline-flex
@@ -76,15 +86,6 @@
   gap: 0.5vw
 
 .bin
-  display: flex
-  flex-direction: column
-  justify-content: center
-  align-items: center
+  @extend .button
   width: max(6vw,3rem)
   cursor: help
-  border: 1px solid
-  border-radius: 6px
-  background-color: transparent
-  color: $header-button-text-color
-  border-color: #1b1f2326
-  box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px,rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset

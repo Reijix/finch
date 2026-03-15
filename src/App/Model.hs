@@ -38,6 +38,9 @@ data SpawnType where
   SpawnProof :: SpawnType
   deriving (Show, Eq)
 
+-- | Enumeration of Logics that the app supports.
+data Logic = Prop | FOL deriving (Show, Eq)
+
 {- | Returns whether a given t'SpawnType' can be spawned __before__ a t'NodeAddr'.
 For example, a t'Proof' can be spawned before a 'NAConclusion',
 but not before a 'NAAssumption'.
@@ -111,8 +114,6 @@ data Model = Model
   -- ^ Currently focused line.
   , _exampleProofs :: [(Text, Proof)]
   -- ^ List of example t'Proof's.
-  , _emptyProof :: Proof
-  -- ^ Empty t'Proof' that is shown when a new proof is loaded.
   , _emptyDerivation :: Derivation
   -- ^ Empty t'Derivation' as a dummy for inserting.
   , _proof :: Proof
@@ -157,13 +158,13 @@ data Model = Model
   -- ^ A map that contains all rules, mapping their t'Name' to their t'RuleSpec'.
   , _uri :: URI
   -- ^ t'URI' of the application.
+  , _logic :: Logic
+  -- ^ t'Logic' that the app currently uses.
   }
   deriving (Eq)
 
 -- | Generates an initial t'Model' for pre-filling some fields (mostly with v'Nothing').
 initialModel ::
-  -- | Empty t'Proof', for the "New Proof" @<button>@.
-  Proof ->
   {- | Empty t'Derivation', used for inserting t'Assumption's, t'Derivation's and
   t'Proof's.
   -}
@@ -182,13 +183,14 @@ initialModel ::
   Map Name RuleSpec ->
   -- | The current t'URI'
   URI ->
+  -- | Logic that the app uses.
+  Logic ->
   -- | Initial t'Model' with sensible defaults
   Model
-initialModel emptyP emptyD initialP ps operators infixPreds quantifiers rules uri =
+initialModel emptyD initialP ps operators infixPreds quantifiers rules uri logic =
   Model
     { _focusedLine = Nothing
     , _exampleProofs = ps
-    , _emptyProof = emptyP
     , _emptyDerivation = emptyD
     , _proof = initialP
     , _sidebarToggle = False
@@ -203,6 +205,7 @@ initialModel emptyP emptyD initialP ps operators infixPreds quantifiers rules ur
     , _predicateSymbols = mempty
     , _rules = rules
     , _uri = uri
+    , _logic = logic
     }
 
 -- * Lenses

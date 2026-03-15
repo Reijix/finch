@@ -12,12 +12,11 @@ operators, rules and some examples.
 module Specification.Prop (
   operatorsProp,
   rulesProp,
-  emptyProofProp,
   exampleProofsProp,
   initialModelProp,
 ) where
 
-import App.Model (Model, initialModel)
+import App.Model (Logic (Prop), Model, initialModel)
 import Fitch.Proof
 import Miso.Router (URI)
 import Parser.Proof
@@ -95,17 +94,6 @@ readProof proofText = case parseProof operatorsProp [] [] proofText of
 
 -- * Examples
 
-{- | The default empty t'Proof' shown when the user starts a new proof in
-propositional logic.
--}
-emptyProofProp :: Proof
-emptyProofProp =
-  readProof
-    """
-    |---
-    |⊤ (⊤I)
-    """
-
 -- | A list of example t'Proof's shown in the sidebar, each paired with a display name.
 exampleProofsProp :: [(Text, Proof)]
 exampleProofsProp =
@@ -148,7 +136,6 @@ initialModelProp ::
   Model
 initialModelProp uri mp =
   initialModel
-    emptyProofProp
     ( Derivation
         (ParsedValid "⊤" (Opr "⊤" []))
         ( ParsedValid
@@ -163,5 +150,6 @@ initialModelProp uri mp =
     []
     rulesProp
     uri
+    Prop
  where
   (_, initialP) : _ = exampleProofsProp

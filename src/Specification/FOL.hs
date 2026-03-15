@@ -14,7 +14,6 @@ module Specification.FOL (
   infixPredsFOL,
   quantifiersFOL,
   rulesFOL,
-  emptyProofFOL,
   exampleProofsFOL,
   initialModelFOL,
 ) where
@@ -125,17 +124,6 @@ readProof proofText =
 
 -- * Examples
 
-{- | The default empty t'Proof' shown when the user starts a new proof in
-first-order-logic.
--}
-emptyProofFOL :: Proof
-emptyProofFOL =
-  readProof
-    """
-    |---
-    |⊤ (⊤I)
-    """
-
 -- | A list of example t'Proof's shown in the sidebar, each paired with a display name.
 exampleProofsFOL :: [(Text, Proof)]
 exampleProofsFOL =
@@ -238,7 +226,6 @@ initialModelFOL ::
   Model
 initialModelFOL uri mp =
   initialModel
-    emptyProofFOL
     ( Derivation
         (ParsedValid "⊤" (Opr "⊤" []))
         ( ParsedValid
@@ -253,5 +240,6 @@ initialModelFOL uri mp =
     quantifiersFOL
     rulesFOL
     uri
+    FOL
  where
   (_, initialP) : _ = exampleProofsFOL

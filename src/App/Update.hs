@@ -22,7 +22,7 @@ import Miso (
   Effect,
   MisoString,
   ROOT,
-  URI (uriQueryString),
+  URI (..),
   back,
   castJSVal,
   consoleLog,
@@ -34,7 +34,9 @@ import Miso (
   getURI,
   io,
   io_,
+  jsNull,
   ms,
+  prettyURI,
   pushURI,
   setSelectionRange,
   (#),
@@ -64,7 +66,7 @@ import Util ((%=?))
 updateModel :: Action -> Effect ROOT Model Action
 ------------------------------------
 -- Setup events
-updateModel Setup = proofReparse >> updateProof
+updateModel Setup = proofReparse >> replaceInitialURI
 updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
 updateModel (SetProof p) = do
   proof .= p
@@ -204,7 +206,7 @@ updateModel Nop = pass
 Should be called after every change to the t'Proof'.
 -}
 updateProof :: Effect ROOT Model Action
-updateProof = checkProof >> updateURI >> updateTitle
+updateProof = checkProof >> pushProofURI >> updateTitle
 
 {- | Updates the @document.title@ to show how many errors there are and
 what the conclusion of the t'Proof' is.
@@ -254,9 +256,12 @@ readURI uri = do
       Just (p :: Proof) -> proof .= p
     _ -> pass
 
--- | Updates the t'URI' to reflect the current 'Proof'.
-updateURI :: Effect ROOT Model Action
-updateURI = do
+{- | Pushes a new t'URI' that has the t'Proof' encoded to the history stack.
+
+See @static/Navigation.js@ for the used @pushStateHistory@ function.
+-}
+pushProofURI :: Effect ROOT Model Action
+pushProofURI = do
   p <- use proof
   io_ $ do
     uri <- getURI
@@ -265,7 +270,31 @@ updateURI = do
             { uriQueryString =
                 insert "proof" (Just . ms $ encodeForUrl p) (uriQueryString uri)
             }
-    if uri /= newURI then pushURI newURI else pass
+    if uri /= newURI
+      then void $ jsg "window" # "pushStateHistory" $ prettyURI newURI
+      else pass
+
+{- | To be called in the v'Setup' t'Action'.
+Replaces the initial URI that possible does not contain the queryParameters,
+with a URI that does. Also initializes the tracking of the HTML5 historu API.
+
+See @static/Navigation.js@ for the used @initHistory@ function.
+-}
+replaceInitialURI :: Effect ROOT Model Action
+replaceInitialURI = do
+  p <- use proof
+  l <- use logic
+  io_ $ do
+    uri <- getURI
+    let newURI =
+          URI
+            { uriPath = uriPath uri
+            , uriQueryString =
+                one ("proof", Just . ms $ encodeForUrl p)
+                  <> one ("logic", Just $ show l)
+            , uriFragment = ""
+            }
+    void $ jsg "window" # "initHistory" $ prettyURI newURI
 
 -- | Re-parses every line of the current t'Proof'
 proofReparse :: Effect ROOT Model Action
