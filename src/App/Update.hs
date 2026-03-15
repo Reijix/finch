@@ -68,10 +68,11 @@ updateModel :: Action -> Effect ROOT Model Action
 -- Setup events
 updateModel Setup = proofReparse >> replaceInitialURI
 updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
-updateModel (SetProof p) = do
-  proof .= p
-  proofReparse
-  updateProof
+updateModel (SetProof p) =
+  whenM (use proof <&> (/= p)) $ do
+    proof .= p
+    proofReparse
+    updateProof
 ------------------------------------
 -- t'URI' events
 updateModel (PopState uri) = do
