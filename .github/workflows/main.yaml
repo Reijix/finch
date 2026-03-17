@@ -26,11 +26,17 @@ jobs:
         with:
           name: haskell-miso-cachix
 
-      - name: Test using Nix
-        run: nix develop .#test --command bash -c "make test" && nix-collect-garbage -d
-
       - name: Build using Nix
-        run: nix develop . --command bash -c "make"
+        run: nix develop . --command bash -c "make" && nix-collect-garbage -d
+
+      - name: Test using Nix
+        run: nix develop .#test --command bash -c "make test"
+
+      - name: Build Documentation
+        run: nix develop .#test --command bash -c "make haddock"
+
+      - name: Move Documentation
+        run: mv haddocks public/docs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
