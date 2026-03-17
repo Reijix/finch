@@ -1,31 +1,16 @@
-// Line number containers
-.line-no-container
-  color: $line-number-text-color
-  display: flex
-  flex-direction: column
-  width: 5%
+// =============================================================================
+// proof.sass
+//
+// Styles for proof area
+// =============================================================================
 
+// -----------------------------------------------------------------------------
+// Outer proof containers
+// -----------------------------------------------------------------------------
 
-.empty-line-no
-  height: 2px
-  margin: 0px
-  margin-bottom: 2px
-
-
-// Proof containers
-.app-container
-  display: flex
-  flex: 1
-  flex-direction: column
-  background-color: $background0
-  font-size: $normal-text-size
-
-.content-container
-  display: inline-flex
-  width: 100%
-  height: 100%
-
-
+// Wrapper around proof-container that adds a border,
+// which captures dragEnter to notice when a user drags
+// outside of the proof.
 .proof-container-border
   flex-grow: 1
   display: flex
@@ -36,7 +21,7 @@
   -ms-overflow-style: none
   scrollbar-width: none
 
-
+// Container for the proof, i.e. for line numbers, proof lines, and rules.
 .proof-container
   margin-top: 1vh
   margin-bottom: 1vh
@@ -51,19 +36,18 @@
   -ms-overflow-style: none
   scrollbar-width: none
 
+// -----------------------------------------------------------------------------
+// Line numbers
+// -----------------------------------------------------------------------------
 
-.formula-container
+// Column that holds the line numbers.
+.line-no-container
+  color: $line-number-text-color
   display: flex
-  align-items: center
-  width: calc(100% - #{$formula-left-margin})
-  margin-left: $formula-left-margin
+  flex-direction: column
+  width: 5%
 
-
-.formula-container:hover > .formula-input
-  background-color: $background0
-  transition: 0.1s linear
-
-
+// Line number
 .line-no
   color: $line-number-text-color
   padding: 0
@@ -71,7 +55,28 @@
   font-size: $normal-text-size
   font-family: $font-math
 
+// -----------------------------------------------------------------------------
+// Inner proof containers
+// -----------------------------------------------------------------------------
 
+// Column that holds all formulae and sub proofs.
+.formulae-container
+  box-sizing: border-box
+  width: 70%
+
+// Wrapper for a single formula.
+.formula-container
+  display: flex
+  align-items: center
+  width: calc(100% - #{$formula-left-margin})
+  margin-left: $formula-left-margin
+
+// background0 on hover.
+.formula-container:hover > .formula-input
+  background-color: $background0
+  transition: 0.1s linear
+
+// Input element for formulae.
 .formula-input
   border: none
   color: $formula-text-color
@@ -81,41 +86,42 @@
   font-size: $normal-text-size
   font-family: $font-math
 
-
-.formulae-container
-  box-sizing: border-box
-  width: 70%
-
-.empty-assumptions
-  height: 2px
-  margin: 0px
-
-
+// Subproof with left border
 .subproof
   position: relative
   width: calc(100% - #{$formula-left-margin})
   border-left: $subproof-border
   margin-left: $formula-left-margin
 
+// TODO improve hover!
 .subproof > .subproof:not(:has(.subproof:hover,.formula-container:hover,.rule-container:hover,.drop-zone:not(.last-assumption):hover)):hover
   background-color: $background0
   transition: 0.1s linear
 
+// Horizontal line below the last assumption.
 .last-assumption
   border-bottom: $subproof-border
   margin-left: 0 !important
   margin-bottom: 5px
 
+// Spacer used when the last-assumption row is empty (no formula content)
 .empty-last-assumption
   margin-bottom: 5px
 
-.proof-view
-  display: grid
-
+// Coloring of input fields with syntax/semantic errors.
 .has-error
   color: rgb(255, 0, 0)
 
+
+// -----------------------------------------------------------------------------
 // Rule containers
+// -----------------------------------------------------------------------------
+
+// Column that holds the rules.
+.rules-container
+  width: 25%
+
+// Placeholder rendered in a rule cell when the row has no rule applied
 .empty-rule
   padding: 0
   margin: 0
@@ -123,20 +129,7 @@
   font-size: $normal-text-size
   height: fit-content
 
-.empty-assumption-rule
-  padding: 0
-  margin: 0
-  height: 2px
-
-.rule-input
-  color: $rule-text-color
-  border: none
-  width: 100%
-  padding: 0
-  margin: 0
-  font-family: $font-math
-  font-size: $normal-text-size
-
+// Rule container
 .rule-container
   display: flex
   align-items: center
@@ -147,9 +140,17 @@
   background-color: transparent
   cursor: pointer
 
+// background0 on hover
 .rule-container:hover > .rule-input
   background-color: $background0
   transition: 0.1s linear
 
-.rules-container
-  width: 25%
+// Rule input field.
+.rule-input
+  color: $rule-text-color
+  border: none
+  width: 100%
+  padding: 0
+  margin: 0
+  font-family: $font-math
+  font-size: $normal-text-size

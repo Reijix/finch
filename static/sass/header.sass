@@ -1,3 +1,9 @@
+// =============================================================================
+// header.sass
+// Styles for the top application bar
+// =============================================================================
+
+// Header container
 .header
   display: flex
   justify-content: space-between
@@ -8,6 +14,11 @@
   padding: 1vh
   height: $header-height
 
+// -----------------------------------------------------------------------------
+// Left button group with logo.
+// -----------------------------------------------------------------------------
+
+// Container for logo icon and text.
 .logo-header
   display: flex
   flex-direction: row
@@ -15,33 +26,68 @@
   height: 100%
   font-size: $header-text-size
 
-%background0-hover:hover
-  background-color: $background0
+// Logo text is hidden on smaller screens.
+@media only screen and (max-width: 1200px)
+  .logo-header > h1
+    width: 0
+    overflow: hidden
 
-%active-scale:active
-  transform: scale(0.9)
+// Logo text.
+.logo-header > h1
+  font-size: $header-text-size
+  display: flex
+  flex-direction: row
+  justify-content: center
 
-.spawn-button
-  @extend .button
-  @extend %background0-hover
-  width: 3rem
+// Logo icon.
+.logo-header > img
+  height: $header-text-size
 
-.spawn-button:hover
-  background-color: $background0
-
+// sidebar toggle button.
 .menu-button
   @extend .button
   @extend %background0-hover
   @extend %active-scale
   border: none
 
+// -----------------------------------------------------------------------------
+// Center button group (proof actions)
+// -----------------------------------------------------------------------------
+
+// Groups the proof actions like add line, add sub proof, delete.
+.proof-actions-header
+  display: flex
+  flex-direction: row
+  height: 100%
+  gap: 1vw
+  font-size: $error-text-size
+
+// Draggable buttons for adding lines / proofs.
+.spawn-button
+  @extend .button
+  @extend %background0-hover
+  width: 3rem
+
+// Drag and drop target for deleting lines / proofs.
+.bin
+  @extend .button
+  width: max(6vw,3rem)
+  cursor: help
+
+// Back / forward navigation buttons
 .navigation-button
   @extend .button
   @extend %background0-hover
   @extend %active-scale
   width: 3rem
   border: none
+  border-radius: 0
 
+// -----------------------------------------------------------------------------
+// Right navigation button group
+// -----------------------------------------------------------------------------
+
+// Wraps the back/forward navigation buttons as a visually connected pill group.
 .navigation-container
   display: inline-flex
   height: 100%
@@ -58,35 +104,3 @@
 .navigation-container:last-child
   border-top-right-radius: 6px
   border-bottom-right-radius: 6px
-
-.proof-actions-header
-  display: flex
-  flex-direction: row
-  height: 100%
-  gap: 1vw
-  font-size: $error-text-size
-
-@media only screen and (max-width: 1200px)
-  .logo-header > h1
-    width: 0
-    overflow: hidden
-
-.logo-header > h1
-  font-size: $header-text-size
-  display: flex
-  flex-direction: row
-  justify-content: center
-
-.logo-header > img
-  height: $header-text-size
-
-.icon-text
-  display: flex
-  flex-direction: row
-  justify-content: center
-  gap: 0.5vw
-
-.bin
-  @extend .button
-  width: max(6vw,3rem)
-  cursor: help

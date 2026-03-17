@@ -1,24 +1,53 @@
+// =============================================================================
+// style.sass
+//
+// Entry point for styling and styling of top-level elements.
+// =============================================================================
+
 @import shared.sass
 @import header.sass
 @import proof.sass
 @import sidebar.sass
 
-// Sensible defaults
+// Container for all app components
+.app-container
+  display: flex
+  flex: 1
+  flex-direction: column
+  background-color: $background0
+  font-size: $normal-text-size
+
+// Container of all content that is not the header.
+.content-container
+  display: inline-flex
+  width: 100%
+  height: 100%
+
+// -----------------------------------------------------------------------------
+// Global styling / resets
+// -----------------------------------------------------------------------------
+
+// Apply border-box sizing universally so padding and borders are included in
+// every element's declared width/height.
 *
   box-sizing: border-box
   margin: 0
   padding: 0
 
-// Set default font and prevent body from being scrollable
+// Set font globally and prevent scrolling outside of sidebar/proof
 body
   font-family: $font-ui
   overflow: clip
 
-// These have a default background-color, make it transparent
+// Remove default backgrounds
 button,
 input
   background-color: transparent
 
-// Remove outlines
+// Remove default outline
 input:focus
   outline: none
+
+// Ensure list bullets are inside the list container.
+ul
+  list-style-position: inside

@@ -1,27 +1,30 @@
-// sass/shared.sass
-// This file contains some helper definitions that are shared between the other modules.
+// =============================================================================
+// shared.sass
+//
+// Shared definitions like variables, button styling etc.
+// =============================================================================
 
-//----------------------------------------------------------------------------------------------------
-// VARIABLES
-//----------------------------------------------------------------------------------------------------
 
-// color theme
+// -----------------------------------------------------------------------------
+// Variables
+// -----------------------------------------------------------------------------
+
+// Background colors:
+// background0 for the 'deepest' background
+// background2 for the 'highest' background
 $background0: #e9f1f4
 $background1: #f3f7fa
 $background2: #ffffff
+// Text & border colours
 $header-button-text-color: #344054
 $sidebar-text-color: black
 $line-number-text-color: #4c4f69
 $formula-text-color: black
 $rule-text-color: black
-
-// Typography
-
-// Margins
+// Spacing
 $drop-zone-height: clamp(0.1rem, 2vh, 0.5rem)
 $formula-left-margin: 0.5rem
-
-// Text sizes
+// Typography
 $sidebar-heading-text-size: clamp(1rem, calc(1vw + 0.75rem), 1.125rem)
 $sidebar-content-text-size: smaller
 $normal-text-size: clamp(1.125rem, calc(2vw + 0.75rem), 1.5rem)
@@ -31,28 +34,29 @@ $header-height: calc(#{$header-text-size} + 2vh)
 $subproof-border-size: 0.2rem
 $subproof-border: $subproof-border-size solid rgba(193, 201, 204, 1)
 $subproof-border-expanded: 0.3rem solid rgba(193, 201, 204, 1)
+// Fonts
 $font-ui: "Fira Sans", system-ui, -apple-system, sans-serif
 $font-math: "Fira Sans", monospace
-
-// widths
+// Sidebar widths — narrower on mobile to avoid covering the proof area.
 $sidebar-width-desktop: 20vw
 $sidebar-width-mobile: 70vw
 
-//----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Drag and Drop
-//----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
+// Adds a grab/move cursor
 .draggable
   cursor: move !important
   /* fallback if grab cursor is unsupported */
   cursor: grab !important
   cursor: -webkit-grab !important
 
-
+// Highlights the line that is currently being hovered over as a drop target.
 .drag-target
   background-color: $background0
 
-
+// Invisible spacer rendered between proof lines, expands on hover.
 .drop-zone
   height: $drop-zone-height
   transition: height 0.2s linear
@@ -60,27 +64,29 @@ $sidebar-width-mobile: 70vw
   width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
 
-
+// Expanded on hover.
 .expanded-drop-zone
   height: $normal-text-size
 
+// -----------------------------------------------------------------------------
+// Icons
+// -----------------------------------------------------------------------------
 
+// Used for rendering material icons
 .material-symbols-outlined
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
 
-//----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Buttons
-//----------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
-
+// Base button, all other button classes in other modules extend this placeholder.
 .button
   display: flex
   justify-content: center
   align-items: center
   outline: 0
   cursor: pointer
-  // font-weight: 500
-  // line-height: 20px
   font-size: $error-text-size
   vertical-align: middle
   border: 1px solid
@@ -93,6 +99,7 @@ $sidebar-width-mobile: 70vw
   box-shadow: rgba(27, 31, 35, 0.04) 0px 1px 0px 0px, rgba(255, 255, 255, 0.25) 0px 1px 0px 0px inset
   user-select: none
 
+// Disabled button
 .disabled, .button:disabled
   color: #cccccc
   background-color: #f5f5f5
@@ -102,10 +109,24 @@ $sidebar-width-mobile: 70vw
   opacity: 0.6
   box-shadow: none
 
-//----------------------------------------------------------------------------------------------------
-// Tooltips
-//----------------------------------------------------------------------------------------------------
+// Sets background0 on hover.
+%background0-hover:hover
+  background-color: $background0
 
+
+// Sets background1 on hover.
+%background1-hover:hover
+  background-color: $background1
+
+// Shrinks on click.
+%active-scale:active
+  transform: scale(0.9)
+
+// -----------------------------------------------------------------------------
+// Tooltips
+// -----------------------------------------------------------------------------
+
+// Base styling of tooltips.
 %tooltip
   position: absolute
   border: 1px solid
@@ -117,21 +138,26 @@ $sidebar-width-mobile: 70vw
   color: #000
   font-size: $error-text-size
 
+// Hide tooltips that have no text content.
 %tooltip:empty
   display: none
 
+// Tooltip right of the element.
 .tooltip-right
   @extend %tooltip
   position-area: right
   position-anchor: --tooltip
 
+// Tooltip below the element.
 .tooltip-bottom
   @extend %tooltip
   position-area: bottom
   position-anchor: --tooltip
 
+// Container of the tooltip, sets the scope.
 .tooltip-container
   anchor-scope: --tooltip
 
+// Anchor of the tooltip, i.e. element that tooltip gets relatively position to.
 .tooltip-anchor
   anchor-name: --tooltip

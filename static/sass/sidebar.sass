@@ -1,12 +1,25 @@
+// =============================================================================
+// sidebar.sass
+//
+// Styles for the collapsible sidebar panel.
+// =============================================================================
+
+// Sidebar container
 .sidebar
   background-color: $background1
   border-right: 1px solid #e0e0e0
   z-index: 110
   height: calc(100dvh - #{$header-height})
-  overflow-x: hidden
   overflow-x: auto
   scrollbar-width: none
+  transition: width 0.3s ease-in-out
 
+// -----------------------------------------------------------------------------
+// Open / Closing
+// -----------------------------------------------------------------------------
+
+// Sidebar content container, improves the way the sidebar slides open/closed, because the inner width is fixed.
+// If it was not fixed, the flexbox would dynamically shrink and look weird.
 .sidebar-content
   box-sizing: border-box
   display: flex
@@ -20,28 +33,29 @@
   font-size: $sidebar-heading-text-size
   border-right: 1px solid #e0e0e0
 
-
+// Collapsed sidebar
 .sidebar-closed
   width: 0
   transition: width 0.3s ease-in-out
 
-.sidebar-open
-  width: $sidebar-width-desktop
-  transition: width 0.3s ease-in-out
-
-
+// On smaller viewports, the sidebar floats over the content instead of displacing it.
+// Since it covers the content anyway, we also give it a higher percentage.
 @media only screen and (max-width: 1200px)
   .sidebar
     position: absolute
 
-
   .sidebar-open
     width: $sidebar-width-mobile
-
 
   .sidebar-content
     width: $sidebar-width-mobile
 
+
+// -----------------------------------------------------------------------------
+// Sidebar content
+// -----------------------------------------------------------------------------
+
+// Container for sidebar elements, styled as a card.
 .sidebar-element
   background-color: $background2
   color: $sidebar-text-color
@@ -50,14 +64,28 @@
   margin: 0px 16px
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03)
 
+
+// -----------------------------------------------------------------------------
+// <details> styling closeable cards as sidebar content.
+// -----------------------------------------------------------------------------
+
+// Remove the default triangle marker from <summary>.
 details > summary
   list-style: none
   cursor: pointer
   user-select: none
+// Fix for webkit.
+details > summary::-webkit-details-marker
+  display: none
 
+// Arrow icon indicating the opened state of the <details>,
+// rotates smoothly when opening.
+details[open] > summary > .summary-arrow
+  transform: rotate(180deg)
 details > summary > .summary-arrow
   transition: 0.3s
 
+// Smooth opening and closing of <details> elements.
 ::details-content
   transition: height 0.3s ease, content-visibility 0.3s ease allow-discrete
   height: 0
@@ -66,19 +94,15 @@ details > summary > .summary-arrow
 [open]::details-content
   height: auto
 
-// allow-keywords if supported, this makes <details> animated. Not supported in firefox and safari!
+// Transitions with height:auto only work on chrome currently, so no smooth
+// animations for firefox/safari :(
 @supports (interpolate-size: allow-keywords)
   \:root
     interpolate-size: allow-keywords
 
-details[open] > summary > .summary-arrow
-  transform: rotate(180deg)
-
-details > summary::-webkit-details-marker
-  display: none
-
-ul
-  list-style-position: inside
+// -----------------------------------------------------------------------------
+// The title row shown at the top of each .sidebar-element
+// -----------------------------------------------------------------------------
 
 .sidebar-header
   font-family: inherit
@@ -89,45 +113,51 @@ ul
   align-items: center
   padding: 0.5vh 0.5vw
 
-.row-sidebar-content
+
+// -----------------------------------------------------------------------------
+// Vertical or horizontal sidebar content containers.
+// -----------------------------------------------------------------------------
+
+%sidebar-content
   width: 100%
   padding: 0.5vh 0.5vw
   gap: 0.5vh
   display: flex
+  justify-content: center
+
+// horizontal container, e.g. used for enumeration of rules.
+.row-sidebar-content
+  @extend %sidebar-content
   flex-direction: row
   flex-wrap: wrap
-  justify-content: center
   font-size: $sidebar-content-text-size
 
+// vertical container, e.g. used for list of examples.
 .column-sidebar-content
-  display: flex
+  @extend %sidebar-content
   flex-direction: column
-  width: 100%
-  padding: 0.5vh 0.5vw
-  gap: 0.5vh
   font-size: $sidebar-content-text-size
 
+
+// -----------------------------------------------------------------------------
+// Buttons
+// -----------------------------------------------------------------------------
+
+// Button for creating a new proof.
 .new-proof-button
   @extend .button
   @extend %background0-hover
   padding: 0.5vh 0.5vw
 
-%background1-hover:hover
-  background-color: $background1
-
+// Pseudo-button that shows symbol alias on hover.
 .symbol-button
   @extend .button
   @extend %background1-hover
   padding: 0.5vh 0.5vw
   width: 2em
 
-.example-container
-  display: flex
-  justify-content: center
-
-.rulebox-container
-  width: 4rem
-
+// Pseudo button that displays an inference rule name,
+// and on hover shows its definition.
 .rule-button
   @extend .button
   @extend %background1-hover
@@ -136,13 +166,16 @@ ul
   width: 100%
   letter-spacing: 0.1em
 
+// Fixed width for rule buttons.
+.tooltip-container:has(.rule-button)
+  width: 4rem
+
+
+// Full-width button for loading a predefined example proof; left-aligned text
+// to match a list-item appearance.
 .example-button
   @extend .button
   @extend %background1-hover
   padding: 0.5vh 0.5vw
   width: 100%
   justify-content: left
-
-
-.math-content
-  font-family: $font-math

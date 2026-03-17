@@ -205,8 +205,7 @@ viewSidebar model =
     [ HP.class_ "sidebar"
     , HE.onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave
     , HP.classList_
-        [ ("sidebar-open", model ^. sidebarToggle)
-        , ("sidebar-closed", not (model ^. sidebarToggle))
+        [ ("sidebar-closed", not (model ^. sidebarToggle))
         ]
     ]
     $ one
@@ -359,7 +358,7 @@ viewRules model =
   viewSingleRule :: (Name, RuleSpec) -> View Model Action
   viewSingleRule (name, rs) =
     H.div_
-      [HP.class_ "tooltip-container", HP.class_ "rulebox-container"]
+      [HP.class_ "tooltip-container"]
       [ H.button_
           [ HP.class_ "tooltip-anchor"
           , HP.class_ "rule-button"
@@ -390,7 +389,7 @@ viewExamples model =
   mkExample :: (Text, Proof) -> View Model Action
   mkExample (name, p) =
     H.div_
-      [HP.class_ "tooltip-container", HP.class_ "example-container"]
+      [HP.class_ "tooltip-container"]
       [ H.button_
           [ HP.class_ "tooltip-anchor"
           , HP.class_ "example-button"
