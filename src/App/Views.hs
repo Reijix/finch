@@ -71,18 +71,18 @@ viewHeader :: Model -> View Model Action
 viewHeader model =
   H.header_
     [HP.class_ "header"]
-    [ viewLogoHeader
+    [ viewLogoHeader model
     , viewProofActionsHeader
     , viewNavigationButtons
     ]
 
 -- | Shows the logo in the 'viewHeader', together with a title and navigation buttons
-viewLogoHeader :: View Model Action
-viewLogoHeader =
+viewLogoHeader :: Model -> View Model Action
+viewLogoHeader model =
   H.div_
     [HP.class_ "logo-header"]
     [ viewMenuButton
-    , H.img_ [HP.src_ "favicon.svg"]
+    , H.img_ [HP.src_ $ uriPath (model ^. uri) <> "/favicon.svg"]
     , H.h1_ [] ["Finch"]
     ]
 
