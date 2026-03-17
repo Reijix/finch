@@ -82,7 +82,7 @@ viewLogoHeader model =
   H.div_
     [HP.class_ "logo-header"]
     [ viewMenuButton
-    , H.img_ [HP.src_ $ uriPath (model ^. uri) <> "/favicon.svg"]
+    , H.img_ [HP.src_ "favicon.svg"]
     , H.h1_ [] ["Finch"]
     ]
 
