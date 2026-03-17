@@ -39,6 +39,8 @@ import Miso (
   prettyURI,
   pushURI,
   setSelectionRange,
+  setSessionStorage,
+  (!),
   (#),
  )
 import Miso.DSL (jsg, (#))
@@ -87,7 +89,12 @@ updateModel (PopOpen name True) =
     False -> io_ $ showPopover name
 updateModel (PopOpen _ False) = pass
 updateModel (PopClose name) = io_ $ hidePopover name
-updateModel ToggleSidebar = sidebarToggle %= not
+updateModel ToggleSidebar = do
+  sidebarToggle %= not
+  st <- use sidebarToggle
+  io_ $
+    void (jsg "window" ! "sessionStorage" # "setItem" $ ("sidebarToggle" :: MisoString, st))
+-- io_ $ setSessionStorage "sidebarToggle" st
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do

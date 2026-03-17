@@ -104,6 +104,7 @@ details > summary > .summary-arrow
 // The title row shown at the top of each .sidebar-element
 // -----------------------------------------------------------------------------
 
+// container for the header
 .sidebar-header
   font-family: inherit
   font-size: $sidebar-heading-text-size
@@ -113,11 +114,17 @@ details > summary > .summary-arrow
   align-items: center
   padding: 0.5vh 0.5vw
 
+// icon with text
+.icon-text
+  gap: 1rem
+  display: flex
+  justify-content: center
 
 // -----------------------------------------------------------------------------
 // Vertical or horizontal sidebar content containers.
 // -----------------------------------------------------------------------------
 
+// container for sidebar content
 %sidebar-content
   width: 100%
   padding: 0.5vh 0.5vw

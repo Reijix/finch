@@ -69,24 +69,40 @@ startAppWrapper window model =
 runApp :: IO ()
 runApp = do
   window <- jsg "window"
-  url <- getURI
-  isMobile :: Maybe Bool <-
-    fromJSVal
-      =<< ( (window # "matchMedia" $ ("only screen and (max-width: 1200px)" :: MisoString))
-              ! "matches"
-          )
-  model <- case join (uriQueryString url !? "logic") of
+  uri <- getURI
+
+  -- retrieve from session storage whether the sidebar was collapsed or not.
+  _sidebarToggle :: Maybe Text <-
+    fromJSVal =<< ((window ! "sessionStorage") # "getItem" $ ("sidebarToggle" :: MisoString))
+
+  -- if storage could be found, take it, otherwise use a @media query
+  -- to determine if sidebar should be initially open (on desktop) or closed (mobile).
+  sidebarToggle <- case _sidebarToggle of
+    Nothing -> do
+      mIsMobile :: Maybe Bool <-
+        fromJSVal
+          =<< ( (window # "matchMedia" $ ("only screen and (max-width: 1200px)" :: MisoString))
+                  ! "matches"
+              )
+      let sidebarToggle = not $ fromMaybe True mIsMobile
+      window ! "sessionStorage" # "setItem" $ ("sidebarToggle" :: MisoString, sidebarToggle)
+      pure sidebarToggle
+    Just "false" -> pure False
+    Just "true" -> pure True
+
+  -- set the initial model by checking if ?logic= and ?proof= are specified.
+  model <- case join (uriQueryString uri !? "logic") of
     Just ((== show Prop) -> True) ->
       pure $
-        initialModelProp url $
-          decodeFromUrl . show =<< join (uriQueryString url !? "proof")
+        initialModelProp uri $
+          decodeFromUrl . show =<< join (uriQueryString uri !? "proof")
     (Just ((== show FOL) -> True); Nothing) ->
       pure $
-        initialModelFOL url $
+        initialModelFOL uri $
           decodeFromUrl . show
             =<< join
-              (uriQueryString url !? "proof")
-  startAppWrapper window (model (fromMaybe False isMobile))
+              (uriQueryString uri !? "proof")
+  startAppWrapper window (model sidebarToggle)
 
 ------------------------------------------------------------------------------------------
 
