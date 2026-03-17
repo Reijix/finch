@@ -1,6 +1,10 @@
 packages:
   ./*.cabal
 
+package *
+  documentation: true
+  haddock-hyperlink-source: true
+
 constraints:
   zlib +bundled-c-zlib
 

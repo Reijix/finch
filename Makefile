@@ -19,21 +19,19 @@ optim:
 	wasm-opt -all -O2 public/finch.wasm -o public/finch.wasm
 	wasm-tools strip -o public/finch.wasm public/finch.wasm
 
-serve: all
+serve: update build optim
 	http-server public
 
 clean:
-	rm -rf dist-newstyle public haddock
+	rm -rf dist-newstyle public docs haddocks
 
 test:
 	cabal update
 	cabal test
 
 haddock:
-	cabal haddock-project --all --internal --hackage
-
-haddock-serve: haddock
-	xdg-open haddock/finch/index.html
+	cabal update
+	cabal haddock-project --all --hoogle
 
 report:
 	cabal test --enable-coverage

@@ -176,6 +176,7 @@ viewSpawnNode tp title icon =
         [text title]
     ]
 
+-- TODO DOCS
 viewMenuButton :: View Model Action
 viewMenuButton =
   H.button_
