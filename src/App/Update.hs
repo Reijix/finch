@@ -66,7 +66,7 @@ import Util ((%=?))
 updateModel :: Action -> Effect ROOT Model Action
 ------------------------------------
 -- Setup events
-updateModel Setup = proofReparse >> replaceInitialURI
+updateModel Setup = proofReparse >> checkProof >> updateTitle >> replaceInitialURI
 updateModel (InitMathJAX domRef) = io_ [js| MathJax.typesetPromise([${domRef}]); |]
 updateModel (SetProof p) =
   whenM (use proof <&> (/= p)) $ do

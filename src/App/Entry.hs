@@ -20,6 +20,7 @@ import App.Views
 import Data.Text qualified as T
 import Fitch.Proof
 import Miso
+import Miso.FFI.QQ (js)
 import Miso.Subscription.Util (createSub)
 import Relude.Extra.Map
 import Specification.FOL
@@ -69,6 +70,11 @@ runApp :: IO ()
 runApp = do
   window <- jsg "window"
   url <- getURI
+  isMobile :: Maybe Bool <-
+    fromJSVal
+      =<< ( (window # "matchMedia" $ ("only screen and (max-width: 1200px)" :: MisoString))
+              ! "matches"
+          )
   model <- case join (uriQueryString url !? "logic") of
     Just ((== show Prop) -> True) ->
       pure $
@@ -80,7 +86,7 @@ runApp = do
           decodeFromUrl . show
             =<< join
               (uriQueryString url !? "proof")
-  startAppWrapper window model
+  startAppWrapper window (model (fromMaybe False isMobile))
 
 ------------------------------------------------------------------------------------------
 

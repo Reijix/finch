@@ -185,15 +185,17 @@ initialModel ::
   URI ->
   -- | Logic that the app uses.
   Logic ->
+  -- | Whether the user is on a small mobile screen or not.
+  Bool ->
   -- | Initial t'Model' with sensible defaults
   Model
-initialModel emptyD initialP ps operators infixPreds quantifiers rules uri logic =
+initialModel emptyD initialP ps operators infixPreds quantifiers rules uri logic isMobile =
   Model
     { _focusedLine = Nothing
     , _exampleProofs = ps
     , _emptyDerivation = emptyD
     , _proof = initialP
-    , _sidebarToggle = False
+    , _sidebarToggle = not isMobile
     , _dragTarget = Nothing
     , _spawnType = Nothing
     , _currentHoverLine = Nothing

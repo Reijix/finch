@@ -223,6 +223,8 @@ initialModelFOL ::
   URI ->
   -- | An optional t'Proof' decoded from the URL; falls back to the first example proof.
   Maybe Proof ->
+  -- | Whether the user is on a large screen or not.
+  Bool ->
   Model
 initialModelFOL uri mp =
   initialModel
