@@ -67,28 +67,25 @@ startAppWrapper window model =
 4. Then starts the Miso application using 'startAppWrapper'.
 -}
 runApp :: IO ()
-runApp = do
+runApp = withJS $ do
   window <- jsg "window"
   uri <- getURI
 
-  -- retrieve from session storage whether the sidebar was collapsed or not.
-  _sidebarToggle :: Maybe Text <-
-    fromJSVal =<< ((window ! "sessionStorage") # "getItem" $ ("sidebarToggle" :: MisoString))
+  _sidebarToggle :: Either MisoString Bool <- do
+    n <- sessionStorageLength
+    if n > 0
+      then getSessionStorage "sidebarToggle"
+      else pure $ Left ""
 
   -- if storage could be found, take it, otherwise use a @media query
   -- to determine if sidebar should be initially open (on desktop) or closed (mobile).
   sidebarToggle <- case _sidebarToggle of
-    Nothing -> do
-      mIsMobile :: Maybe Bool <-
-        fromJSVal
-          =<< ( (window # "matchMedia" $ ("only screen and (max-width: 1200px)" :: MisoString))
-                  ! "matches"
-              )
-      let sidebarToggle = not $ fromMaybe True mIsMobile
-      window ! "sessionStorage" # "setItem" $ ("sidebarToggle" :: MisoString, sidebarToggle)
-      pure sidebarToggle
-    Just "false" -> pure False
-    Just "true" -> pure True
+    Right b -> pure b
+    s -> do
+      isMobile :: Bool <-
+        [js| return window.matchMedia("only screen and (max-width: 1200px)").matches; |]
+      setSessionStorage "sidebarToggle" (not isMobile)
+      pure (not isMobile)
 
   -- set the initial model by checking if ?logic= and ?proof= are specified.
   model <- case join (uriQueryString uri !? "logic") of

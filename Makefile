@@ -19,7 +19,7 @@ optim:
 	wasm-opt -all -O2 public/finch.wasm -o public/finch.wasm
 	wasm-tools strip -o public/finch.wasm public/finch.wasm
 
-serve: update build optim
+serve: build optim
 	http-server public
 
 clean:

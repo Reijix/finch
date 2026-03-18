@@ -92,9 +92,7 @@ updateModel (PopClose name) = io_ $ hidePopover name
 updateModel ToggleSidebar = do
   sidebarToggle %= not
   st <- use sidebarToggle
-  io_ $
-    void (jsg "window" ! "sessionStorage" # "setItem" $ ("sidebarToggle" :: MisoString, st))
--- io_ $ setSessionStorage "sidebarToggle" st
+  io_ $ setSessionStorage "sidebarToggle" st
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
