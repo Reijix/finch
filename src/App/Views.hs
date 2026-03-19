@@ -82,7 +82,7 @@ viewLogoHeader model =
   H.div_
     [HP.class_ "logo-header"]
     [ viewMenuButton
-    , H.img_ [HP.src_ "favicon.svg"]
+    , H.img_ [HP.src_ "icons/favicon.svg"]
     , H.h1_ [] ["Finch"]
     ]
 
@@ -176,7 +176,9 @@ viewSpawnNode tp title icon =
         [text title]
     ]
 
--- TODO DOCS
+{- | For use in 'viewHeader'
+returns a @<button>@ that opens and closes the sidebar.
+-}
 viewMenuButton :: View Model Action
 viewMenuButton =
   H.button_
@@ -237,9 +239,7 @@ viewDetails txt icon content =
     [ H.summary_
         [HP.class_ "sidebar-header"]
         [ H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, text txt]
-        , H.span_
-            [HP.class_ "material-symbols-outlined", HP.class_ "summary-arrow"]
-            ["keyboard_arrow_down"]
+        , H.div_ [HP.class_ "summary-arrow"] [viewMaterialIcon "keyboard_arrow_down"]
         ]
     , content
     ]
@@ -422,7 +422,7 @@ viewSource model =
         [HP.class_ "row-sidebar-content"]
         [ H.a_
             [HP.class_ "source-button", HP.href_ "https://github.com/Reijix/finch"]
-            [H.img_ [HP.src_ "github.svg"], text " Repository"]
+            [H.img_ [HP.src_ "icons/github.svg"], text " Repository"]
         , H.a_
             [ HP.class_ "source-button"
             , HP.href_
@@ -434,7 +434,7 @@ viewSource model =
                       }
                 )
             ]
-            [H.img_ [HP.src_ "haskell.svg"], "Documentation"]
+            [H.img_ [HP.src_ "icons/haskell.svg"], "Documentation"]
         ]
     )
 
@@ -758,7 +758,7 @@ viewLine model na e =
 see <https://fonts.google.com/icons>
 -}
 viewMaterialIcon :: MisoString -> View Model Action
-viewMaterialIcon name = H.span_ [HP.class_ "material-symbols-outlined"] [text name]
+viewMaterialIcon name = H.img_ [HP.src_ $ "icons/" <> name <> ".svg"]
 
 {- |
 Shows a dropzone for the given t'NodeAddr',

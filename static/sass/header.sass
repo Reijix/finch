@@ -65,21 +65,17 @@
 .spawn-button
   @extend .button
   @extend %background0-hover
-  width: 3rem
 
-.spawn-button span
-  width: 100%
-  text-align: center
+.spawn-button > img
+  padding: 1vw
 
 // Drag and drop target for deleting lines / proofs.
 .bin
   @extend .button
-  width: max(6vw,3rem)
   cursor: help
 
-.bin span
-  width: 100%
-  text-align: center
+.bin > img
+  padding: max(3vw,1.5rem)
 
 // Back / forward navigation buttons
 .navigation-button
