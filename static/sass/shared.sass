@@ -98,7 +98,6 @@ $sidebar-width-mobile: 70vw
   vertical-align: middle
   border: 1px solid
   border-radius: 6px
-  color: #24292e
   background-color: transparent
   transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1)
   text-decoration: none
@@ -108,18 +107,12 @@ $sidebar-width-mobile: 70vw
 
 // Disabled button
 .disabled, .button:disabled
-  color: #cccccc
-  background-color: #f5f5f5
-  border-color: #e0e0e0
-  cursor: not-allowed
+  background-color: $background1
+  font-weight: 300
   pointer-events: none
-  opacity: 0.6
-  box-shadow: none
 
-// Sets background0 on hover.
 %background0-hover:hover
   background-color: $background0
-
 
 // Sets background1 on hover.
 %background1-hover:hover
