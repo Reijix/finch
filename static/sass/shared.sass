@@ -59,14 +59,18 @@ $sidebar-width-mobile: 70vw
 // Invisible spacer rendered between proof lines, expands on hover.
 .drop-zone
   height: $drop-zone-height
-  transition: height 0.2s linear
   cursor: default
   width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
 
 // Expanded on hover.
-.expanded-drop-zone
-  height: $normal-text-size
+.drop-zone.expanded-drop-zone
+  height: calc(#{$normal-text-size} + 2 * #{$drop-zone-height})
+
+// Only animate when dragging, this cancels the animation on drop making
+// it look better.
+.dragging .drop-zone
+  transition: height 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)
 
 // -----------------------------------------------------------------------------
 // Icons

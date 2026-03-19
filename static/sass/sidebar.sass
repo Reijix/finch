@@ -177,7 +177,6 @@ details > summary > .summary-arrow
 .tooltip-container:has(.rule-button)
   width: 4rem
 
-
 // Full-width button for loading a predefined example proof; left-aligned text
 // to match a list-item appearance.
 .example-button
@@ -186,3 +185,13 @@ details > summary > .summary-arrow
   padding: 0.5vh 0.5vw
   width: 100%
   justify-content: left
+
+// Button like example-button but contains text and image, so add gap inbetween
+.source-button
+  @extend .example-button
+  gap: 1rem
+
+// and force a size for the icon
+.source-button > img
+  width: 1rem
+  height: 1rem

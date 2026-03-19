@@ -219,6 +219,7 @@ viewSidebar model =
       , viewRules model
       , viewExamples model
       , viewLogics model
+      , viewSource model
       ]
 
 -- | Wrapper for creating @<details>@ elements in the sidebar.
@@ -270,34 +271,6 @@ viewUsage =
             ["Check below how to write the symbols and how the rules are defined."]
         ]
     )
-
-{- | For use in 'viewSidebar', returns a list of buttons
-that enable the user to change the underlying logic of the proof checker.
--}
-viewLogics :: Model -> View Model Action
-viewLogics model =
-  viewDetails
-    "Logics"
-    "schema"
-    ( H.div_
-        [HP.class_ "column-sidebar-content"]
-        (map mkLogic [("First-order logic", FOL), ("Propositional Logic", Prop)])
-    )
- where
-  mkLogic :: (MisoString, Logic) -> View Model Action
-  mkLogic (description, l) =
-    H.a_
-      [ HP.class_ "example-button"
-      , HP.classList_ [("disabled", (model ^. logic) == l)]
-      , HP.href_ $
-          prettyURI $
-            URI
-              { uriPath = uriPath (model ^. uri)
-              , uriFragment = ""
-              , uriQueryString = one ("logic", Just $ show l)
-              }
-      ]
-      [text description]
 
 {- | For use in 'viewSidebar',
 returns a list of symbols that can be used, and on hover shows their aliases.
@@ -409,6 +382,62 @@ viewExamples model =
           [text . ms $ proofPreviewTex p]
       ]
 
+{- | For use in 'viewSidebar', returns a list of buttons
+that enable the user to change the underlying logic of the proof checker.
+-}
+viewLogics :: Model -> View Model Action
+viewLogics model =
+  viewDetails
+    "Logics"
+    "schema"
+    ( H.div_
+        [HP.class_ "column-sidebar-content"]
+        (map mkLogic [("First-order logic", FOL), ("Propositional Logic", Prop)])
+    )
+ where
+  mkLogic :: (MisoString, Logic) -> View Model Action
+  mkLogic (description, l) =
+    H.a_
+      [ HP.class_ "example-button"
+      , HP.classList_ [("disabled", (model ^. logic) == l)]
+      , HP.href_ $
+          prettyURI $
+            URI
+              { uriPath = uriPath (model ^. uri)
+              , uriFragment = ""
+              , uriQueryString = one ("logic", Just $ show l)
+              }
+      ]
+      [text description]
+
+{- | For use in 'viewSidebar', contains a link to the repository
+and the documentation.
+-}
+viewSource :: Model -> View Model Action
+viewSource model =
+  viewDetails
+    "Source"
+    "code"
+    ( H.div_
+        [HP.class_ "row-sidebar-content"]
+        [ H.a_
+            [HP.class_ "source-button", HP.href_ "https://github.com/Reijix/finch"]
+            [H.img_ [HP.src_ "github.svg"], text " Repository"]
+        , H.a_
+            [ HP.class_ "source-button"
+            , HP.href_
+                ( prettyURI $
+                    URI
+                      { uriPath = uriPath (model ^. uri) <> "docs"
+                      , uriFragment = ""
+                      , uriQueryString = mempty
+                      }
+                )
+            ]
+            [H.img_ [HP.src_ "haskell.svg"], "Documentation"]
+        ]
+    )
+
 ------------------------------------------------------------------------------------------
 
 -- ** Proof
@@ -423,7 +452,10 @@ viewProof model =
     , HE.onDragEnterWithOptions preventDefault DragLeave
     ]
     [ H.div_
-        [HP.class_ "proof-container", HE.onDragEnterWithOptions stopPropagation Nop]
+        [ HP.class_ "proof-container"
+        , HE.onDragEnterWithOptions stopPropagation Nop
+        , HP.classList_ [("dragging", model ^. dragging)]
+        ]
         [viewLineNos model, proofView, viewRuleApplications model]
     ]
  where
