@@ -72,8 +72,8 @@
   width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
 
-// background0 on hover.
-.formula-container:hover > .formula-input
+// background0 on hover, only when element is draggable.
+.draggable.formula-container:hover > .formula-input
   background-color: $background0
   transition: 0.1s linear
 
@@ -94,8 +94,8 @@
   border-left: $subproof-border
   margin-left: $formula-left-margin
 
-// TODO improve hover!
-.subproof > .subproof:not(:has(.subproof:hover,.formula-container:hover,.rule-container:hover,.drop-zone:not(.last-assumption):hover)):hover
+// background0 on hover, should not trigger when hovering any of its elements!
+.draggable.subproof:hover:not(:has(.subproof:hover,.formula-container:hover,.drop-zone:not(.last-assumption):hover))
   background-color: $background0
   transition: 0.1s linear
 

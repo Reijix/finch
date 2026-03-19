@@ -472,9 +472,11 @@ viewProof model =
       , HP.id_ . show $ pa PAProof
       ]
       (pa PAProof /= PAProof)
-      [ HP.class_ "draggable"
-      , HP.draggable_ (isNothing (model ^. focusedLine))
-      , HP.classList_ [("drag-target", Just (Right (pa PAProof)) == model ^. dragTarget)]
+      [ HP.draggable_ True
+      , HP.classList_
+          [ ("draggable", not (model ^. dragging))
+          , ("drag-target", Just (Right (pa PAProof)) == model ^. dragTarget)
+          ]
       , HE.onDragStartWithOptions stopPropagation . DragStart . Right $ pa PAProof
       , HE.onDragEndWithOptions defaultOptions DragEnd
       ]
@@ -705,7 +707,8 @@ viewLine model na e =
    in
     H.div_
       [ HP.class_ "formula-container"
-      , HP.class_ "draggable"
+      , HP.classList_
+          [("draggable", isNothing (model ^. focusedLine) && not (model ^. dragging))]
       , HP.class_ "tooltip-container"
       , HP.draggable_ (isNothing (model ^. focusedLine))
       , if model ^. focusedLine /= Just (Left na)
@@ -724,7 +727,6 @@ viewLine model na e =
           , HP.classList_
               [ ("has-error", hasError)
               , ("drag-target", Just (Left na) == model ^. dragTarget)
-              , ("draggable", Just (Left na) /= model ^. focusedLine)
               , ("focused", Just (Left na) == model ^. focusedLine)
               ]
           , HP.autocomplete_ False
