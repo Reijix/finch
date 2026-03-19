@@ -71,20 +71,17 @@ runApp = withJS $ do
   window <- jsg "window"
   uri <- getURI
 
-  _sidebarToggle :: Either MisoString Bool <- do
-    n <- sessionStorageLength
-    if n > 0
-      then getSessionStorage "sidebarToggle"
-      else pure $ Left ""
+  _sidebarToggle :: Maybe MisoString <- getSessionStorage "sidebarToggle"
 
   -- if storage could be found, take it, otherwise use a @media query
   -- to determine if sidebar should be initially open (on desktop) or closed (mobile).
   sidebarToggle <- case _sidebarToggle of
-    Right b -> pure b
-    s -> do
+    Just "True" -> pure True
+    Just "False" -> pure False
+    _ -> do
       isMobile :: Bool <-
         [js| return window.matchMedia("only screen and (max-width: 1200px)").matches; |]
-      setSessionStorage "sidebarToggle" (not isMobile)
+      setSessionStorage "sidebarToggle" (ms . show $ not isMobile)
       pure (not isMobile)
 
   -- set the initial model by checking if ?logic= and ?proof= are specified.
