@@ -238,7 +238,7 @@ viewDetails txt icon content =
     [HP.open_ True, HP.class_ "sidebar-element"]
     [ H.summary_
         [HP.class_ "sidebar-header"]
-        [ H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, text txt]
+        [ H.div_ [HP.class_ "icon-text"] [viewMaterialIcon icon, H.b_ [] [text txt]]
         , H.div_ [HP.class_ "summary-arrow"] [viewMaterialIcon "keyboard_arrow_down"]
         ]
     , content
@@ -253,24 +253,22 @@ viewUsage =
     "Usage Info"
     "info"
     ( H.ul_
-        [HP.class_ "column-sidebar-content"]
-        [ H.li_
-            []
-            ["Use the buttons at the top of the screen to add lines and subproofs."]
-        , H.li_
-            []
-            ["Drag lines and subproofs to modify the proof."]
-        , H.li_
-            []
-            ["Drag lines and subproofs to the trash can at the top to delete them."]
-        , H.li_
-            []
-            ["Click lines to edit their contents."]
-        , H.li_
-            []
-            ["Check below how to write the symbols and how the rules are defined."]
+        [HP.class_ "column-sidebar-content", HP.class_ "usage-info"]
+        [ mkLi "Drag" " the buttons at the top of the screen to insert lines and subproofs."
+        , mkLi "Drag" " lines and subproofs to modify the proof."
+        , mkLi "Drag" " lines and subproofs to the trash can at the top to delete them."
+        , mkLi "Click" " lines to edit their contents."
+        , mkLi "Check" " below to see how to write the symbols and how the rules are defined."
+        , mkLi "Share" " proofs by copying the URL."
+        , mkLi "On mobile" " long press to move subproofs."
         ]
     )
+ where
+  mkLi :: MisoString -> MisoString -> View Model Action
+  mkLi emph content =
+    H.li_
+      []
+      [viewMaterialIcon "keyboard_arrow_right", H.p_ [] [H.b_ [] [text emph], text content]]
 
 {- | For use in 'viewSidebar',
 returns a list of symbols that can be used, and on hover shows their aliases.
