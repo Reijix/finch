@@ -23,6 +23,13 @@ Visit the automatically hosted website at [finch.vatthauer.xyz](https://finch.va
 
 ---
 
+
+## Documentation
+
+Automatically generated haddock documentation is available at [finch.vatthauer.xyz/docs](https://finch.vatthauer.xyz/docs).
+
+---
+
 ## Setup
 
 ### Prerequisites
@@ -67,9 +74,3 @@ Afterwards you can run the test suite with:
 make test
 ```
 
----
-
-
-## Documentation
-
-Automatically generated haddock documentation is available at [finch.vatthauer.xyz/docs](https://finch.vatthauer.xyz/docs).
