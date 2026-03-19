@@ -26,6 +26,8 @@
   margin-top: 1vh
   margin-bottom: 1vh
   padding: 1vh
+  font-size: $normal-text-size
+  font-family: $font-ui
   background-color: $background2
   border-radius: 0.5vw
   display: flex
@@ -42,7 +44,6 @@
 
 // Column that holds the line numbers.
 .line-no-container
-  color: $line-number-text-color
   display: flex
   flex-direction: column
   width: 5%
@@ -50,10 +51,7 @@
 // Line number
 .line-no
   color: $line-number-text-color
-  padding: 0
-  margin: 0
-  font-size: $normal-text-size
-  font-family: $font-math
+
   user-select: none
 
 // -----------------------------------------------------------------------------
@@ -80,12 +78,9 @@
 // Input element for formulae.
 .formula-input
   border: none
-  color: $formula-text-color
   width: 100%
   padding-left: 0.3vw
   margin: 0
-  font-size: $normal-text-size
-  font-family: $font-math
 
 // Subproof with left border
 .subproof
@@ -126,8 +121,6 @@
 .empty-rule
   padding: 0
   margin: 0
-  font-family: $font-math
-  font-size: $normal-text-size
   height: fit-content
   user-select: none
 
@@ -149,10 +142,14 @@
 
 // Rule input field.
 .rule-input
-  color: $rule-text-color
   border: none
   width: 100%
   padding: 0
   margin: 0
-  font-family: $font-math
-  font-size: $normal-text-size
+
+
+// -----------------------------------------------------------------------------
+// Error tooltips
+// -----------------------------------------------------------------------------
+.rule-container > %tooltip, .formula-container > %tooltip
+  font-size: $error-text-size

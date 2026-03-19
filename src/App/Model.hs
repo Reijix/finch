@@ -56,12 +56,12 @@ canSpawnBefore _ _ = False
 data Action where
   -- | Start MathJAX on the given t'DOMRef'
   InitMathJAX :: DOMRef -> Action
-  {- | Open a @popover@ element with given @id@. Takes a t'Bool',
+  {- | Open the tooltip with given @id@. Takes a t'Bool',
   that turns the action into a Noop, when 'False'.
   -}
-  PopOpen :: MisoString -> Bool -> Action
-  -- | Close a @popover@ element with given @id@.
-  PopClose :: MisoString -> Action
+  OpenTooltip :: MisoString -> Bool -> Action
+  -- | Close the currently opened tooltip element with given @id@.
+  CloseTooltip :: Action
   -- | Toggle the sidebar.
   ToggleSidebar :: Action
   -- | Update the t'Proof'.
@@ -160,6 +160,8 @@ data Model = Model
   -- ^ t'URI' of the application.
   , _logic :: Logic
   -- ^ t'Logic' that the app currently uses.
+  , _currentTooltip :: Maybe MisoString
+  -- ^ @id@ of the currently opened tooltip
   }
   deriving (Eq)
 
@@ -208,6 +210,7 @@ initialModel emptyD initialP ps operators infixPreds quantifiers rules uri logic
     , _rules = rules
     , _uri = uri
     , _logic = logic
+    , _currentTooltip = Nothing
     }
 
 -- * Lenses

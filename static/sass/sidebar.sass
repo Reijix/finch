@@ -29,7 +29,6 @@
   padding: 2vh 0 2vh 0
   gap: 2vh
 
-  font-family: inherit
   font-size: $sidebar-heading-text-size
   border-right: 1px solid #e0e0e0
 
@@ -58,7 +57,6 @@
 // Container for sidebar elements, styled as a card.
 .sidebar-element
   background-color: $background2
-  color: $sidebar-text-color
   border: 1px solid #dadce0
   border-radius: 8px
   margin: 0px 16px
@@ -106,7 +104,6 @@ details > summary > .summary-arrow
 
 // container for the header
 .sidebar-header
-  font-family: inherit
   font-size: $sidebar-heading-text-size
   font-weight: 500
   display: flex
@@ -131,20 +128,18 @@ details > summary > .summary-arrow
   gap: 0.5vh
   display: flex
   justify-content: center
+  font-size: $sidebar-content-text-size
 
 // horizontal container, e.g. used for enumeration of rules.
 .row-sidebar-content
   @extend %sidebar-content
   flex-direction: row
   flex-wrap: wrap
-  font-size: $sidebar-content-text-size
 
 // vertical container, e.g. used for list of examples.
 .column-sidebar-content
   @extend %sidebar-content
   flex-direction: column
-  font-size: $sidebar-content-text-size
-
 
 // -----------------------------------------------------------------------------
 // Buttons
@@ -168,7 +163,7 @@ details > summary > .summary-arrow
 .rule-button
   @extend .button
   @extend %background1-hover
-  font-family: $font-math
+  font-family: $font-ui
   padding: 0.5vh 0.5vw
   width: 100%
   letter-spacing: 0.1em

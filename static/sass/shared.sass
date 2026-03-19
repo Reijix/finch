@@ -9,35 +9,39 @@
 // Variables
 // -----------------------------------------------------------------------------
 
+@font-face
+  font-family: "Fira Code"
+  src: url("fonts/FiraCode-VariableFont_wght.ttf")
+
+@font-face
+  font-family: "Inter"
+  src: url("fonts/Inter-VariableFont_opsz,wght.ttf")
+
 // Background colors:
 // background0 for the 'deepest' background
 // background2 for the 'highest' background
 $background0: #e9f1f4
 $background1: #f3f7fa
 $background2: #ffffff
-// Text & border colours
-$header-button-text-color: #344054
-$sidebar-text-color: black
+// Text & border colors
+$base-text-color: #000000
 $line-number-text-color: #4c4f69
-$formula-text-color: black
-$rule-text-color: black
 // Spacing
 $drop-zone-height: clamp(0.1rem, 2vh, 0.5rem)
 $formula-left-margin: 0.5rem
-// Typography
-$sidebar-heading-text-size: clamp(1rem, calc(1vw + 0.75rem), 1.125rem)
-$sidebar-content-text-size: smaller
-$normal-text-size: clamp(1.125rem, calc(2vw + 0.75rem), 1.5rem)
-$error-text-size: calc(#{$normal-text-size} - 0.5rem)
-$header-text-size: clamp(1.5rem, calc(2.5vw + 1rem), 2.25rem)
+// Text sizes
+$sidebar-heading-text-size: clamp(0.875rem, calc(1.2vw + 0.4rem), 1.25rem) // clamp(1.125rem, calc(1.5vw + 1rem), 1.375rem) //clamp(1rem, calc(1vw + 0.75rem), 1.125rem)
+$sidebar-content-text-size: clamp(0.75rem, calc(1vw + 0.4rem), 1.125rem)//clamp(1rem, calc(1vw + 1rem), 1.2rem)//smaller
+$normal-text-size: clamp(1.125rem, calc(1.5vw + 1rem), 1.375rem)// clamp(1.125rem, calc(2vw + 0.75rem), 1.5rem)
+$error-text-size: clamp(0.75rem, calc(0.5vw + 0.7rem), 0.875rem)//calc(#{$normal-text-size} - 0.5rem)
+$header-text-size: clamp(1.5rem, calc(2vw + 1rem), 2rem) // clamp(1.5rem, calc(2.5vw + 1rem), 2.25rem)
 $header-height: calc(#{$header-text-size} + 2vh)
-$subproof-border-size: 0.2rem
-$subproof-border: $subproof-border-size solid rgba(193, 201, 204, 1)
-$subproof-border-expanded: 0.3rem solid rgba(193, 201, 204, 1)
+// Subproof border, i.e. the subproof lines in fitch
+$subproof-border: 0.2rem solid #c1c9cc
 // Fonts
-$font-ui: "Fira Sans", system-ui, -apple-system, sans-serif
-$font-math: "Fira Sans", monospace
-// Sidebar widths — narrower on mobile to avoid covering the proof area.
+$font-ui: "Inter", system-ui, -apple-system, sans-serif
+$font-mono: "Fira Code", monospace
+// Sidebar widths, smaller on desktop because it is permanently shown
 $sidebar-width-desktop: 20vw
 $sidebar-width-mobile: 70vw
 
@@ -91,7 +95,6 @@ $sidebar-width-mobile: 70vw
   align-items: center
   outline: 0
   cursor: pointer
-  font-size: $error-text-size
   vertical-align: middle
   border: 1px solid
   border-radius: 6px
@@ -133,14 +136,28 @@ $sidebar-width-mobile: 70vw
 // Base styling of tooltips.
 %tooltip
   position: absolute
-  border: 1px solid
-  border-radius: 2px
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)
+  border-radius: 6px
   width: fit-content
   padding: 0.5vh 0.5vw
   white-space: pre
+  text-wrap: wrap
   background-color: $background2
-  color: #000
-  font-size: $error-text-size
+  color: #1f2937
+  opacity: 0
+  transition-property: opacity
+  transition-duration: 0.3s
+  transition-timing-function: ease-out
+  transition-behavior: allow-discrete
+
+%tooltip:popover-open
+  opacity: 1
+  transition-property: opacity
+  transition-duration: 0.3s
+  transition-timing-function: ease-out
+  transition-behavior: allow-discrete
+  @starting-style
+    opacity: 0
 
 // Hide tooltips that have no text content.
 %tooltip:empty
@@ -165,3 +182,6 @@ $sidebar-width-mobile: 70vw
 // Anchor of the tooltip, i.e. element that tooltip gets relatively position to.
 .tooltip-anchor
   anchor-name: --tooltip
+
+code
+  font-family: $font-mono

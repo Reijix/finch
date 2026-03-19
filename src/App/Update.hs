@@ -83,12 +83,12 @@ updateModel NavigateForward = io_ forward
 updateModel NavigateBackward = io_ back
 ------------------------------------
 -- Events that toggle UI elements
-updateModel (PopOpen name True) =
+updateModel (OpenTooltip name True) =
   use dragging >>= \case
     True -> pass
-    False -> io_ $ showPopover name
-updateModel (PopOpen _ False) = pass
-updateModel (PopClose name) = io_ $ hidePopover name
+    False -> showTooltip name
+updateModel (OpenTooltip _ False) = pass
+updateModel CloseTooltip = hideTooltip
 updateModel ToggleSidebar = do
   sidebarToggle %= not
   st <- use sidebarToggle
@@ -122,15 +122,13 @@ updateModel (DragEnter na) = do
           _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
-  io_ . hidePopover . ms $ show st
+  hideTooltip
   spawnType .= Just st
   dragging .= True
 updateModel (DragStart dt) = do
   dragTarget .= Just dt
   p <- use proof
-  whenLeftM_ (pure dt) $ \na ->
-    io_ $
-      hidePopover ("formula-error-" <> show (lineNoOr999 na p))
+  hideTooltip
   dragging .= True
 updateModel DragEnd = do
   chl <- use currentHoverLine
@@ -369,12 +367,24 @@ setFocus ea = do
     Right na -> io_ $ focus (mkRuleInputId na p)
 
 -- | Show the @<popover>@ with the given @id@.
-showPopover :: MisoString -> IO ()
-showPopover name = void $ getElementById name >>= \ref -> ref # "showPopover" $ ()
+showTooltip :: MisoString -> Effect ROOT Model Action
+showTooltip name = do
+  tt <- use currentTooltip
+  if tt == Just name
+    then pass
+    else do
+      io_ . void $ getElementById name >>= \ref -> ref # "showPopover" $ ()
+      currentTooltip .= Just name
 
 -- | Hide the @<popover>@ with the given @id@.
-hidePopover :: MisoString -> IO ()
-hidePopover name = void $ getElementById name >>= \ref -> ref # "hidePopover" $ ()
+hideTooltip :: Effect ROOT Model Action
+hideTooltip = do
+  tt <- use currentTooltip
+  case tt of
+    Nothing -> pass
+    Just name -> do
+      io_ . void $ getElementById name >>= \ref -> ref # "hidePopover" $ ()
+      currentTooltip .= Nothing
 
 -- * Parsing
 
