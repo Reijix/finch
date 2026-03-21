@@ -397,6 +397,7 @@ viewLogics model =
   mkLogic (description, l) =
     H.a_
       [ HP.class_ "example-button"
+      , HP.target_ "_blank"
       , HP.classList_ [("disabled", (model ^. logic) == l)]
       , HP.href_ $
           prettyURI $
@@ -419,10 +420,14 @@ viewSource model =
     ( H.div_
         [HP.class_ "row-sidebar-content"]
         [ H.a_
-            [HP.class_ "source-button", HP.href_ "https://github.com/Reijix/finch"]
+            [ HP.class_ "source-button"
+            , HP.href_ "https://github.com/Reijix/finch"
+            , HP.target_ "_blank"
+            ]
             [H.img_ [HP.src_ "icons/github.svg"], text " Repository"]
         , H.a_
             [ HP.class_ "source-button"
+            , HP.target_ "_blank"
             , HP.href_
                 ( prettyURI $
                     URI
