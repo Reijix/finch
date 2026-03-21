@@ -50,7 +50,11 @@ startAppWrapper window model =
     )
     $ (component model updateModel viewModel)
       { mount = Just Setup
-      , subs = [uriSub PopState, onKeyDownSub window]
+      , subs =
+          [ uriSub PopState
+          , onKeyDownSub window
+          , resizeSub window
+          ]
       }
 
 {- | Application entry point.
@@ -75,14 +79,13 @@ runApp = withJS $ do
 
   -- if storage could be found, take it, otherwise use a @media query
   -- to determine if sidebar should be initially open (on desktop) or closed (mobile).
-  sidebarToggle <- case _sidebarToggle of
-    Just "True" -> pure True
-    Just "False" -> pure False
-    _ -> do
-      isMobile :: Bool <-
-        [js| return window.matchMedia("only screen and (max-width: 1200px)").matches; |]
-      setSessionStorage "sidebarToggle" (ms . show $ not isMobile)
-      pure (not isMobile)
+  let sidebarToggle = case _sidebarToggle of
+        Just "True" -> Just True
+        Just "False" -> Just False
+        _ -> Nothing
+
+  onMobile :: Bool <-
+    [js| return window.matchMedia("only screen and (max-width: 1200px)").matches; |]
 
   -- set the initial model by checking if ?logic= and ?proof= are specified.
   model <- case join (uriQueryString uri !? "logic") of
@@ -96,7 +99,7 @@ runApp = withJS $ do
           decodeFromUrl . show
             =<< join
               (uriQueryString uri !? "proof")
-  startAppWrapper window (model sidebarToggle)
+  startAppWrapper window (model sidebarToggle onMobile)
 
 ------------------------------------------------------------------------------------------
 
@@ -112,7 +115,7 @@ Used for detecting presses of @(@ and @Enter@.
 onKeyDownSub :: DOMRef -> Sub Action
 onKeyDownSub window = createSub acquire (removeEventListener window "keydown")
  where
-  acquire = do
+  acquire =
     addEventListener window "keydown" $ \evt -> do
       domRef <- jsg "document" # "querySelector" $ (".focused" :: MisoString)
       isNull domRef >>= \case
@@ -142,5 +145,19 @@ onKeyDownSub window = createSub acquire (removeEventListener window "keydown")
 
           -- when 'Enter' is pressed, call blur on the element, to lose focus
           when (keyCode == 13) $ void $ callFunction domRef "blur" ()
+
+{- | Subscription for the resize event
+<https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport/resize_event>
+
+Dynamically adjusts the '_onMobile' field of the t'Model'
+-}
+resizeSub :: DOMRef -> Sub Action
+resizeSub window sink = createSub acquire (removeEventListener window "resize") sink
+ where
+  acquire = do
+    addEventListener window "resize" . const $ do
+      onMobile :: Bool <-
+        [js| return window.matchMedia("only screen and (max-width: 1200px)").matches; |]
+      sink (Resize onMobile)
 
 ------------------------------------------------------------------------------------------

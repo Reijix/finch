@@ -98,6 +98,10 @@ data Action where
   NavigateForward :: Action
   -- | Navigate backward in the history
   NavigateBackward :: Action
+  {- | Action fired when the window gets resized
+  <https://developer.mozilla.org/en-US/docs/Web/API/Window/resize_event>
+  -}
+  Resize :: Bool -> Action
   -- | No op.
   Nop :: Action
 
@@ -162,6 +166,8 @@ data Model = Model
   -- ^ t'Logic' that the app currently uses.
   , _currentTooltip :: Maybe MisoString
   -- ^ @id@ of the currently opened tooltip
+  , _onMobile :: Bool
+  -- ^ Responds to the current viewport, v'True' if viewport is small (on mobile)
   }
   deriving (Eq)
 
@@ -187,31 +193,45 @@ initialModel ::
   URI ->
   -- | Logic that the app uses.
   Logic ->
-  -- | initial state of '_sidebarToggle'
+  -- | Initial state of onMobile
+  Maybe Bool ->
+  -- | Possibly a previous sidebarToggle state.
   Bool ->
   -- | Initial t'Model' with sensible defaults
   Model
-initialModel emptyD initialP ps operators infixPreds quantifiers rules uri logic sidebarToggle =
-  Model
-    { _focusedLine = Nothing
-    , _exampleProofs = ps
-    , _emptyDerivation = emptyD
-    , _proof = initialP
-    , _sidebarToggle = sidebarToggle
-    , _dragTarget = Nothing
-    , _spawnType = Nothing
-    , _currentHoverLine = Nothing
-    , _dragging = False
-    , _operators = operators
-    , _infixPreds = infixPreds
-    , _quantifiers = quantifiers
-    , _functionSymbols = mempty
-    , _predicateSymbols = mempty
-    , _rules = rules
-    , _uri = uri
-    , _logic = logic
-    , _currentTooltip = Nothing
-    }
+initialModel
+  emptyD
+  initialP
+  ps
+  operators
+  infixPreds
+  quantifiers
+  rules
+  uri
+  logic
+  sidebarToggle
+  onMobile =
+    Model
+      { _focusedLine = Nothing
+      , _exampleProofs = ps
+      , _emptyDerivation = emptyD
+      , _proof = initialP
+      , _sidebarToggle = fromMaybe (not onMobile) sidebarToggle
+      , _dragTarget = Nothing
+      , _spawnType = Nothing
+      , _currentHoverLine = Nothing
+      , _dragging = False
+      , _operators = operators
+      , _infixPreds = infixPreds
+      , _quantifiers = quantifiers
+      , _functionSymbols = mempty
+      , _predicateSymbols = mempty
+      , _rules = rules
+      , _uri = uri
+      , _logic = logic
+      , _currentTooltip = Nothing
+      , _onMobile = onMobile
+      }
 
 -- * Lenses
 

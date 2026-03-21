@@ -75,6 +75,8 @@ updateModel (SetProof p) =
     proof .= p
     proofReparse
     updateProof
+    whenM (use onMobile) toggleSidebar
+updateModel (Resize b) = onMobile .= b
 ------------------------------------
 -- t'URI' events
 updateModel (PopState uri) = do
@@ -89,10 +91,7 @@ updateModel (OpenTooltip name True) =
     False -> showTooltip name
 updateModel (OpenTooltip _ False) = pass
 updateModel CloseTooltip = hideTooltip
-updateModel ToggleSidebar = do
-  sidebarToggle %= not
-  st <- use sidebarToggle
-  io_ $ setSessionStorage "sidebarToggle" (ms $ show st)
+updateModel ToggleSidebar = toggleSidebar
 ------------------------------------
 -- Drag n Drop events
 updateModel (Drop LocationBin) = do
@@ -385,6 +384,13 @@ hideTooltip = do
     Just name -> do
       io_ . void $ getElementById name >>= \ref -> ref # "hidePopover" $ ()
       currentTooltip .= Nothing
+
+-- | Flip the sidebar state and save it in sessionStorage
+toggleSidebar :: Effect ROOT Model Action
+toggleSidebar = do
+  sidebarToggle %= not
+  st <- use sidebarToggle
+  io_ $ setSessionStorage "sidebarToggle" (ms $ show st)
 
 -- * Parsing
 

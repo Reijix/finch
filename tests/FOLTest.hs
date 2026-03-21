@@ -70,7 +70,7 @@ readProof filePath = do
       pure . (^. proof) $
         execState
           checkProof
-          (initialModelFOL (URI "" "" mempty) (Just p) True)
+          (initialModelFOL (URI "" "" mempty) (Just p) Nothing False)
 
 ------------------------------------------------------------------------------------------
 
