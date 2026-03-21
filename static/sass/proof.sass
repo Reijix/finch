@@ -51,7 +51,6 @@
 // Line number
 .line-no
   color: $line-number-text-color
-
   user-select: none
 
 // -----------------------------------------------------------------------------
@@ -65,8 +64,6 @@
 
 // Wrapper for a single formula.
 .formula-container
-  display: flex
-  align-items: center
   width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
 
@@ -80,7 +77,6 @@
   border: none
   width: 100%
   padding-left: 0.3vw
-  margin: 0
 
 // Subproof with left border
 .subproof
@@ -95,9 +91,9 @@
   transition: 0.1s linear
 
 // Horizontal line below the last assumption.
-.last-assumption
+.drop-zone.last-assumption
   border-bottom: $subproof-border
-  margin-left: 0 !important
+  margin-left: 0
   margin-bottom: 5px
 
 // Spacer used when the last-assumption row is empty (no formula content)
@@ -107,7 +103,6 @@
 // Coloring of input fields with syntax/semantic errors.
 .rule-input.has-error, .formula-input.has-error
   color: rgb(255, 0, 0)
-
 
 // -----------------------------------------------------------------------------
 // Rule containers
@@ -119,20 +114,12 @@
 
 // Placeholder rendered in a rule cell when the row has no rule applied
 .empty-rule
-  padding: 0
-  margin: 0
   height: fit-content
   user-select: none
 
 // Rule container
 .rule-container
-  display: flex
-  align-items: center
   width: 100%
-  padding: 0
-  margin: 0
-  position: relative
-  background-color: transparent
   cursor: pointer
 
 // background0 on hover
@@ -144,8 +131,6 @@
 .rule-input
   border: none
   width: 100%
-  padding: 0
-  margin: 0
 
 
 // -----------------------------------------------------------------------------
