@@ -213,7 +213,7 @@ viewSidebar model =
     ]
     $ one
     $ H.div_
-      [ HP.class_ "sidebar-content"
+      [ HP.class_ "sidebar-container"
       ]
       [ viewNewProofButton model
       , viewUsage

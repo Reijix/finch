@@ -20,7 +20,7 @@
 
 // Sidebar content container, improves the way the sidebar slides open/closed, because the inner width is fixed.
 // If it was not fixed, the flexbox would dynamically shrink and look weird.
-.sidebar-content
+.sidebar-container
   box-sizing: border-box
   display: flex
   flex-direction: column
@@ -46,9 +46,12 @@
   .sidebar-open
     width: $sidebar-width-mobile
 
-  .sidebar-content
+  .sidebar-container
     width: $sidebar-width-mobile
 
+// all of the sidebar buttons should have a higher font-weight
+.sidebar-container .button
+  font-weight: 500
 
 // -----------------------------------------------------------------------------
 // Sidebar content
@@ -166,7 +169,6 @@ details > summary > .summary-arrow
 .rule-button
   @extend .button
   @extend %background1-hover
-  font-family: $font-ui
   padding: 0.5vh 0.5vw
   width: 100%
   letter-spacing: 0.1em
