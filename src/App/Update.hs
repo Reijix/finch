@@ -372,7 +372,7 @@ showTooltip name = do
   if tt == Just name
     then pass
     else do
-      io_ . void $ getElementById name >>= \ref -> ref # "showPopover" $ ()
+      io_ [js| let ref = document.getElementById(${name}); if (ref) { ref.showPopover() } |]
       currentTooltip .= Just name
 
 -- | Hide the @<popover>@ with the given @id@.
@@ -382,7 +382,7 @@ hideTooltip = do
   case tt of
     Nothing -> pass
     Just name -> do
-      io_ . void $ getElementById name >>= \ref -> ref # "hidePopover" $ ()
+      io_ [js| let ref = document.getElementById(${name}); if (ref) { ref.hidePopover() } |]
       currentTooltip .= Nothing
 
 -- | Flip the sidebar state and save it in sessionStorage

@@ -75,7 +75,6 @@
   border: none
   width: 100%
   padding-left: 0.3vw
-  line-height: 1
 
 // Subproof with left border
 .subproof
@@ -101,11 +100,7 @@
 
 // Coloring of input fields with syntax/semantic errors.
 .rule-input.has-error, .formula-input.has-error
-  background-color: rgba(255,0,0,0.15)
-  // color: rgb(255, 0, 0)
-
-.rule-container:hover > .rule-input.has-error, .formula-container:hover > .formula-input.has-error
-  background-color: rgba(255,0,0,0.2)
+  text-decoration-line: spelling-error
 
 // -----------------------------------------------------------------------------
 // Rule containers
@@ -136,9 +131,16 @@
   width: 100%
   line-height: 1
 
-
 // -----------------------------------------------------------------------------
 // Error tooltips
 // -----------------------------------------------------------------------------
 .rule-container > %tooltip, .formula-container > %tooltip
   font-size: $error-text-size
+
+// -----------------------------------------------------------------------------
+// Misc
+// -----------------------------------------------------------------------------
+
+// unify line-height of all text containers
+.formula-input, .rule-input, .line-no, .empty-rule
+  line-height: 1.4
