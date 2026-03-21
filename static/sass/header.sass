@@ -90,6 +90,31 @@
 // Right navigation button group
 // -----------------------------------------------------------------------------
 
+// Container for right side of the header
+.header-right-container
+  display: flex
+  flex-direction: row
+  align-items: center
+  gap: 2vw
+  height: 100%
+
+// Text displaying how many errors are left
+.error-number
+  text-align: center
+  font-size: $normal-text-size
+  user-select: none
+
+.error-number + p
+  font-size: $error-text-size
+
+// no errors remaining
+.error-number.success
+  color: green
+
+// some errors remaining
+.error-number.failure
+  color: red
+
 // Wraps the back/forward navigation buttons as a visually connected pill group.
 .navigation-container
   display: inline-flex

@@ -101,7 +101,11 @@
 
 // Coloring of input fields with syntax/semantic errors.
 .rule-input.has-error, .formula-input.has-error
-  color: rgb(255, 0, 0)
+  background-color: rgba(255,0,0,0.15)
+  // color: rgb(255, 0, 0)
+
+.rule-container:hover > .rule-input.has-error, .formula-container:hover > .formula-input.has-error
+  background-color: rgba(255,0,0,0.2)
 
 // -----------------------------------------------------------------------------
 // Rule containers

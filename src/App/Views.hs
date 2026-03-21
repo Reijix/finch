@@ -24,6 +24,7 @@ import Miso (
   onCreatedWith,
   onWithOptions,
   optionalAttrs,
+  optionalChildren,
   prettyURI,
   preventDefault,
   stopPropagation,
@@ -73,7 +74,7 @@ viewHeader model =
     [HP.class_ "header"]
     [ viewLogoHeader model
     , viewProofActionsHeader
-    , viewNavigationButtons
+    , viewHeaderRight model
     ]
 
 -- | Shows the logo in the 'viewHeader', together with a title and navigation buttons
@@ -85,6 +86,46 @@ viewLogoHeader model =
     , H.img_ [HP.src_ "icons/favicon.svg"]
     , H.h1_ [] ["Finch"]
     ]
+
+viewHeaderRight :: Model -> View Model Action
+viewHeaderRight model =
+  H.div_
+    [HP.class_ "header-right-container"]
+    [ viewErrorNumber model
+    , viewNavigationButtons
+    ]
+
+viewErrorNumber :: Model -> View Model Action
+viewErrorNumber model =
+  optionalChildren
+    H.div_
+    [ HP.class_ "tooltip-container"
+    , HE.onMouseOver (OpenTooltip "error-number" True)
+    , HE.onMouseOut CloseTooltip
+    ]
+    [ H.p_
+        [ HP.class_ "error-number"
+        , HP.class_ "tooltip-anchor"
+        , HP.classList_
+            [("success", errors == 0), ("failure", errors /= 0)]
+        ]
+        [ text $
+            if model ^. onMobile
+              then show errors
+              else errorText
+        ]
+    ]
+    (model ^. onMobile)
+    [ H.p_
+        [HP.id_ "error-number", HP.class_ "tooltip-bottom", textProp "popover" "hint"]
+        [text errorText]
+    ]
+ where
+  errors = proofErrors (model ^. proof)
+  errorText = case errors of
+    0 -> "No errors left."
+    1 -> "1 error left."
+    n -> show n <> " errors left."
 
 -- | Adds navigation @<button>@s for accessing the browsers history API.
 viewNavigationButtons :: View Model Action
@@ -137,7 +178,7 @@ viewBin =
     , H.p_
         [ HP.class_ "tooltip-bottom"
         , HP.id_ "bin"
-        , textProp "popover" "manual"
+        , textProp "popover" "hint"
         , HP.draggable_ False
         ]
         [text "Drag lines or subproofs here to delete them."]
@@ -170,7 +211,7 @@ viewSpawnNode tp title icon =
     , H.p_
         [ HP.class_ "tooltip-bottom"
         , HP.id_ (show tp)
-        , textProp "popover" "manual"
+        , textProp "popover" "hint"
         , HP.draggable_ False
         ]
         [text title]
@@ -290,29 +331,26 @@ viewGrammar model =
     )
  where
   viewSingleSymbol :: (Name, Name) -> View Model Action
-  viewSingleSymbol ("", symbol) =
-    H.button_
-      [ HP.class_ "symbol-button"
-      ]
-      [text $ ms symbol]
   viewSingleSymbol (alias, symbol) =
     H.div_
       [HP.class_ "tooltip-container"]
       [ H.button_
           [ HP.class_ "tooltip-anchor"
           , HP.class_ "symbol-button"
-          , HE.onMouseOver (OpenTooltip (ms alias) True)
+          , HE.onMouseOver (OpenTooltip id True)
           , HE.onMouseOut CloseTooltip
           ]
           [text $ ms symbol]
       , H.p_
           [ HP.class_ "tooltip-right"
-          , HP.id_ (ms alias)
-          , textProp "popover" "manual"
+          , HP.id_ id
+          , textProp "popover" "hint"
           , HP.draggable_ False
           ]
-          [text . ms $ "Alias: " <> alias]
+          [text $ if alias == "" then "No alias." else "Alias: " <> ms alias]
       ]
+   where
+    id = ms $ if alias == "" then symbol else alias
 
 {- | For use in 'viewSidebar',
 returns a list of the logic's rules, on hover shows the rule definition.
@@ -342,7 +380,7 @@ viewRules model =
           [ HP.class_ "tooltip-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
-          , textProp "popover" "manual"
+          , textProp "popover" "hint"
           , HP.draggable_ False
           ]
           [text . ms $ "\\[(\\mathrm{" <> name <> "})" <> ruleSpecTex rs <> "\\]"]
@@ -374,7 +412,7 @@ viewExamples model =
           [ HP.class_ "tooltip-right"
           , HP.id_ (ms name)
           , onCreatedWith InitMathJAX
-          , textProp "popover" "manual"
+          , textProp "popover" "hint"
           , HP.draggable_ False
           ]
           [text . ms $ proofPreviewTex p]
@@ -686,7 +724,7 @@ viewErrorBox name err =
   H.code_
     [ HP.class_ "tooltip-bottom"
     , HP.id_ name
-    , textProp "popover" "manual"
+    , textProp "popover" "hint"
     , HP.draggable_ False
     ]
     [text err]
@@ -712,7 +750,7 @@ viewLine model na e =
     H.div_
       [ HP.class_ "formula-container"
       , HP.classList_
-          [("draggable", isNothing (model ^. focusedLine) && not (model ^. dragging))]
+          [("draggable", (model ^. focusedLine /= Just (Left na)) && not (model ^. dragging))]
       , HP.class_ "tooltip-container"
       , HP.draggable_ (isNothing (model ^. focusedLine))
       , if model ^. focusedLine /= Just (Left na)
