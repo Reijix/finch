@@ -100,20 +100,32 @@
 
 // Text displaying how many errors are left
 .error-number
+  display: flex
+  justify-content: center
   text-align: center
   font-size: $normal-text-size
   user-select: none
+  height: 100%
 
+// gap next to icon
+.error-number > img
+    padding-right: min(1vw, 1vh)
+
+// tooltip styling
 .error-number + p
   font-size: $error-text-size
 
 // no errors remaining
 .error-number.success
   color: green
+.error-number.success > img
+    filter: invert(20%) sepia(82%) saturate(7128%) hue-rotate(123deg) brightness(98%) contrast(105%)
 
 // some errors remaining
 .error-number.failure
   color: red
+.error-number.failure > img
+    filter: invert(12%) sepia(73%) saturate(7418%) hue-rotate(6deg) brightness(110%) contrast(119%)
 
 // Wraps the back/forward navigation buttons as a visually connected pill group.
 .navigation-container

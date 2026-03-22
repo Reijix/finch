@@ -109,7 +109,7 @@ viewErrorNumber model =
         , HP.classList_
             [("success", errors == 0), ("failure", errors /= 0)]
         ]
-        [ text $
+        [ icon, text $
             if model ^. onMobile
               then show errors
               else errorText
@@ -121,11 +121,15 @@ viewErrorNumber model =
         [text errorText]
     ]
  where
+  icon =
+    if errors == 0
+      then viewMaterialIcon "check_circle"
+      else viewMaterialIcon "warning"
   errors = proofErrors (model ^. proof)
   errorText = case errors of
-    0 -> "No errors left."
-    1 -> "1 error left."
-    n -> show n <> " errors left."
+    0 -> "No errors found"
+    1 -> "1 error found"
+    n -> show n <> " errors found"
 
 -- | Adds navigation @<button>@s for accessing the browsers history API.
 viewNavigationButtons :: View Model Action
