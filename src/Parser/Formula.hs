@@ -131,7 +131,7 @@ pInfixPred = do
   t1 <- lexeme pTerm
   op <- lexeme pInfixPredName
   t2 <- lexeme pTerm
-  pure $ Pred op [t1, t2]
+  pure $ InfixPred op t1 t2
 
 {- | Parses an atomic t'RawFormula': a quantifier, infix predicate,
 parenthesised formula, constant, or predicate.

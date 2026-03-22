@@ -283,7 +283,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     collectTermsFormula ::
       [(Pos, Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec))] ->
       Map Name (NonEmpty (Pos, Term))
-    collectTermsFormula ((line, Right (Pred _ [p1, p2], FInfixPred _ q1 q2)) : rest) =
+    collectTermsFormula ((line, Right (InfixPred _ p1 p2, FInfixPred _ q1 q2)) : rest) =
       M.unionWith
         (<>)
         (collectTermsTerm [(line, p1, q1), (line, p2, q2)])
@@ -356,7 +356,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] ->
         Map Name (NonEmpty RawFormula)
       collectSimpleFormulae [] = mempty
-      collectSimpleFormulae (Right (Pred{}, (FPred{}; FInfixPred{})) : rest) =
+      collectSimpleFormulae (Right ((Pred{}; InfixPred{}), (FPred{}; FInfixPred{})) : rest) =
         collectSimpleFormulae rest
       collectSimpleFormulae (Right (Opr _ fs, FOpr _ fSpecs) : rest) =
         collectSimpleFormulae $ zipWith (curry Right) fs fSpecs <> rest
@@ -428,12 +428,12 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                     <> ") such that the equations\n"
                     <> n
                     <> prettyPrint sub
-                    <> " = "
+                    <> " == "
                     <> prettyPrint f
                     <> "\n"
                     <> n
                     <> prettyPrint sub
-                    <> " = "
+                    <> " == "
                     <> prettyPrint fOrig
                     <> "\nhold, but none found"
               else Right f'
@@ -528,7 +528,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       collectMoreFormulae formMap (_ : rest) = collectMoreFormulae formMap rest
       substBackwardsForm :: Subst Term -> RawFormula -> NonEmpty RawFormula
       substBackwardsForm s (InfixPred p t1 t2) =
-        fmap (Pred p) . allCombinations $ fmap (substBackwardsTerm s) [t1, t2]
+        fmap (\[t1', t2'] -> InfixPred p t1' t2') . allCombinations $
+          fmap (substBackwardsTerm s) [t1, t2]
       substBackwardsForm s (Pred p ts) =
         fmap (Pred p) . allCombinations $ fmap (substBackwardsTerm s) ts
       substBackwardsForm s (Opr o fs) =
@@ -766,6 +767,14 @@ regenerateSymbols p =
       Text ->
       RawFormula ->
       (Map Text (Int, Pos), Map Text (Int, Pos), Formula)
+    go n fsymbs psymbs txt formula@(InfixPred name a1 a2) =
+      let
+        -- first check function symbols
+        mTermError = goArgs n fsymbs [a1, a2]
+       in
+        case mTermError of
+          Left termError -> (fsymbs, psymbs, ParsedInvalid txt termError formula)
+          Right fsymbs' -> (fsymbs', psymbs, ParsedValid txt formula)
     go n fsymbs psymbs txt formula@(Pred name args) =
       let
         -- first check function symbols
