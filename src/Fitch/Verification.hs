@@ -62,11 +62,12 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
  where
   verifyRule :: Int -> Derivation -> Derivation
   verifyRule _ d@(Derivation _ (Unparsed{})) = d
-  verifyRule _ d@(Derivation f@(Unparsed{}) wr) =
+  verifyRule lineNo d@(Derivation f@(Unparsed{}) wr) =
     let (ruleText, ra) = case wr of
           (ParsedInvalid ruleText _ ra) -> (ruleText, ra)
           (ParsedValid ruleText ra) -> (ruleText, ra)
-     in Derivation f $ ParsedInvalid ruleText "Parse error in formula." ra
+     in Derivation f $
+          ParsedInvalid ruleText ("Error:\ninvalid formula at line " <> show lineNo) ra
   verifyRule ruleLine (Derivation wf wr) = Derivation wf
     $ either
       (\err -> ParsedInvalid ruleText err ra)
@@ -100,7 +101,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
     -- 1. Check that the rule exists.
     checkExistence :: Map Name RuleSpec -> Either Text RuleSpec
     checkExistence rules = case rules !? ruleName of
-      Nothing -> Left ("Rule (" <> ruleName <> ") does not exist.")
+      Nothing -> Left ("Error:\nrule (" <> ruleName <> ") does not exist")
       Just spec -> Right spec
     ---------------------------------------------------
 
@@ -112,10 +113,12 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         then Right (actual, expected)
         else
           Left $
-            "Rule cannot be applied to "
-              <> formulaText
-              <> "\nExpecting a formula of the form "
+            "Error:\nrule ("
+              <> ruleName
+              <> ") can only derive formulae of the form\n"
               <> prettyPrint expected
+              <> ",\nbut found\n"
+              <> prettyPrint actual
     ---------------------------------------------------
 
     ---------------------------------------------------
@@ -126,7 +129,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
       FormulaSpec ->
       Either Text (RawFormula, FormulaSpec)
     handleFormula line f fSpec = case f of
-      Unparsed{} -> Left $ "Unparsed formula at line " <> show line
+      Unparsed{} -> Left $ "Error:\ninvalid formula at line " <> show line
       ParsedInvalid txt err rf -> handleRawFormula rf
       ParsedValid txt rf -> handleRawFormula rf
      where
@@ -136,17 +139,16 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           then Right (rf, fSpec)
           else
             Left $
-              "Found "
+              "Error:\nfound "
                 <> prettyPrint rf
-                <> " at line "
+                <> "\nat line "
                 <> show line
-                <> ".\nBut expected a formula of the form "
+                <> ",\nbut expected a formula of the form\n"
                 <> prettyPrint fSpec
-                <> "."
     handleAssumption ::
       Int -> Assumption -> AssumptionSpec -> Either Text (RawAssumption, AssumptionSpec)
     handleAssumption line (a, _) aSpec = case a of
-      Unparsed{} -> Left $ "Unparsed assumption at line " <> show line
+      Unparsed{} -> Left $ "Error:\ninvalid formula at line " <> show line
       (ParsedInvalid txt err ra) -> handleRawAssumption ra
       (ParsedValid txt ra) -> handleRawAssumption ra
      where
@@ -156,13 +158,12 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           then Right (ra, aSpec)
           else
             Left $
-              "Found "
+              "Error:\nfound formula\n"
                 <> prettyPrint ra
-                <> " at line "
+                <> "\nat line "
                 <> show line
-                <> ".\nBut expected a formula of the form "
+                <> ",\nbut expected a formula of the form\n"
                 <> prettyPrint aSpec
-                <> "."
     unifyReferences ::
       Int ->
       RuleSpec ->
@@ -194,8 +195,16 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           Either Text [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)]
         handleProof (start, end) (SubProof fs ps (Derivation c r)) (fSpecs, cSpec)
           | length fs /= length fSpecs =
-              Left
-                "Number of assumptions of the subproof does not match the expected number."
+              Left $
+                "Error:\nsubproof at range "
+                  <> show start
+                  <> "-"
+                  <> show end
+                  <> "\nshould have "
+                  <> show (length fSpecs)
+                  <> " assumptions, but found "
+                  <> show (length fs)
+                  <> " assumptions"
           | otherwise = do
               (fs', fSpecs') <-
                 unzip . snd
@@ -210,57 +219,55 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
               pure $ zipWith (curry Left) fs' fSpecs' <> [Right (c', cSpec')]
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
-        "Rule ("
+        "Error:\nrule ("
           <> ruleName
           <> ") expects a single line at position "
           <> show n
-          <> " but got the range "
+          <> ",\nbut found the range "
           <> show start
           <> "-"
           <> show end
-          <> "."
     unifyReferences n (RuleSpec _ (_ : _) _) (LineReference line : refs) =
       Left $
-        "Rule ("
+        "Error:\nrule ("
           <> ruleName
           <> ") expects a line range at position "
           <> show n
-          <> " but got the single line "
+          <> ",\nbut found the single line "
           <> show line
-          <> "."
     unifyReferences n (RuleSpec (_ : fs) ps _) [] =
       Left $
-        "Rule ("
+        "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show (n + length fs + length ps + 1)
-          <> " references,\nbut got "
+          <> " references,\nbut found "
           <> show n
-          <> " references."
+          <> " references"
     unifyReferences n (RuleSpec [] (_ : ps) _) [] =
       Left $
-        "Rule ("
+        "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show (n + length ps + 1)
-          <> " references,\nbut got "
+          <> " references,\nbut found "
           <> show n
-          <> " references."
+          <> " references"
     unifyReferences n (RuleSpec [] [] _) (_ : refs) =
       Left $
-        "Rule ("
+        "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show n
-          <> " references,\nbut got "
+          <> " references,\nbut found "
           <> show (n + length refs + 1)
-          <> " references."
+          <> " references"
     unifyReferences _ (RuleSpec [] [] _) [] = Right []
     ---------------------------------------------------
 
     ---------------------------------------------------
     -- 4. Collect terms
-    collectTermsTerm :: [(Term, TermSpec)] -> Map Name [Term]
+    collectTermsTerm :: [(Term, TermSpec)] -> Map Name (NonEmpty Term)
     collectTermsTerm [] = mempty
     collectTermsTerm ((Fun _ ts, TFun _ ss) : rest) = collectTermsTerm (zip ts ss <> rest)
     collectTermsTerm ((t, TPlaceholder n) : rest) =
@@ -273,7 +280,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     collectTermsFormula ::
       [Either (RawAssumption, AssumptionSpec) (RawFormula, FormulaSpec)] ->
-      Map Name [Term]
+      Map Name (NonEmpty Term)
     collectTermsFormula (Right (Pred _ [p1, p2], FInfixPred _ q1 q2) : rest) =
       M.unionWith
         (<>)
@@ -302,29 +309,29 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
 
     ---------------------------------------------------
     -- 5. Verify term mappings
-    verifyTerms :: Map Name [Term] -> Either Text (Map Name Term)
+    verifyTerms :: Map Name (NonEmpty Term) -> Either Text (Map Name Term)
     verifyTerms m = fromList <$> mapM makeUnique (toPairs m)
      where
-      makeUnique :: (Name, [Term]) -> Either Text (Name, Term)
-      makeUnique (_, []) = Left "Internal error on makeUnique: should not happen!"
-      makeUnique (v, t : ts) = do
+      makeUnique :: (Name, NonEmpty Term) -> Either Text (Name, Term)
+      makeUnique (v, t :| ts) = do
         foldlM
           ( \lastTerm currTerm ->
               if lastTerm == currTerm
                 then Right currTerm
                 else
                   Left $
-                    "Error when trying to verify that\nall assignments of placeholder "
+                    "Error:\ntrying to verify that all assignments\nof placeholder "
                       <> v
-                      <> " are the same, found\n"
+                      <> " in rule ("
+                      <> ruleName
+                      <> ") are the same, but found\n"
                       <> v
                       <> "↦"
                       <> prettyPrint lastTerm
-                      <> " and\n"
+                      <> "\nand\n"
                       <> v
                       <> "↦"
                       <> prettyPrint currTerm
-                      <> "."
           )
           t
           ts
@@ -371,7 +378,7 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
         reduceHelper ::
           Name -> NonEmpty (Either RawFormula [RawFormula]) -> Either Text RawFormula
         reduceHelper n (Left f :| rest) = go n f rest
-        reduceHelper n (Right [] :| rest) = Left "Could not find match for formula."
+        reduceHelper n (Right [] :| rest) = Left "Error:\ncould not find match for formula."
         reduceHelper n (Right [f] :| rest) = case go n f rest of
           Left err -> Left $ "Error, can't find match for " <> prettyPrint f
           Right f -> Right f
