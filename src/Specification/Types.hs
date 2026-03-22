@@ -72,6 +72,10 @@ data Subst a
     Subst Name a
   deriving (Show, Eq)
 
+instance (PrettyPrint a) => PrettyPrint (Subst a) where
+  prettyPrint :: (PrettyPrint a) => Subst a -> Text
+  prettyPrint (Subst n t) = "[" <> prettyPrint t <> "/" <> n <> "]"
+
 infixl 9 ~>
 
 -- | Smart constructor for t'Subst'.
