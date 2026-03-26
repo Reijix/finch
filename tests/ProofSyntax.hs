@@ -268,8 +268,6 @@ prop_naRemoveShiftAssumption (PrettyProof p) =
         naLookup a <$> naRemove a p
       === Just ((`naLookup` p) =<< incrementNodeAddr a)
 
--- TODO test naRemove on conclusion!
-
 ------------------------------------------------------------------------------------------
 
 -- * Properties: naInsertBefore
@@ -329,7 +327,12 @@ prop_naInsertBeforeNaLookupDerivation (PrettyProof p) =
     (naLookup na <$> naInsertBefore' (Right $ derivation 0) na p)
       === (Just . Just . Right $ derivation 0)
 
--- TODO test inserting before NAConclusion and NAAfterConclusion
+-- | Inserting an element and then removing it should return the original proof.
+prop_naInsertBeforeRemove :: PrettyProof -> Property
+prop_naInsertBeforeRemove (PrettyProof p) =
+  forAll (arbitraryNodeAddrFor p anyKind) $ \na ->
+    (naInsertBefore (Right $ derivation 0) na p >>= uncurry naRemove)
+      === Just p
 
 ------------------------------------------------------------------------------------------
 
@@ -404,8 +407,6 @@ prop_compareLineNo (PrettyProof p) =
       compare a b
         === compare (fromNodeAddr a p) (fromNodeAddr b p)
 
--- TODO test compare of t'ProofAddr'
-
 ------------------------------------------------------------------------------------------
 
 -- * Properties: Line Range Conversion
@@ -456,6 +457,9 @@ naInsertBeforeQCTests =
     , QC.testProperty
         "prop_naInsertBeforeNaLookupDerivation"
         prop_naInsertBeforeNaLookupDerivation
+    , QC.testProperty
+        "prop_naInsertBeforeRemove"
+        prop_naInsertBeforeRemove
     ]
 
 -- | Tests for 'paMoveBefore'
