@@ -58,7 +58,7 @@ adding error messages to erroneous t'RuleApplication's
 __Note:__ This does not check freshness assumptions or check if arities are consistent.
 Use 'checkFreshness' and 'regenerateSymbols' for that.
 -}
-verifyProof :: Map Name RuleSpec -> Proof -> Proof
+verifyProof :: [(Name, RuleSpec)] -> Proof -> Proof
 verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
  where
   verifyRule :: Int -> Derivation -> Derivation
@@ -100,8 +100,8 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
           (formulaText, f, ruleText, ra)
     ---------------------------------------------------
     -- 1. Check that the rule exists.
-    checkExistence :: Map Name RuleSpec -> Either Text RuleSpec
-    checkExistence rules = case rules !? ruleName of
+    checkExistence :: [(Name, RuleSpec)] -> Either Text RuleSpec
+    checkExistence rules = case (fromList rules :: Map Name RuleSpec) !? ruleName of
       Nothing -> Left ("Error:\nrule (" <> ruleName <> ") does not exist")
       Just spec -> Right spec
     ---------------------------------------------------

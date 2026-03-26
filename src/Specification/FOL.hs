@@ -72,10 +72,26 @@ quantifiersFOL = [("forall", "∀"), ("exists", "∃")]
 
 Extends 'rulesProp' with rules for @∀@, @∃@ and @=@.
 -}
-rulesFOL :: Map Text RuleSpec
+rulesFOL :: [(Text, RuleSpec)]
 rulesFOL =
   rulesProp
-    <> [ ("=I", RuleSpec [] [] (FInfixPred "=" (TPlaceholder "E") (TPlaceholder "E")))
+    <> [
+         ( "∀I"
+         , RuleSpec
+             []
+             [([FFreshVar "c"], FSubst "φ" ("x" ~> "c"))]
+             (FQuantifier "∀" "x" phi)
+         )
+       , ("∀E", RuleSpec [FQuantifier "∀" "x" phi] [] (FSubst "φ" ("x" ~> "E")))
+       , ("∃I", RuleSpec [FSubst "φ" ("x" ~> "E")] [] (FQuantifier "∃" "x" phi))
+       ,
+         ( "∃E"
+         , RuleSpec
+             [FQuantifier "∃" "x" phi]
+             [([FFreshVar "c", AssumptionSpec $ FSubst "φ" ("x" ~> "c")], psi)]
+             psi
+         )
+       , ("=I", RuleSpec [] [] (FInfixPred "=" (TPlaceholder "E") (TPlaceholder "E")))
        ,
          ( "=E"
          , RuleSpec
@@ -84,22 +100,6 @@ rulesFOL =
              ]
              []
              (FSubst "φ" ("x" ~> "D"))
-         )
-       , ("∀E", RuleSpec [FQuantifier "∀" "x" phi] [] (FSubst "φ" ("x" ~> "E")))
-       ,
-         ( "∀I"
-         , RuleSpec
-             []
-             [([FFreshVar "c"], FSubst "φ" ("x" ~> "c"))]
-             (FQuantifier "∀" "x" phi)
-         )
-       , ("∃I", RuleSpec [FSubst "φ" ("x" ~> "E")] [] (FQuantifier "∃" "x" phi))
-       ,
-         ( "∃E"
-         , RuleSpec
-             [FQuantifier "∃" "x" phi]
-             [([FFreshVar "c", AssumptionSpec $ FSubst "φ" ("x" ~> "c")], psi)]
-             psi
          )
        ]
  where

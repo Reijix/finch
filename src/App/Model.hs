@@ -158,7 +158,7 @@ data Model = Model
   * arity :: Int
   * first occurence :: Pos
   -}
-  , _rules :: Map Name RuleSpec
+  , _rules :: [(Name, RuleSpec)]
   -- ^ A map that contains all rules, mapping their t'Name' to their t'RuleSpec'.
   , _uri :: URI
   -- ^ t'URI' of the application.
@@ -188,7 +188,7 @@ initialModel ::
   -- | A list of infix predicates (alias, predicate)
   [(Text, Text)] ->
   -- | The map of rules
-  Map Name RuleSpec ->
+  [(Name, RuleSpec)] ->
   -- | The current t'URI'
   URI ->
   -- | Logic that the app uses.
