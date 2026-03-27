@@ -130,7 +130,7 @@ $sidebar-width-mobile: 70vw
 
 // Base styling of tooltips.
 %tooltip
-  position: absolute
+  position: fixed
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)
   border-radius: 6px
   width: fit-content
@@ -144,6 +144,7 @@ $sidebar-width-mobile: 70vw
   transition-duration: 0.3s
   transition-timing-function: ease-out
   transition-behavior: allow-discrete
+  position-anchor: --tooltip
 
 %tooltip:popover-open
   opacity: 1
@@ -161,14 +162,16 @@ $sidebar-width-mobile: 70vw
 // Tooltip right of the element.
 .tooltip-right
   @extend %tooltip
-  position-area: right
-  position-anchor: --tooltip
+  left: anchor(right)
+  align-self: anchor-center
+  margin-left: 10px
 
 // Tooltip below the element.
 .tooltip-bottom
   @extend %tooltip
-  position-area: bottom
-  position-anchor: --tooltip
+  top: anchor(bottom)
+  justify-self: anchor-center
+  margin-top: 1px
 
 // Container of the tooltip, sets the scope.
 .tooltip-container
