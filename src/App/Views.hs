@@ -13,6 +13,7 @@ module App.Views where
 ------------------------------------------------------------------------------------------
 import App.Model
 import Data.List qualified as L
+import Data.Text qualified as T
 import Fitch.Proof
 import Miso (
   MisoString,
@@ -109,7 +110,8 @@ viewErrorNumber model =
         , HP.classList_
             [("success", errors == 0), ("failure", errors /= 0)]
         ]
-        [ icon, text $
+        [ icon
+        , text $
             if model ^. onMobile
               then show errors
               else errorText
@@ -210,6 +212,9 @@ viewSpawnNode tp title icon =
     , HE.onMouseOut CloseTooltip
     , HE.onDragStartWithOptions stopPropagation $ SpawnStart tp
     , HE.onDragEndWithOptions defaultOptions DragEnd
+    , -- this next line fixes an annoying bug that causes a seemingly random line to get dragEntered
+      -- as soon as hovering starts. Only happens on some viewports and only on chrome (on wayland)!
+      HE.onDragEnter EnableDrag
     ]
     [ viewMaterialIcon icon
     , H.p_
@@ -498,7 +503,7 @@ viewProof model =
     ]
     [ H.div_
         [ HP.class_ "proof-container"
-        , HE.onDragEnterWithOptions stopPropagation Nop
+        , HE.onDragEnterWithOptions stopPropagation EnableDrag
         , HP.classList_ [("dragging", model ^. dragging)]
         ]
         [viewLineNos model, proofView, viewRuleApplications model]
@@ -514,7 +519,7 @@ viewProof model =
     optionalAttrs
       H.div_
       [ HP.class_ "subproof"
-      , HP.id_ . show $ pa PAProof
+      , HP.id_ $ ms $ T.filter (/= ' ') (show $ pa PAProof)
       ]
       (pa PAProof /= PAProof)
       [ HP.draggable_ True
@@ -756,10 +761,13 @@ viewLine model na e =
       , HP.classList_
           [("draggable", (model ^. focusedLine /= Just (Left na)) && not (model ^. dragging))]
       , HP.class_ "tooltip-container"
-      , HP.draggable_ (isNothing (model ^. focusedLine))
+      , HP.draggable_ True
       , if model ^. focusedLine /= Just (Left na)
           then HE.onDragStartWithOptions stopPropagation $ DragStart (Left na)
           else HE.onDragStartWithOptions (stopPropagation <> preventDefault) Nop
+      , -- this next line fixes an annoying bug that causes a seemingly random line to get dragEntered
+        -- as soon as hovering starts. Only happens on some viewports and only on chrome (on wayland)!
+        HE.onDragEnter $ if (model ^. dragTarget) == Just (Left na) then EnableDrag else Nop
       , HE.onDragEndWithOptions defaultOptions DragEnd
       , HE.onMouseOver (OpenTooltip errorBoxId hasError)
       , HE.onMouseOut CloseTooltip
@@ -824,7 +832,7 @@ viewDropZoneAt ::
 viewDropZoneAt model mclass na =
   H.div_
     [ HP.class_ "drop-zone"
-    , HP.id_ (show na)
+    , HP.id_ $ ms $ T.filter (/= ' ') (show na)
     , HP.classList_
         [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
         , (fromMaybe "" mclass, isJust mclass)

@@ -102,33 +102,36 @@ updateModel (Drop LocationBin) = do
     Just (Right pa) -> proof %=? paRemove pa
   clearDrag >> updateProof
 updateModel (Drop (LineAddr targetAddr)) = dropBeforeLine targetAddr
-updateModel (DragEnter na) = do
-  p <- use proof
-  use spawnType
-    >>= \case
-      Just (canSpawnBefore na -> True) ->
-        currentHoverLine .= Just na
-      Just (canSpawnBefore na -> False) ->
-        currentHoverLine .= Nothing
-      Nothing ->
-        use dragTarget >>= \case
-          Just (Left (flip (naCanMoveBefore p) na -> True)) -> currentHoverLine .= Just na
-          Just (Right sourcePA) -> case paFromNA na p of
-            Nothing -> currentHoverLine .= Nothing
-            Just targetPA ->
-              currentHoverLine
-                .= if paCanMoveBefore sourcePA targetPA then Just na else Nothing
-          _ -> currentHoverLine .= Nothing
+updateModel EnableDrag = allowDrag .= True
+updateModel (DragEnter na) =
+  whenM
+    (liftA2 (||) (use onMobile) (use allowDrag))
+    $ do
+      p <- use proof
+      use spawnType
+        >>= \case
+          Just (canSpawnBefore na -> True) ->
+            currentHoverLine .= Just na
+          Just (canSpawnBefore na -> False) ->
+            currentHoverLine .= Nothing
+          Nothing ->
+            use dragTarget >>= \case
+              Just (Left (flip (naCanMoveBefore p) na -> True)) -> currentHoverLine .= Just na
+              Just (Right sourcePA) -> case paFromNA na p of
+                Nothing -> currentHoverLine .= Nothing
+                Just targetPA ->
+                  currentHoverLine
+                    .= if paCanMoveBefore sourcePA targetPA then Just na else Nothing
+              _ -> currentHoverLine .= Nothing
 updateModel DragLeave = currentHoverLine .= Nothing
 updateModel (SpawnStart st) = do
   hideTooltip
-  spawnType .= Just st
   dragging .= True
+  spawnType .= Just st
 updateModel (DragStart dt) = do
-  dragTarget .= Just dt
-  p <- use proof
   hideTooltip
   dragging .= True
+  dragTarget .= Just dt
 updateModel DragEnd = do
   chl <- use currentHoverLine
   whenJust chl dropBeforeLine
@@ -249,6 +252,7 @@ clearDrag = do
   dragging .= False
   dragTarget .= Nothing
   spawnType .= Nothing
+  allowDrag .= False
 
 -- | Takes a t'URI' and reads in a proof if it contains one.
 readURI :: URI -> Effect ROOT Model Action

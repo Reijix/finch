@@ -102,6 +102,10 @@ data Action where
   <https://developer.mozilla.org/en-US/docs/Web/API/Window/resize_event>
   -}
   Resize :: Bool -> Action
+  {- | Used for fixing a bug where random elements get dragEntered, we dont allow dragEnter, until
+  the dragStart element has received a dragEnter
+  -}
+  EnableDrag :: Action
   -- | No op.
   Nop :: Action
 
@@ -168,6 +172,7 @@ data Model = Model
   -- ^ @id@ of the currently opened tooltip
   , _onMobile :: Bool
   -- ^ Responds to the current viewport, v'True' if viewport is small (on mobile)
+  , _allowDrag :: Bool
   }
   deriving (Eq)
 
@@ -231,6 +236,7 @@ initialModel
       , _logic = logic
       , _currentTooltip = Nothing
       , _onMobile = onMobile
+      , _allowDrag = False
       }
 
 -- * Lenses
