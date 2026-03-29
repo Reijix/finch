@@ -53,10 +53,10 @@ $sidebar-width-mobile: 70vw
 
 // Adds a grab/move cursor
 .draggable
-  cursor: move !important
+  cursor: move
   /* fallback if grab cursor is unsupported */
-  cursor: grab !important
-  cursor: -webkit-grab !important
+  cursor: grab
+  cursor: -webkit-grab
 
 // Highlights the line that is currently being hovered over as a drop target.
 .drag-target
@@ -65,6 +65,10 @@ $sidebar-width-mobile: 70vw
 // Invisible spacer rendered between proof lines, expands on hover.
 .drop-zone
   height: $drop-zone-height
+
+// reset cursor on non draggable drop-zones
+// to hide the draggable cursor of its container
+.drop-zone:not(.draggable)
   cursor: default
 
 // Expanded on hover.

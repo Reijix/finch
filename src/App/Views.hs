@@ -55,7 +55,12 @@ containing a sidebar, the proof workspace and a header.
 viewModel :: Model -> View Model Action
 viewModel model =
   H.div_
-    [HP.class_ "app-container"]
+    [ HP.class_ "app-container"
+    , -- This is needed to fix a bug, where on dragStart, we instantly get a random
+      -- dragEnter fired in the middle of the screen.
+      -- Possibly this bug only occurs on wayland.
+      HE.onDragEnter DragLeave
+    ]
     [ viewHeader model
     , H.div_
         [HP.class_ "content-container"]
@@ -171,7 +176,6 @@ viewBin :: View Model Action
 viewBin =
   H.div_
     [ HE.onDragOverWithOptions preventDefault Nop
-    , HE.onDragEnterWithOptions preventDefault Nop
     , HE.onDragLeaveWithOptions preventDefault Nop
     , HP.class_ "tooltip-container"
     , HP.class_ "tooltip-anchor"
@@ -212,9 +216,6 @@ viewSpawnNode tp title icon =
     , HE.onMouseOut CloseTooltip
     , HE.onDragStartWithOptions stopPropagation $ SpawnStart tp
     , HE.onDragEndWithOptions defaultOptions DragEnd
-    , -- this next line fixes an annoying bug that causes a seemingly random line to get dragEntered
-      -- as soon as hovering starts. Only happens on some viewports and only on chrome (on wayland)!
-      HE.onDragEnter EnableDrag
     ]
     [ viewMaterialIcon icon
     , H.p_
@@ -256,7 +257,6 @@ viewSidebar :: Model -> View Model Action
 viewSidebar model =
   H.div_
     [ HP.class_ "sidebar"
-    , HE.onDragEnterWithOptions (preventDefault <> stopPropagation) DragLeave
     , HP.classList_
         [ ("sidebar-closed", not (model ^. sidebarToggle))
         ]
@@ -499,11 +499,9 @@ viewProof :: Model -> View Model Action
 viewProof model =
   H.div_
     [ HP.class_ "proof-container-border"
-    , HE.onDragEnterWithOptions preventDefault DragLeave
     ]
     [ H.div_
         [ HP.class_ "proof-container"
-        , HE.onDragEnterWithOptions stopPropagation EnableDrag
         , HP.classList_ [("dragging", model ^. dragging)]
         ]
         [viewLineNos model, proofView, viewRuleApplications model]
@@ -765,9 +763,7 @@ viewLine model na e =
       , if model ^. focusedLine /= Just (Left na)
           then HE.onDragStartWithOptions stopPropagation $ DragStart (Left na)
           else HE.onDragStartWithOptions (stopPropagation <> preventDefault) Nop
-      , -- this next line fixes an annoying bug that causes a seemingly random line to get dragEntered
-        -- as soon as hovering starts. Only happens on some viewports and only on chrome (on wayland)!
-        HE.onDragEnter $ if (model ^. dragTarget) == Just (Left na) then EnableDrag else Nop
+      , HE.onDragEnterWithOptions (preventDefault <> stopPropagation) Nop
       , HE.onDragEndWithOptions defaultOptions DragEnd
       , HE.onMouseOver (OpenTooltip errorBoxId hasError)
       , HE.onMouseOut CloseTooltip
@@ -813,7 +809,7 @@ viewLine model na e =
 see <https://fonts.google.com/icons>
 -}
 viewMaterialIcon :: MisoString -> View Model Action
-viewMaterialIcon name = H.img_ [HP.src_ $ "icons/" <> name <> ".svg"]
+viewMaterialIcon name = H.img_ [HP.draggable_ False, HP.src_ $ "icons/" <> name <> ".svg"]
 
 {- |
 Shows a dropzone for the given t'NodeAddr',
@@ -841,7 +837,7 @@ viewDropZoneAt model mclass na =
     , HP.draggable_ (isNothing mclass) -- true to overshadow the draggable of subproof
     , HE.onDragStartWithOptions (preventDefault <> stopPropagation) Nop
     , HE.onDragOverWithOptions preventDefault Nop
-    , HE.onDragEnterWithOptions preventDefault (DragEnter na)
+    , HE.onDragEnterWithOptions (preventDefault <> stopPropagation) (DragEnter na)
     , HE.onDropWithOptions defaultOptions (Drop (LineAddr na))
     ]
     []

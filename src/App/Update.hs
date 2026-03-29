@@ -102,7 +102,6 @@ updateModel (Drop LocationBin) = do
     Just (Right pa) -> proof %=? paRemove pa
   clearDrag >> updateProof
 updateModel (Drop (LineAddr targetAddr)) = dropBeforeLine targetAddr
-updateModel EnableDrag = allowDrag .= True
 updateModel (DragEnter na) =
   whenM
     (liftA2 (||) (use onMobile) (use allowDrag))

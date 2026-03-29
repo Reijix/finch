@@ -102,10 +102,6 @@ data Action where
   <https://developer.mozilla.org/en-US/docs/Web/API/Window/resize_event>
   -}
   Resize :: Bool -> Action
-  {- | Used for fixing a bug where random elements get dragEntered, we dont allow dragEnter, until
-  the dragStart element has received a dragEnter
-  -}
-  EnableDrag :: Action
   -- | No op.
   Nop :: Action
 
