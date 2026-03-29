@@ -78,8 +78,12 @@
 // Subproof with left border
 .subproof
   position: relative
-  width: calc(100% - #{$formula-left-margin})
   border-left: $subproof-border
+
+// Add a left margin to drop zones and to subproofs
+// to make subproof dragging easier.
+.subproof .drop-zone:not(.last-assumption), .subproof .subproof
+  width: calc(100% - #{$formula-left-margin})
   margin-left: $formula-left-margin
 
 // background0 on hover, should not trigger when hovering any of its elements!
