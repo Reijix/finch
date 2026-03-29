@@ -696,6 +696,7 @@ viewRuleApplications model =
         , H.input_
             [ HP.class_ "rule-input"
             , HP.spellcheck_ False
+            , HP.placeholder_ "    "
             , HP.id_ inputId
             , HP.class_ "tooltip-anchor"
             , HP.classList_
@@ -772,6 +773,7 @@ viewLine model na e =
       [ H.input_
           [ HP.inert_ (Just (Left na) /= model ^. focusedLine)
           , HP.id_ inputId
+          , HP.placeholder_ "    "
           , HP.spellcheck_ False
           , HP.class_ "formula-input"
           , HP.class_ "tooltip-anchor"
