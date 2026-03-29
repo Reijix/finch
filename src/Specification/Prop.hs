@@ -64,7 +64,7 @@ rulesProp =
     , RuleSpec [phi ∨ psi] [([AssumptionSpec phi], chi), ([AssumptionSpec psi], chi)] chi
     )
   , ("→I", RuleSpec [] [([AssumptionSpec phi], psi)] (phi ↝ psi))
-  , ("→E", RuleSpec [phi, phi ↝ psi] [] psi)
+  , ("→E", RuleSpec [phi ↝ psi, phi] [] psi)
   ]
  where
   phi = FPlaceholder "φ"
@@ -131,8 +131,8 @@ exampleProofsProp =
         ||---
         |||¬B
         |||---
-        |||¬A   (→E) 3,1
-        |||⊥    (¬E) 2, 4
+        |||¬A   (→E) 1,3
+        |||⊥    (¬E) 2,4
         ||¬¬B   (¬I) 3-5
         ||B     (¬¬E) 6
         | A → B (→I) 2-7

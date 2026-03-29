@@ -148,7 +148,7 @@ pRawFormula :: (FormulaParser m) => m RawFormula
 pRawFormula = do
   ops <- gets operators
   let operatorTable =
-        [ concatMap
+        ( map
             ( \(alias, u, arity) ->
                 if arity == 1
                   then
@@ -158,17 +158,17 @@ pRawFormula = do
                   else []
             )
             ops
-        , concatMap
-            ( \(alias, b, arity) ->
-                if arity == 2
-                  then
-                    [ binary alias (\f1 f2 -> Opr b [f1, f2])
-                    , binary b (\f1 f2 -> Opr b [f1, f2])
-                    ]
-                  else []
-            )
-            ops
-        ]
+            <> map
+              ( \(alias, b, arity) ->
+                  if arity == 2
+                    then
+                      [ binary alias (\f1 f2 -> Opr b [f1, f2])
+                      , binary b (\f1 f2 -> Opr b [f1, f2])
+                      ]
+                    else []
+              )
+              ops
+        )
    in makeExprParser pFormulaAtomic operatorTable <?> "formula"
 
 ------------------------------------------------------------------------------------------
