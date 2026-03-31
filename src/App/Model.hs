@@ -168,7 +168,6 @@ data Model = Model
   -- ^ @id@ of the currently opened tooltip
   , _onMobile :: Bool
   -- ^ Responds to the current viewport, v'True' if viewport is small (on mobile)
-  , _allowDrag :: Bool
   }
   deriving (Eq)
 
@@ -232,7 +231,6 @@ initialModel
       , _logic = logic
       , _currentTooltip = Nothing
       , _onMobile = onMobile
-      , _allowDrag = False
       }
 
 -- * Lenses
