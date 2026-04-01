@@ -502,7 +502,8 @@ viewProof model =
     ]
     [ H.div_
         [ HP.class_ "proof-container"
-        , HP.classList_ [("dragging", model ^. dragging)]
+        , HP.classList_
+            [("dragging", model ^. dragging)]
         ]
         [viewLineNos model, proofView, viewRuleApplications model]
     ]
@@ -588,8 +589,16 @@ viewLineNos model =
     one $
       goProof 1 id (model ^. proof)
  where
-  lineNoFor :: Int -> View Model Action
-  lineNoFor = H.p_ [HP.class_ "line-no", HP.draggable_ False] . one . text . ms
+  lineNoFor :: NodeAddr -> Int -> View Model Action
+  lineNoFor na =
+    H.p_
+      [ HP.class_ "line-no"
+      , HP.draggable_ False
+      , HP.classList_ [("dragged", model ^. dragTarget == Just (Left na))]
+      ]
+      . one
+      . text
+      . ms
   goProof :: Int -> (NodeAddr -> NodeAddr) -> Proof -> View Model Action
   goProof lineNo na (SubProof fs ps c) =
     H.div_
@@ -618,7 +627,10 @@ viewLineNos model =
       )
    where
     ((lineNo', _), goFs) =
-      mapAccumL (\(lineNo, d) f -> ((lineNo + 1, d + 1), lineNoFor lineNo)) (lineNo, 0) fs
+      mapAccumL
+        (\(lineNo, d) f -> ((lineNo + 1, d + 1), lineNoFor (na $ NAAssumption d) lineNo))
+        (lineNo, 0)
+        fs
     ((lineNo'', _), goPs) =
       mapAccumL
         ( \(lineNo, n) e ->
@@ -631,7 +643,7 @@ viewLineNos model =
         ps
     goC = goDerivation lineNo'' (na NAConclusion) c
   goDerivation :: Int -> NodeAddr -> Derivation -> View Model Action
-  goDerivation lineNo _ _ = lineNoFor lineNo
+  goDerivation lineNo na _ = lineNoFor na lineNo
 
 {- | For use in 'viewProof',
 returns a list of t'RuleApplication's (judgements),
@@ -670,7 +682,14 @@ viewRuleApplications model =
             )
       )
    where
-    goFs = map (const $ H.p_ [HP.class_ "empty-rule"] [textRaw "\160"]) fs
+    goFs =
+      map
+        ( const $
+            H.p_
+              [HP.class_ "empty-rule"]
+              [textRaw "\160"]
+        )
+        fs
     goPs =
       snd $
         mapAccumL
@@ -691,6 +710,7 @@ viewRuleApplications model =
         , HP.class_ "rule-container"
         , HP.class_ "tooltip-container"
         , HE.onClick $ Focus (Right na)
+        , HP.classList_ [("dragged", model ^. dragTarget == Just (Left na))]
         ]
         [ viewErrorBox errorBoxId err
         , H.input_
@@ -758,7 +778,9 @@ viewLine model na e =
     H.div_
       [ HP.class_ "formula-container"
       , HP.classList_
-          [("draggable", (model ^. focusedLine /= Just (Left na)) && not (model ^. dragging))]
+          [ ("draggable", (model ^. focusedLine /= Just (Left na)) && not (model ^. dragging))
+          , ("dragged", model ^. dragTarget == Just (Left na))
+          ]
       , HP.class_ "tooltip-container"
       , HP.draggable_ True
       , if model ^. focusedLine /= Just (Left na)

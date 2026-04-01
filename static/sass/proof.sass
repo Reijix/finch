@@ -151,3 +151,12 @@
 // Overwrite draggable drop-zone
 .rules-container .drop-zone.draggable, .line-no-container .drop-zone.draggable
   cursor: default
+
+.dragged
+  display: none
+
+.drop-zone:has( + .dragged)
+  padding-bottom: calc(#{$normal-text-size} + 2 * #{$drop-zone-height})
+
+.drop-zone
+  padding: 0

@@ -77,8 +77,10 @@ $sidebar-width-mobile: 70vw
 
 // Only animate when dragging, this cancels the animation on drop making
 // it look better.
+.drop-zone
+  transition: padding-bottom 0.3s ease-out
 .dragging .drop-zone
-  transition: height 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+  transition: height 0.3s ease-out
 
 // -----------------------------------------------------------------------------
 // Icons
