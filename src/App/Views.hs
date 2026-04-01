@@ -780,6 +780,7 @@ viewLine model na e =
       , HP.classList_
           [ ("draggable", (model ^. focusedLine /= Just (Left na)) && not (model ^. dragging))
           , ("dragged", model ^. dragTarget == Just (Left na))
+          , ("failed-drop", model ^. lastDragged == Just na)
           ]
       , HP.class_ "tooltip-container"
       , HP.draggable_ True
@@ -857,6 +858,7 @@ viewDropZoneAt model mclass na =
         [ ("expanded-drop-zone", model ^. currentHoverLine == Just na)
         , (fromMaybe "" mclass, isJust mclass)
         , ("draggable", isJust mclass && not (isNAAssumption na))
+        , ("failed-drop", model ^. lastDragged == Just na)
         ]
     , HP.draggable_ (isNothing mclass) -- true to overshadow the draggable of subproof
     , HE.onDragStartWithOptions (preventDefault <> stopPropagation) Nop

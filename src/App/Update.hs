@@ -127,6 +127,7 @@ updateModel (SpawnStart st) = do
 updateModel (DragStart dt) = do
   hideTooltip
   dragging .= True
+  lastDragged .= Nothing
   dragTarget .= Just dt
 updateModel DragEnd = do
   chl <- use currentHoverLine
@@ -317,11 +318,12 @@ naReparseLine na =
 dropBeforeLine :: NodeAddr -> Effect ROOT Model Action
 dropBeforeLine targetAddr = do
   m <- get
+  p <- use proof
   use dragTarget >>= \case
     Nothing -> pass
     Just (Left na) -> do
       use proof >>= \p -> case naMoveBefore targetAddr na p of
-        Nothing -> pass
+        Nothing -> lastDragged .= Just na
         Just (ta, p) -> do
           proof %= const p
           naReparseLine ta

@@ -126,6 +126,8 @@ data Model = Model
   -- ^ v'True' if the sidebar is open.
   , _dragTarget :: Maybe (Either NodeAddr ProofAddr)
   -- ^ t'Assumption', t'Derivation' or t'Proof' that is currently being dragged.
+  , _lastDragged :: Maybe NodeAddr
+  -- ^ last node that was dragged
   , _spawnType :: Maybe SpawnType
   -- ^ Type of element to be spawned.
   , _currentHoverLine :: Maybe NodeAddr
@@ -218,6 +220,7 @@ initialModel
       , _proof = initialP
       , _sidebarToggle = fromMaybe (not onMobile) sidebarToggle
       , _dragTarget = Nothing
+      , _lastDragged = Nothing
       , _spawnType = Nothing
       , _currentHoverLine = Nothing
       , _dragging = False
