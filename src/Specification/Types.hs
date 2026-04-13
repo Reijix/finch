@@ -131,10 +131,10 @@ instance PrettyPrint FormulaSpec where
     go _ (FPred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
     go _ (FPlaceholder n) = n
     go _ (FSubst f (Subst n t)) = f <> "[" <> n <> " ↦ " <> t <> "]"
+    go _ (FOpr op []) = op
+    go _ (FOpr op [f]) = op <> go True f
     go True f = "(" <> go False f <> ")"
     go False (FInfixPred p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
-    go False (FOpr op []) = op
-    go False (FOpr op [f]) = op <> go True f
     go False (FOpr op [f1, f2]) = go True f1 <> " " <> op <> " " <> go True f2
     go False (FOpr op fs) = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (FQuantifier q v f) = q <> " " <> v <> ". " <> prettyPrint f

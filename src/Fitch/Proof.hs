@@ -175,12 +175,12 @@ instance PrettyPrint RawFormula where
     go :: Bool -> RawFormula -> Text
     go _ (Pred p []) = p
     go _ (Pred p ts) = p <> "(" <> T.intercalate "," (map prettyPrint ts) <> ")"
+    go _ (Opr op []) = op
+    go _ (Opr op [f]) = op <> go True f
     go True f = "(" <> go False f <> ")"
     go False (InfixPred p t1 t2) = prettyPrint t1 <> " " <> p <> " " <> prettyPrint t2
-    go False (Opr op fs)
-      | null fs = op
-      | length fs == 2 = T.intercalate op (map (go True) fs)
-      | otherwise = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
+    go False (Opr op [f1, f2]) = go True f1 <> " " <> op <> " " <> go True f2
+    go False (Opr op fs) = op <> "(" <> T.intercalate "," (map prettyPrint fs) <> ")"
     go False (Quantifier q v f) = q <> v <> "." <> prettyPrint f
 
 -- | A reference to either a single line or a whole subproof.
