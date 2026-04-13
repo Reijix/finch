@@ -93,6 +93,7 @@ viewLogoHeader model =
     , H.h1_ [] ["Finch"]
     ]
 
+-- | Container for right-hand-side header buttons.
 viewHeaderRight :: Model -> View Model Action
 viewHeaderRight model =
   H.div_
@@ -101,6 +102,7 @@ viewHeaderRight model =
     , viewNavigationButtons
     ]
 
+-- | Error number in the header.
 viewErrorNumber :: Model -> View Model Action
 viewErrorNumber model =
   optionalChildren
