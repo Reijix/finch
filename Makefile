@@ -22,6 +22,9 @@ optim:
 serve: all
 	http-server public
 
+serve-quick: build optim
+	http-server public
+
 clean:
 	rm -rf dist-newstyle public docs haddocks
 
