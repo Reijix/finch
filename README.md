@@ -44,10 +44,10 @@ nix develop .
 
 ### Building
 
-Once inside the Nix shell, build the project with:
+After Nix is installed, the project can be built with:
 
 ```sh
-make
+nix develop . --command bash -c "make"
 ```
 
 The finished site lands in the `public/` directory.
@@ -60,17 +60,24 @@ make serve
 
 This builds the project and then serves `public/` using [http-server](https://github.com/http-party/http-server).
 
-### Running tests
-
-The test suite requires a regular GHC installation without WASM, this is also provided with Nix:
+### Generating and Deploying the Documentation
+Building the documentation requires a regular GHC installation without WASM, this is also provided using Nix:
 
 ```sh
 nix develop .#test
 ```
 
-Afterwards you can run the test suite with:
+To fully build and serve the app together with its documentation (which can be found in the sidebar of the website), run:
 
 ```sh
-make test
+nix develop .#test --command bash -c "make haddock"
+nix develop . --command bash -c "make serve"
 ```
 
+### Running Tests
+
+You can run the test suite with:
+
+```sh
+nix develop .#test --command bash -c "make test"
+```

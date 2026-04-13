@@ -95,6 +95,7 @@ unchanged.
 inRange :: (Int, Int) -> Int -> Bool
 inRange (start, end) n = n >= start && n <= end
 
+-- | Turns text into plural (by appending \'s\') when the second argument is not 1.
 plural :: Text -> Int -> Text
 plural txt 1 = txt
 plural txt n = txt <> "s"

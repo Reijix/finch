@@ -1,0 +1,56 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: main
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cachix
+        uses: cachix/cachix-action@v16
+        with:
+          name: haskell-miso-cachix
+
+      - name: Build using Nix
+        run: nix develop . --command bash -c "make" && nix-collect-garbage -d
+
+      - name: Test using Nix
+        run: nix develop .#test --command bash -c "make test"
+
+      - name: Build Documentation
+        run: nix develop .#test --command bash -c "make haddock"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./public
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    needs: build
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
