@@ -94,3 +94,7 @@ unchanged.
 -- | Returns whether the given integer lies inside the inclusive interval.
 inRange :: (Int, Int) -> Int -> Bool
 inRange (start, end) n = n >= start && n <= end
+
+plural :: Text -> Int -> Text
+plural txt 1 = txt
+plural txt n = txt <> "s"

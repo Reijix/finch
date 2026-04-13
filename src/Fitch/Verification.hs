@@ -50,7 +50,7 @@ import Fitch.Unification
 import Relude.Extra.Map
 import Relude.Extra.Newtype
 import Specification.Types
-import Util (allCombinations)
+import Util (allCombinations, plural)
 
 {- | Runs the full proof-verification pipeline on a t'Proof',
 adding error messages to erroneous t'RuleApplication's
@@ -203,9 +203,10 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                   <> show end
                   <> "\nshould have "
                   <> show (length fSpecs)
-                  <> " assumptions, but found "
+                  <> plural " assumption" (length fSpecs)
+                  <> ", but found "
                   <> show (length fs)
-                  <> " assumptions"
+                  <> plural " assumption" (length fs)
           | otherwise = do
               (_, fs'') <-
                 mapAccumM
@@ -220,49 +221,45 @@ verifyProof rules p = pMapLinesWithLineNo (const id) verifyRule p
                 map (\(ln, f, fspec) -> (ln, Left (f, fspec))) fs'' <> [(end, Right (c', cSpec'))]
     unifyReferences n (RuleSpec (_ : _) _ _) (ProofReference start end : refs) =
       Left $
-        "Error:\nrule ("
+        "Error:\nfound a reference to line range "
+            <> show start <> "-" <> show end <> ", but rule ("
           <> ruleName
-          <> ") expects a single line at position "
-          <> show n
-          <> ",\nbut found the range "
-          <> show start
-          <> "-"
-          <> show end
+          <> ") expects a single line at that position"
     unifyReferences n (RuleSpec _ (_ : _) _) (LineReference line : refs) =
       Left $
-        "Error:\nrule ("
+        "Error:\found a reference to line " <> show line <> ", but rule ("
           <> ruleName
-          <> ") expects a line range at position "
-          <> show n
-          <> ",\nbut found the single line "
-          <> show line
+          <> ") expects a line range at that position"
     unifyReferences n (RuleSpec (_ : fs) ps _) [] =
       Left $
         "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show (n + length fs + length ps + 1)
-          <> " references,\nbut found "
+          <> plural " reference" (n + length fs + length ps + 1)
+          <> ",\nbut found "
           <> show n
-          <> " references"
+          <> plural " reference" n
     unifyReferences n (RuleSpec [] (_ : ps) _) [] =
       Left $
         "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show (n + length ps + 1)
-          <> " references,\nbut found "
+          <> plural " reference" (n + length ps + 1)
+          <> ",\nbut found "
           <> show n
-          <> " references"
+          <> plural " reference" n
     unifyReferences n (RuleSpec [] [] _) (_ : refs) =
       Left $
         "Error:\nrule ("
           <> ruleName
           <> ") expects "
           <> show n
-          <> " references,\nbut found "
+          <> plural " reference" n
+          <> ",\nbut found "
           <> show (n + length refs + 1)
-          <> " references"
+          <> plural " reference" (n + length refs + 1)
     unifyReferences _ (RuleSpec [] [] _) [] = Right []
     ---------------------------------------------------
 
@@ -751,14 +748,12 @@ regenerateSymbols p =
                     <> show name
                     <> " has "
                     <> show (length args)
-                    <> " argument"
-                    <> (if length args == 1 then "" else "s")
+                    <> plural " argument" (length args)
                     <> ",\nbut in line "
                     <> show pos
                     <> " it appears with "
                     <> show expLen
-                    <> " argument"
-                    <> (if expLen == 1 then "" else "s")
+                    <> plural " argument" expLen
     -- proccesses a single formula.
     go ::
       Int ->
@@ -802,14 +797,12 @@ regenerateSymbols p =
                             <> name
                             <> " has "
                             <> show (length args)
-                            <> " argument"
-                            <> (if length args == 1 then "" else "s")
+                            <> plural " argument" (length args)
                             <> ",\nbut in line "
                             <> show pos
                             <> " it appears with "
                             <> show expLen
-                            <> " argument"
-                            <> (if expLen == 1 then "" else "s")
+                            <> plural " argument" expLen
                         )
                         formula
                     )
